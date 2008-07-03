@@ -1,0 +1,28 @@
+#
+# dateFormat = "%Y %b %d %H:%M:%S"
+# timeZone = "UTC"
+#
+# Calibration file for Paroscientific 202BG
+# coefficient (units)
+# U0 (usec)
+# Y1 (degC/usec)
+# Y2 (degC/usec^2)
+# Y3 (degC/usec^3)
+# C1 (kPag)
+# C2 (kPag/usec)
+# C3 (kPag/usec^2)
+# D1 ()
+# D2 (usec^-1)
+# T1 (usec)
+# T2 (usec/usec)
+# T3 (usec/usec^2)
+# T4 (usec/usec^3)
+# T5 (usec/usec^4)
+# a1 (kPa/kPa)
+# a2 (kPa/kPa^2)
+# b1 (kPa^-1)
+# P0 (kPa)
+
+# Calibration report 74198, May 5, 2008, for S/N 110232
+#                           U0      Y1          Y2          Y3  C1        C2        C3        D1        D2  T1        T2        T3        T4  T5  a1        a2         b1           P0
+2007 Mar 14 00:00:00     5.8284116  -3912.068   -11089.97   0.0 78.746708 -11.16794 -556.4539 0.029362 0.0 30.267685 2.5712979 47.396038 0.0 0.0 -0.0029851 6.9336e-6 -1.7503e-5    100
