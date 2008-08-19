@@ -1,0 +1,33 @@
+#
+# $Log: krypton1089,v $
+# Revision 1.3  2003/07/26 18:24:30  maclean
+# added SonicSeparation
+#
+# Revision 1.2  2003/01/13 19:34:36  maclean
+# changed julian day to MMM ddd
+#
+# Revision 1.1  1998/03/17  00:06:56  maclean
+# initial checkin
+#
+# Revision 1.1  1997/05/11  21:00:00  militzer
+# Initial revision
+#
+# Calibrations for Campbell Scientific Krypton Hygrometer serial number 1089
+# Rented from Campbell during CASES97
+#
+# Used by java CalFile class
+# dateFormat = "yyyy MMM dd HH:mm:ss"
+# timeZone = "GMT"
+#
+# A value of 0.0 for SonicSeparation likely means that it isn't available -
+# someone needs to re-visit the project info and make a determination.
+#
+#			Kw	Vo (mv)	X(cm)	Bias	SonicSeparation(cm)
+# CASES97, Calibration per Campbell Scientific
+# Note: these represent from the Campbell Cal Sheet Full Vapor Range
+#			g/m^3		Kw	XKw	Vo(mv)	X(cm)
+# Full Vapor Range: 1.93-19.57		-.142	-.14385  3038   1.01
+# Dry Vapor Range:  1.93- 9.31		-.145	-.14634  3080
+# Wet Vapor Range:  8.30-19.57		-.141	-.14265	 2984
+#
+1997 May 1 00:00:00	-0.142	3038	1.01	0.0	0.0
