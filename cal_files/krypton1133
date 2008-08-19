@@ -1,0 +1,115 @@
+#
+# $Log: krypton1133,v $
+# Revision 1.18  2007/02/23 05:13:29  maclean
+# CHATS kryptons
+#
+# Revision 1.17  2004/10/14 19:58:10  oncley
+# add HVAMS 30cm sep
+#
+# Revision 1.16  2004/06/11 18:09:45  maclean
+# added CME04 cals
+#
+# Revision 1.15  2004/01/10 06:14:38  maclean
+# added 22cm separation for DASH04
+#
+# Revision 1.14  2003/12/31 17:04:55  aster
+# pre-DASH04 cals
+#
+# Revision 1.13  2003/08/29 04:44:19  maclean
+# added HVAMS krypton cals
+#
+# Revision 1.12  2003/07/26 18:24:31  maclean
+# added SonicSeparation
+#
+# Revision 1.11  2003/02/09 06:20:47  maclean
+# *** empty log message ***
+#
+# Revision 1.10  2003/01/13 19:34:37  maclean
+# changed julian day to MMM ddd
+#
+# Revision 1.9  2002/08/07 17:28:19  maclean
+# added pre-NIWOT cal
+#
+# Revision 1.8  2002/06/06 11:37:52  maclean
+# IHOP cal
+#
+# Revision 1.7  2002/03/01 17:10:07  maclean
+# *** empty log message ***
+#
+# Revision 1.6  2000/10/12 21:05:56  maclean
+# added pre-ebex00 cal
+#
+# Revision 1.5  1999/10/28 22:34:57  maclean
+# CASES entry
+#
+# Revision 1.4  1998/08/06 17:58:31  maclean
+# Changed OASIS from FULL to WET VAPOR RANGE
+#
+# Revision 1.3  1998/06/11  20:35:26  maclean
+# Added entry for OASIS98
+#
+# Revision 1.2  1996/06/06  20:46:04  maclean
+# Added pre-FLATLAND96 cals
+#
+# Revision 1.1  1995/11/07  21:10:47  maclean
+# Initial revision
+#
+#
+# Calibrations for Campbell Scientific Krypton Hygrometer serial number 1133
+# This file only contains "clean" calibrations, since only the offset changes.
+#
+# A value of 0.0 for SonicSeparation likely means that it isn't available -
+# someone needs to re-visit the project info and make a determination.
+#
+# Used by java CalFile class
+# dateFormat = "yyyy MMM dd HH:mm:ss"
+# timeZone = "GMT"
+#			Kw	Vo (mv)	X(cm)	Bias	SonicSeparation(cm)
+#9/91: CSI (8/26/91)
+1991 Aug 26 00:00:00	-0.138	4870	1.354	0.0	0.0
+#
+#8/92: CSI (8/2/92, 8/13/92) 
+1992 Aug 13 00:00:00	-0.142	4126	1.353	0.0	0.0
+#
+#2/94: CSI new source (2/16/94)
+1994 Feb 16 00:00:00	-0.132	4903	1.205	0.0	0.0
+#
+#9/94: CSI K1101 new source (9/19/94, 9/30/94)
+1994 Sep 30 00:00:00	-0.124	4527	1.008	0.0	0.0
+#
+#11/94: NCAR
+1994 Nov  9 00:00:00	-0.126	5302	1.008	0.0	0.0
+#
+#2/95: K1133 Failed after PAMIII94
+#
+#3/95: CSI K1133 new det [middle  Microfronts95] (3/17/95)
+1995 Mar 16 00:00:00	-0.140	4359	1.449	0.0	0.0
+#
+#5/95: NCAR [post Microfronts95] (5/4/95), (5/9/95) (scaled during 5/9 run)
+1995 May  9 00:00:00	-0.183	5307	1.26	0.0	0.0
+#
+# Pre FLATLAND96 calibration, done in Thunder Scientific chamber
+1996 June 1 00:00:00	-0.142	2854	1.458	0.0	0.0
+# OASIS98, krypton at 4.5 m.  Scaled, WET VAPOR RANGE
+1998 June 1 00:00:00	-0.137	2431	1.434	0.0	0.0
+#
+# CASES99, calibration done at NCAR
+1999 Sep 15 00:00:00	-0.153	2886	1.434	0.0	0.0
+#
+# pre EBEX00, calibration done at NCAR, Jul 10, 2000
+2000 Jul 10 00:00:00	-0.145	5583	1.215	0.0	0.0
+#
+# pre-IHOP, calibration done at NCAR, Apr 16, 2002
+2002 Apr 16 00:00:00  -0.146  6252    1.215   0.0	30.0
+#
+# Niwot, calibration done at NCAR, July 2002
+2002 Aug  1 00:00:00	-0.149	5420	1.200	0.0	0.0
+# HVAMS03, calibration done at NCAR
+2003 Jul 1 00:00:00	-.154	1903	1.3	0.0	30.0
+# DASH04, calibration done at NCAR
+2003 Dec 30 00:00:00	-.178	2412.9	1.3	0.0	22.0
+# CME04, calibration done at NCAR
+2004 Jun 1 00:00:00	-.148	1174.8	1.3	0.0	0.0
+# CHATS
+2007 Feb  1 00:00:00    -0.15	3289.0	1.22     0.000	22.0
+2007 Feb 20 00:00:00    -0.15	5158.0	1.22     0.000	22.0

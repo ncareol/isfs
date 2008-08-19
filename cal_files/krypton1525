@@ -1,0 +1,22 @@
+#
+# Calibrations for Campbell Scientific Krypton Hygrometer serial number 1525
+# belonging to HAO.
+#
+# Used by java CalFile class
+# dateFormat = "yyyy MMM dd HH:mm:ss"
+# timeZone = "GMT"
+#
+# A value of 0.0 for SonicSeparation likely means that it isn't available -
+# someone needs to re-visit the project info and make a determination.
+#
+#			Kw	Vo (mv)	X(cm)	Bias	SonicSeparation(cm)
+# This is just a guess. Don't use for actual data!
+2004 Mar 23 00:00:00	-.150	2500.0	1.3	0.0	0.0
+# TREX
+2006 Feb 23 00:00:00    -.162   6556.4  1.3     0.0     31.0
+# MLO_CN2
+2006 Jun  9 00:00:00    -.147   2439.2  1.3     0.0     0.0 
+# METCRAX
+2006 Sep 24 00:00:00    -.147   2439.2  1.3     0.0     24.0 
+# CHATS
+2007 Feb 20 00:00:00    -0.15	3808.0	1.36     0.000	22.0

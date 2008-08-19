@@ -1,0 +1,86 @@
+#
+# Calibrations for Campbell Scientific Krypton Hygrometer serial number 1389
+# This file only contains "clean" calibrations, since only the offset changes.
+#
+# $Log: krypton1389,v $
+# Revision 1.15  2007/02/23 05:13:29  maclean
+# CHATS kryptons
+#
+# Revision 1.14  2004/06/11 18:09:45  maclean
+# added CME04 cals
+#
+# Revision 1.13  2004/01/10 06:14:38  maclean
+# added 22cm separation for DASH04
+#
+# Revision 1.12  2003/12/31 17:04:55  aster
+# pre-DASH04 cals
+#
+# Revision 1.11  2003/12/16 05:06:24  maclean
+# set FLOSSII sonic separation to 30cm
+#
+# Revision 1.10  2003/08/29 04:44:19  maclean
+# added HVAMS krypton cals
+#
+# Revision 1.9  2003/07/26 18:24:31  maclean
+# added SonicSeparation
+#
+# Revision 1.8  2003/02/09 06:20:47  maclean
+# *** empty log message ***
+#
+# Revision 1.7  2003/01/13 19:35:15  maclean
+# added java dateFormat
+#
+# Revision 1.6  2002/11/11 18:43:53  semmer
+# cals entered for FLOSS-II
+#
+# Revision 1.5  2002/08/07 17:28:20  maclean
+# added pre-NIWOT cal
+#
+# Revision 1.4  2002/06/06 11:37:52  maclean
+# IHOP cal
+#
+# Revision 1.3  2001/11/16 16:39:30  aster
+# New calibrations for FLOSS01
+#
+# Revision 1.2  2000/10/12 21:05:56  maclean
+# added pre-ebex00 cal
+#
+# Revision 1.1  1999/10/28 22:38:37  maclean
+# CASES99
+#
+# Used by java CalFile class
+# dateFormat = "yyyy MMM dd HH:mm:ss"
+# timeZone = "GMT"
+#
+# A value of 0.0 for SonicSeparation likely means that it isn't available -
+# someone needs to re-visit the project info and make a determination.
+#
+#			Kw	Vo (mv)	X(cm)	Bias	SonicSeparation(cm)
+# 25 Aug 99 pre-CASES99: CSI clean, full-range calibration
+#			
+1999 Sep 15 00:00:00	-0.147	5003	1.308	0.0	0.0
+#
+# pre EBEX00, calibration done at NCAR, Jul 7, 2000
+2000 Jul 7 00:00:00	-0.147	4823	1.308	0.0	0.0
+#
+# 14 Nov 01 FLOSS01: CSI clean, full range calibration
+#
+2001 Nov 14 00:00:00	-0.160	5052	1.308	0.0	0.0
+#
+# pre-IHOP: CSI clean, full range calibration 
+2002 apr 16 00:00:00  -0.145  4679    1.308   0.0	30.0
+#
+# Niwot, calibration done at NCAR, July 2002
+2002 Aug 1 00:00:00	-0.151	4239	1.302	0.0	0.0
+#
+# FLOSS-II, calibration done at NCAR, NOV 2002 path length incresed to 2.6
+2002 Nov 1 00:00:00	-.146	753.3	2.600	0.0	30.0
+# HVAMS03, calibration done at NCAR
+2003 Jul 1 00:00:00	-.146	2331	1.3	0.0	30.0
+# DASH04, calibration done at NCAR
+2003 Dec 30 00:00:00	-.178	3226.5	1.3	0.0	22.0
+# CME04, calibration done at NCAR
+2004 Jun 1 00:00:00	-.144	491.8	1.3	0.0	0.0
+# CHATS
+2007 Feb  1 00:00:00    -0.15	3160.0	1.28     0.000	22.0
+2007 Feb 20 00:00:00    -0.15	5158.0	1.28     0.000	22.0
