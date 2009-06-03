@@ -23,7 +23,7 @@
 # b1 (kPa^-1)
 # P0 (kPa)
 #
-# Calibration report 62770, for S/N 104887
+# Calibration report 62770, for S/N 104887 [original CHATS -- scrapped by Paro as of 21 Jan 2009, replaced by S/N 108964]
 # #
 # Pressure units were in PSI.  Converted units from psi to kPa (kpp=6.89476 kPa/psi)
 # C1=11.567802*kpp=79.75722
