@@ -1,0 +1,43 @@
+#
+# $Log: E26416.pyg,v $
+# Revision 1.4  2007/02/23 05:13:40  maclean
+# *** empty log message ***
+#
+# Revision 1.3  2003/02/20 17:00:23  maclean
+# added dateFormat
+#
+# Revision 1.2  2002/10/16 15:39:35  maclean
+# Added swcor from IHOP shadow tests
+#
+# Revision 1.1  2002/09/27 19:06:50  maclean
+# initial checkin
+#
+# Used by java CalFile class
+# dateFormat = "yyyy MMM dd HH:mm"
+# timeZone = "GMT"
+#
+# Calibration factors for Eppy pyrgeometer SN26416
+#
+#  c(uV/(W/m^2) is cal factor for conversion between thermopile microVolts
+#		and W/m^2
+#  k(unitless) is B value for dome&case correction.
+#  swcor: fraction (%) of shortwave radiation that should be removed
+#         from the long wave.  These are usually determined from a shadow
+#         test. 999 means unknown.
+#  
+# Date of NOAA cal     c	k	swcor
+#		    uV/(W/m^2)           (%)
+# 1999 Jan 27 00:00    3.472	2.6
+# 1999 jan 28 00:00    3.459	2.6
+# 1999 jan 29 00:00    3.597	2.5
+# Average the 3 above
+1999 jan 29 00:00    3.509	2.57	999
+#
+# Pre-IHOP cal
+# swcor from shadow test during IHOP
+2002 apr 03 00:00    3.438	2.9	0.9
+
+# Post-FLOSSII cal
+# c from NOAA cal 17-19 jun 03
+# B and swcor from shadow test on roof
+2003 may 12 00:00    3.390	2.4	0.9

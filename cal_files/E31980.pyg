@@ -1,0 +1,34 @@
+#
+# $Log: E31980.pyg,v $
+# Revision 1.3  2007/02/23 05:13:40  maclean
+# *** empty log message ***
+#
+# Revision 1.2  2003/02/20 17:00:25  maclean
+# added dateFormat
+#
+# Revision 1.1  2003/01/13 17:18:38  maclean
+# *** empty log message ***
+#
+# Used by java CalFile class
+# dateFormat = "yyyy MMM dd HH:mm"
+# timeZone = "GMT"
+#
+#
+# Calibration factors for Eppy pyrgeometer SN31980
+#
+#  c(uV/(W/m^2) is cal factor for conversion between thermopile microVolts
+#		and W/m^2
+#  k(unitless) is B value for dome&case correction.
+#  swcor: fraction (%) of shortwave radiation that should be removed
+#         from the long wave.  These are usually determined from a shadow
+#         test. 999 means unknown.
+#  
+# Date of NOAA cal     c	k	swcor
+#		    uV/(W/m^2)           (%)
+# Taken from CASES99 dpar.init.
+1999 sep 23 00:00     1.e37	3.90	999
+
+# Post-FLOSSII cal
+# c from NOAA cal 17-19 jun 03
+# B and swcor from shadow test on roof
+2003 may 12 00:00    3.516      1.9     1.2
