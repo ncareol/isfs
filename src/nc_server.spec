@@ -13,18 +13,26 @@ Vendor: UCAR
 BuildArch: i386 x86_64
 Source: %{name}-%{version}.tar.gz
 BuildRequires: nidas-x86-build netcdf-devel
-Requires: nidas
+Requires: nidas nc_server-devel netcdf
 %description
 Server for NetCDF file writing.
 
 %package devel
-Summary: nc_server headers
-Requires: nc_server
+Summary: nc_server library and header file
 Group: Applications/Engineering
 # Allow this package to be relocatable to other places than /opt/local/nidas/x86
 # rpm --relocate /opt/local/nidas/x86=/usr --relocate /opt/local/nidas/share=/usr/share
 %description devel
-nc_server headers
+nc_server library and header file
+
+%package auxprogs
+Summary: nc_server auxillary programs
+Group: Applications/Engineering
+Requires: nc_server-devel
+# Allow this package to be relocatable to other places than /opt/local/nidas/x86
+# rpm --relocate /opt/local/nidas/x86=/usr --relocate /opt/local/nidas/share=/usr/share
+%description auxprogs
+nc_server auxillary programs
 
 %prep
 %setup -n nc_server
@@ -45,15 +53,17 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 /usr/bin/nc_server
+
+%files auxprogs
 /usr/bin/nc_sync
 /usr/bin/nc_shutdown
 /usr/bin/nc_close
 /usr/bin/nc_check
-/usr/lib/libnc_server_rpc.so.*
 
 %files devel
 /usr/include/nc_server_rpc.h
-/usr/lib/libnc_server_rpc.so
+%_libdir/libnc_server_rpc.so.*
+%_libdir/libnc_server_rpc.so
 
 %changelog
 * Mon Jun  7 2010 Gordon Maclean <maclean@ucar.edu> 1.0-1
