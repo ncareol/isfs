@@ -10,9 +10,9 @@ Packager: Gordon Maclean <maclean@ucar.edu>
 # becomes RPM_BUILD_ROOT, except on newer versions of rpmbuild
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 Vendor: UCAR
-BuildArch: i386
+BuildArch: i386 x86_64
 Source: %{name}-%{version}.tar.gz
-BuildRequires: nidas-x86-build
+BuildRequires: nidas-x86-build netcdf-devel
 Requires: nidas
 %description
 Server for NetCDF file writing.
