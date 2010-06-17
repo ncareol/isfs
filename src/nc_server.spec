@@ -49,10 +49,11 @@ rm -rf $RPM_BUILD_ROOT
 /usr/bin/nc_shutdown
 /usr/bin/nc_close
 /usr/bin/nc_check
-/usr/lib/libnc_server_rpc.so
+/usr/lib/libnc_server_rpc.so.*
 
 %files devel
 /usr/include/nc_server_rpc.h
+/usr/lib/libnc_server_rpc.so
 
 %changelog
 * Mon Jun  7 2010 Gordon Maclean <maclean@ucar.edu> 1.0-1
