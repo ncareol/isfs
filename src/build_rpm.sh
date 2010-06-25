@@ -36,7 +36,10 @@ pkg=nc_server
 if [ $dopkg == all -o $dopkg == $pkg ];then
     version=`get_version ${pkg}.spec`
     # tar czf $topdir/SOURCES/${pkg}-${version}.tar.gz --exclude .svn -C ../../.. --transform="s/^nidas/nidas-bin/" nidas/src/SConstruct nidas/src/nidas nidas/src/site_scons nidas/xml
-    tar czf $topdir/SOURCES/${pkg}-${version}.tar.gz --exclude .svn ${pkg}/SConstruct ${pkg}/nc_server.h ${pkg}/nc_server.cc ${pkg}/nc_server_rpc.x ${pkg}/nc_server_rpc_procs.cc ${pkg}/nc_check.c ${pkg}/nc_close.cc ${pkg}/nc_shutdown.cc ${pkg}/nc_sync.cc
+    tar czf $topdir/SOURCES/${pkg}-${version}.tar.gz --exclude .svn \
+        ${pkg}/SConstruct ${pkg}/nc_server.h ${pkg}/nc_server.cc ${pkg}/nc_server_rpc.x \
+        ${pkg}/nc_server_rpc_procs.cc ${pkg}/nc_check.c ${pkg}/nc_close.cc ${pkg}/nc_shutdown.cc \
+        ${pkg}/nc_sync.cc ${pkg}/site_scons
     rpmbuild -v -ba ${pkg}.spec | tee -a $log  || exit $?
 fi
 

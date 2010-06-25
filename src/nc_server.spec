@@ -23,7 +23,7 @@ Group: Applications/Engineering
 # Allow this package to be relocatable to other places than /opt/local/nidas/x86
 # rpm --relocate /opt/local/nidas/x86=/usr --relocate /opt/local/nidas/share=/usr/share
 %description devel
-nc_server library and header file
+libnc_server_rpc.so library and header file
 
 %package auxprogs
 Summary: nc_server auxillary programs
