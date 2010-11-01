@@ -39,13 +39,13 @@ if [ $dopkg == all -o $dopkg == $pkg ];then
     tar czf $topdir/SOURCES/${pkg}-${version}.tar.gz --exclude .svn \
         ${pkg}/SConstruct ${pkg}/nc_server.h ${pkg}/nc_server.cc ${pkg}/nc_server_rpc.x \
         ${pkg}/nc_server_rpc_procs.cc ${pkg}/nc_check.c ${pkg}/nc_close.cc ${pkg}/nc_shutdown.cc \
-        ${pkg}/nc_sync.cc ${pkg}/site_scons
+        ${pkg}/nc_sync.cc ${pkg}/site_scons ${pkg}/scripts
     rpmbuild -v -ba ${pkg}.spec | tee -a $log  || exit $?
 fi
 
 echo "RPMS:"
 egrep "^Wrote:" $log
-rpms=`egrep '^Wrote:' $log | egrep /RPMS/ | awk '{print $2}'`
+rpms=`egrep '^Wrote:' $log | egrep /S?RPMS/ | awk '{print $2}'`
 echo "rpms=$rpms"
 
 if $install && [ -d $rroot ]; then
