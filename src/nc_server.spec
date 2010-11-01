@@ -44,6 +44,7 @@ scons PREFIX=${RPM_BUILD_ROOT}/usr
 %install
 rm -rf $RPM_BUILD_ROOT
 scons PREFIX=${RPM_BUILD_ROOT}/usr install
+cp scripts/* ${RPM_BUILD_ROOT}/usr/bin
 
 %post
 ldconfig
@@ -59,6 +60,8 @@ rm -rf $RPM_BUILD_ROOT
 /usr/bin/nc_shutdown
 /usr/bin/nc_close
 /usr/bin/nc_check
+/usr/bin/nc_ping
+/usr/bin/nc_server.check
 
 %files devel
 /usr/include/nc_server_rpc.h
