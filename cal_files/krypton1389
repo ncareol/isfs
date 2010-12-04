@@ -84,8 +84,6 @@
 # CHATS
 2007 Feb  1 00:00:00    -0.150	3160.0	1.28     0.000	22.0
 2007 Feb 20 00:00:00    -0.150	5158.0	1.28     0.000	22.0
-#PCAPS 
-2010 Sep 10 00:00:00    nan     nan     nan     nan     nan
-2010 Dec 1  14:30:00    -0.17   5804.4  1.359    0.0     22.0
-
-
+# PCAPS Where is first cal?
+# second PCAPS calibration with shorter path length
+2010 Nov 30 00:00:00    -0.17   5804.4  1.359    0.0     22.0
