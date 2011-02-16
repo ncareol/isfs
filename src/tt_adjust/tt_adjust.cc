@@ -17,16 +17,19 @@
  by doing a least squares fit to the linear relationship between x=record number
  and y=timetag.
 
- If the input data has been sorted, and the original timetags were bad enough
- such that the sequence of samples from a sensor were re-ordered, then this
- algorithm does not fix that issue, except in the case of samples from a
- CSAT3 sonic, which contain an internal sequence number, 0-63. If the
+ If the input data has been sorted after it was sampled and time tagged,
+ and the original timetags were bad enough such that the sequence of
+ samples from a sensor were re-ordered, then this algorithm does not
+ fix that issue, except in the case of samples from a CSAT3 sonic,
+ which contain an internal sequence number, 0-63. If the
  CSAT3 samples were not re-ordered by more than 32 samples, then it is 
  straightforward to use the sequence number to determine the original
- sample sequence, generate the timetags from the least squares fit.
+ sample sequence and generate the timetags from the least squares fit.
 */
 
+#define HAS_BZLIB_H
 #include <nidas/core/FileSet.h>
+#include <nidas/core/Bzip2FileSet.h>
 #include <nidas/dynld/RawSampleInputStream.h>
 #include <nidas/dynld/RawSampleOutputStream.h>
 #include <nidas/util/EOFException.h>
@@ -40,9 +43,10 @@ namespace n_u = nidas::util;
 /**
  * Least squares fitting code taken from GNU Scientific Library (gsl),
  * function gsl_fit_linear.  That function computes the fit in one call,
- * if passed x and y input arguments of continuous double arrays. In order
- * to avoid creating the x and y arrays, we split the function into several
- * passes, using a struct to pass the results of the sums:
+ * if passed x and y input arguments of double arrays. In order
+ * to avoid creating separate x and y arrays, and instead add x,y values
+ * to the sums as they are determined, we split the function into several
+ * passes, using a struct to hold the results of the sums:
  *
  * initialize the gsl_fit_sums structure.
  * gsl_fit_init(struct gsl_fit_sums*)
@@ -133,13 +137,34 @@ int get_csat_seq(const Sample* samp)
     // check for correct termination bytes
     if (dptr[inlen-2] != '\x55' || dptr[inlen-1] != '\xaa') return -1;
 
-    unsigned short diag = ((const unsigned short*) dptr)[4];
-    return (diag & 0x003f);
+    return (dptr[8] & 0x3f);
 }
 
 class TT_Adjust
 {
 public:
+
+    /** information to save with each data sample */
+    struct samp_save {
+        const Sample* samp;
+
+        /** sequence number 0-63 found in CSAT3 sample */
+        int seq;
+
+        /**
+         * Sample number for a given sensor, used to
+         * as the x value in the fit of sample timetags.
+         * Reset to 0 at the beginning of each fit period.
+         */
+        size_t sampleNumber;
+
+        /**
+         * sample number from its DSM
+         */
+        size_t dsmSampleNumber;
+
+        samp_save() : samp(0),seq(0),sampleNumber(0),dsmSampleNumber(0) {}
+    };
 
     TT_Adjust();
 
@@ -155,13 +180,34 @@ public:
 
     static int usage(const char* argv0);
 
-    void do_fit(dsm_sample_id_t id,size_t* n,double* a, double* b,
-        double* cov_00, double* cov_01, double* cov_11, double* sumsq);
+    void do_fit(list<samp_save>& samps,gsl_fit_sums& sums,
+            size_t* n,double* a, double* b,
+            double* cov_00, double* cov_01, double* cov_11, double* sumsq);
 
-    // void free_samps(dsm_sample_id_t id);
+    /**
+     * Do a linear least squares fit of record number to CSAT3 timetags,
+     * output the newly timetagged samples.
+     */
+    void csat_fit_output(SampleClient&);
 
-    void write_samps(dsm_sample_id_t id,
-        SampleClient& out,double a, double b);
+    /**
+     * Do a linear least squares fit of record number to timetags of a fixed
+     * rate sensor, output the newly timetagged samples.
+     */
+    void fixed_fit_output(SampleClient&);
+
+    /**
+     * Adjust the timetags on a list of samples, using the coefficients
+     * of the least squares fit, and send them to a SampleClient,
+     */
+    void write_samps(list<samp_save>& samps,SampleClient& out,
+            double a, double b,int* maxnegp, int* maxposp);
+
+    /**
+     * Output the other sensors that haven't been designated as CSAT3 or fixed
+     * rate, using the adjusted time tags of the CSAT and fixed rate sensors.
+     */
+    void output_other(SampleClient& out, int* maxnegp, int* maxposp);
 
 private:
 
@@ -175,26 +221,71 @@ private:
 
     int _outputFileLength;
 
+    /**
+     * Rate of CSAT3 sonics.
+     */
     double _csatRate;
 
+    /**
+     * Parsed from the runstring, the ids of the CSAT3s and their rates.
+     */
     map<dsm_sample_id_t,double> _csatRates;
 
-    map<dsm_sample_id_t,double> _otherRates;
+    /**
+     * Parsed from the runstring, the ids and rates of the fixed rate sensors.
+     */
+    map<dsm_sample_id_t,double> _fixedRates;
 
-    /** information to save with each CSAT3 data sample */
-    struct csat_save {
-        const Sample* samp;
-        /** sequence number 0-63 found in CSAT3 sample */
-        int seq;
-        /** sample number for a given CSAT3 in the input */
-        size_t snum;
-        csat_save() : samp(0),seq(0),snum(0) {}
+    /**
+     * information to save with each CSAT3 data sample
+     * */
+    map<dsm_sample_id_t, list<samp_save> > _csat_samples;
+
+    /** 
+     * least squares sums for each CSAT3
+     */
+    map<dsm_sample_id_t, gsl_fit_sums> _csat_sums;
+
+    /**
+     * information to save with each non-CSAT3 data sample with a fixed rate
+     */
+    map<dsm_sample_id_t, list<samp_save> > _fixed_rate_samples;
+
+    /**
+     * least squares sums for each non-CSAT3 with a fixed rate
+     */
+    map<dsm_sample_id_t, gsl_fit_sums> _fixed_sums;
+
+    /**
+     * The list of other samples to be output after the fits of CSAT3 and other fixed
+     * rate sensors.
+     */
+    list<samp_save> _other_samples;
+
+    /**
+     * counter of current sample number of each dsm.
+     */
+    map<unsigned int, size_t> _dsmSampleNumbers;
+
+    /**
+     * Comparator class for a set of record number,time tag pairs, sorting
+     * on the record number.
+     */
+    class SequenceComparator {
+    public:
+        /**
+         * return true if x is less than y.
+         */
+        bool operator() (const pair<size_t,dsm_time_t>& x,
+                const pair<size_t,dsm_time_t>& y) const {
+            return x.first < y.first;
+        }
     };
 
-    map<dsm_sample_id_t, list<csat_save> > _csat_samples;
-
-    /** least squares sums for each CSAT3 */
-    map<dsm_sample_id_t, gsl_fit_sums> _csat_sums;
+    /**
+     * Sequence of record number and time tags for each dsm.
+     */
+    map<unsigned int, set<pair<size_t,dsm_time_t>,SequenceComparator> > _dsmSequences;
 
 };
 
@@ -243,8 +334,6 @@ int TT_Adjust::parseRunstring(int argc, char** argv)
                 dsm_sample_id_t id = 0;
                 id = SET_DSM_ID(id,dsmid);
                 id = SET_SHORT_ID(id,sensorid);
-                cerr << "dsmid=" << dsmid << " sensorid=" << sensorid <<
-                    " rate=" << rate << endl;
                 _csatRates[id] = rate;
             }
             break;
@@ -280,7 +369,7 @@ int TT_Adjust::parseRunstring(int argc, char** argv)
                 id = SET_DSM_ID(id,dsmid);
                 id = SET_SHORT_ID(id,sensorid);
 
-                _otherRates[id] = rate;
+                _fixedRates[id] = rate;
             }
             break;
 	case '?':
@@ -292,7 +381,7 @@ int TT_Adjust::parseRunstring(int argc, char** argv)
     for ( ; optind < argc; optind++) _inputFileNames.push_back(argv[optind]);
     if (_inputFileNames.size() == 0) return usage(argv[0]);
 
-    // set unspecified rates to default
+    // set unspecified csat rates to default
     map<dsm_sample_id_t,double>::iterator ci = _csatRates.begin();
     for ( ; ci != _csatRates.end(); ++ci) {
         pair<const dsm_sample_id_t,double>& p = *ci;
@@ -367,48 +456,44 @@ void TT_Adjust::setupSignals()
     sigaction(SIGTERM,&act,(struct sigaction *)0);
 }
 
-void TT_Adjust::do_fit(dsm_sample_id_t id,size_t* np, double* a, double* b,
+void TT_Adjust::do_fit(list<samp_save>& samps,gsl_fit_sums& sums,
+        size_t* np, double* a, double* b,
         double* cov_00, double* cov_01, double* cov_11, double* sumsq)
 {
-
-    size_t n = _csat_sums[id].n;
+    size_t n = sums.n;
 
     if (n > 0) {
-        gsl_fit_linear_compute(&_csat_sums[id],a,b);
+        gsl_fit_linear_compute(&sums,a,b);
 
-        list<csat_save>& samps = _csat_samples[id];
-        list<csat_save>::const_iterator si = samps.begin();
-
-        dsm_time_t tt0 =  samps.front().samp->getTimeTag();
+        list<samp_save>::const_iterator si = samps.begin();
+        dsm_time_t tt0 =  si->samp->getTimeTag();
 
         for ( ; si != samps.end(); ++si) {
-            const csat_save& save = *si;
+            const samp_save& save = *si;
             const Sample* samp = save.samp;
-            gsl_fit_linear_add_resid((double)save.snum,
-                    (double)samp->getTimeTag() - tt0,&_csat_sums[id]);
+            gsl_fit_linear_add_resid((double)save.sampleNumber,
+                    (double)samp->getTimeTag() - tt0,&sums);
         }
 
-        gsl_fit_linear_compute_resid(&_csat_sums[id],
-                cov_00, cov_01, cov_11, sumsq);
+        gsl_fit_linear_compute_resid(&sums,cov_00, cov_01, cov_11, sumsq);
     }
+    sums.zero();      // we're done, zero the sums
     *np = n;
 }
 
-void TT_Adjust::write_samps(dsm_sample_id_t id,
-        SampleClient& out,double a, double b)
+void TT_Adjust::write_samps(list<samp_save>& samps, SampleClient& out,
+        double a, double b,int* maxnegp, int* maxposp)
 {
-    list<csat_save>& samps = _csat_samples[id];
-    list<csat_save>::iterator si = samps.begin();
-
-    dsm_time_t tt0 =  samps.front().samp->getTimeTag();
     int maxneg = 0;
     int maxpos = 0;
 
+    list<samp_save>::iterator si = samps.begin();
+    dsm_time_t tt0 =  si->samp->getTimeTag();
     for ( ; si != samps.end(); ++si) {
-        csat_save& save = *si;
+        samp_save& save = *si;
         Sample* samp = const_cast<Sample*>(save.samp);
 
-        dsm_time_t newtt = tt0 + (dsm_time_t) (a + save.snum * b + 0.5);
+        dsm_time_t newtt = tt0 + (dsm_time_t) (a + save.sampleNumber * b + 0.5);
         int dt = newtt - samp->getTimeTag();
 
         if (dt < 0) maxneg = std::min(dt,maxneg);
@@ -416,13 +501,133 @@ void TT_Adjust::write_samps(dsm_sample_id_t id,
 
         samp->setTimeTag(newtt);
         out.receive(samp);
+
+        unsigned int dsmid = samp->getDSMId();
+        _dsmSequences[dsmid].insert(make_pair<size_t,dsm_time_t>(save.dsmSampleNumber,newtt));
+
         samp->freeReference();
     }
     samps.clear();
-    _csat_sums[id].zero();      // zero the sums
+    *maxnegp = maxneg;
+    *maxposp = maxpos;
+}
 
-    cerr << GET_DSM_ID(id) << ',' << GET_SPS_ID(id) << ": " <<
-            "maxneg=" << maxneg << " maxpos=" << maxpos << endl;
+void TT_Adjust::output_other(SampleClient& out, int* maxnegp, int* maxposp)
+{
+    int maxneg = 0;
+    int maxpos = 0;
+
+    list<samp_save>::iterator si = _other_samples.begin();
+    for ( ; si != _other_samples.end(); ++si) {
+        samp_save& save = *si;
+        Sample* samp = const_cast<Sample*>(save.samp);
+        unsigned int dsmid = samp->getDSMId();
+
+        set<pair<size_t,dsm_time_t>,SequenceComparator>& seq = _dsmSequences[dsmid];
+
+        dsm_time_t tt = samp->getTimeTag();
+        if (seq.size() > 0) {
+            // create a key containing the sample number
+            pair<size_t,dsm_time_t> p(save.dsmSampleNumber,0);
+
+            // find iterator pointing to first element > key, giving us the
+            // timetag of the sample with record number > save.dsmSampleNumber.
+            set<pair<size_t,dsm_time_t>,SequenceComparator>::const_iterator i1 = seq.upper_bound(p);
+
+            // extrapolate backwards if first element is > key
+            if (i1 == seq.begin()) ++i1;   
+
+            set<pair<size_t,dsm_time_t>,SequenceComparator>::const_iterator i0 = i1;
+            // since size() > 0, i0 is a valid iterator after this decrement
+            --i0;
+
+            if (i1 != seq.end()) {
+                // leave timetag alone if it is found between times of the neighboring records
+                if (tt < i0->second || tt > i1->second) {
+                    tt = i0->second +
+                        (i1->second - i0->second) / (signed)(i1->first - i0->first) *
+                        (signed)(save.dsmSampleNumber - i0->first);
+#ifdef DEBUG
+                    cerr << samp->getDSMId() << ',' << samp->getSpSId() << ": " <<
+                        save.dsmSampleNumber << ',' << samp->getTimeTag() << 
+                        ", i0=" << i0->first << ',' << i0->second <<
+                        ", i1=" << i1->first << ',' << i1->second <<
+                        ", newtt=" << tt <<
+                        ", recdiff = " << i1->first - i0->first << 
+                        ", timediff = " << i1->second - i0->second <<
+                        ", recdiff = " << save.dsmSampleNumber - i0->first << endl;
+#endif
+                }
+            }
+        }
+
+        int dt = tt - samp->getTimeTag();
+
+        if (dt < 0) maxneg = std::min(dt,maxneg);
+        else if (dt > 0) maxpos = std::max(dt,maxpos);
+
+        samp->setTimeTag(tt);
+        out.receive(samp);
+        samp->freeReference();
+    }
+    _other_samples.clear();
+    _dsmSequences.clear();
+    *maxnegp = maxneg;
+    *maxposp = maxpos;
+}
+
+void TT_Adjust::csat_fit_output(SampleClient& sorter)
+{
+    map<dsm_sample_id_t,double>::const_iterator ci = _csatRates.begin();
+    for ( ; ci != _csatRates.end(); ++ci) {
+        const pair<dsm_sample_id_t,double>& p = *ci;
+        dsm_sample_id_t id = p.first;
+
+        size_t n;
+        double a,b; /* y = a + b * x */
+        double cov_00, cov_01, cov_11, sumsq;
+
+        list<samp_save>& samps = _csat_samples[id];
+        gsl_fit_sums& sums = _csat_sums[id];
+
+        do_fit(samps,sums,&n,&a,&b,&cov_00,&cov_01,&cov_11,&sumsq);
+        if (n > 0) {
+            int maxneg,maxpos;
+            write_samps(samps,sorter,a,b,&maxneg,&maxpos);
+            cerr << GET_DSM_ID(id) << ',' << GET_SPS_ID(id) << ": " <<
+                "n=" << n << ", a=" << a << " b=" << b <<
+                " sumsq=" << sumsq <<
+                " sd=" << sqrt(sumsq / (n-2.0)) <<
+                " maxneg=" << maxneg << " maxpos=" << maxpos << endl;
+        }
+    }
+}
+
+void TT_Adjust::fixed_fit_output(SampleClient& sorter)
+{
+    map<dsm_sample_id_t,double>::const_iterator ci = _fixedRates.begin();
+    for ( ; ci != _fixedRates.end(); ++ci) {
+        const pair<dsm_sample_id_t,double>& p = *ci;
+        dsm_sample_id_t id = p.first;
+
+        size_t n;
+        double a,b; /* y = a + b * x */
+        double cov_00, cov_01, cov_11, sumsq;
+
+        list<samp_save>& samps = _fixed_rate_samples[id];
+        gsl_fit_sums& sums = _fixed_sums[id];
+
+        do_fit(samps,sums,&n,&a,&b,&cov_00,&cov_01,&cov_11,&sumsq);
+        if (n > 0) {
+            int maxneg,maxpos;
+            write_samps(samps,sorter,a,b,&maxneg,&maxpos);
+            cerr << GET_DSM_ID(id) << ',' << GET_SPS_ID(id) << ": " <<
+                "n=" << n << ", a=" << a << " b=" << b <<
+                " sumsq=" << sumsq <<
+                " sd=" << sqrt(sumsq / (n-2.0)) <<
+                " maxneg=" << maxneg << " maxpos=" << maxpos << endl;
+        }
+    }
 }
 
 int TT_Adjust::run() throw()
@@ -430,11 +635,9 @@ int TT_Adjust::run() throw()
 
     try {
 	nidas::core::FileSet* outSet = 0;
-#ifdef HAS_BZLIB_H
-        if (outputFileName.find(".bz2") != string::npos)
+        if (_outputFileName.find(".bz2") != string::npos)
             outSet = new nidas::core::Bzip2FileSet();
         else
-#endif
             outSet = new nidas::core::FileSet();
 
 	outSet->setFileName(_outputFileName);
@@ -453,108 +656,160 @@ int TT_Adjust::run() throw()
 
         // SampleInputStream owns the fset ptr.
         RawSampleInputStream input(fset);
+
         for (;;) {
-
             Sample* samp;
-
             try {
                 samp = input.readSample();
             }
             catch(const n_u::EOFException& e) {
-                map<dsm_sample_id_t,double>::const_iterator ci = _csatRates.begin();
-                for ( ; ci != _csatRates.end(); ++ci) {
-                    const pair<dsm_sample_id_t,double>& p = *ci;
-                    dsm_sample_id_t id = p.first;
-
-                    size_t n;
-                    double a,b; /* y = a + b * x */
-                    double cov_00, cov_01, cov_11, sumsq;
-
-                    do_fit(id,&n,&a,&b,&cov_00,&cov_01,&cov_11,&sumsq);
-                    write_samps(id,sorter,a,b);
-                }
-                sorter.finish();
-                outStream.close();
                 break;
             }
             if (_interrupted) break;
 
             dsm_time_t tt = samp->getTimeTag();
-
             if (tt > endTime) {
-                map<dsm_sample_id_t,double>::const_iterator ci = _csatRates.begin();
-                for ( ; ci != _csatRates.end(); ++ci) {
-                    const pair<dsm_sample_id_t,double>& p = *ci;
-                    dsm_sample_id_t id = p.first;
-
-                    size_t n;
-                    double a,b; /* y = a + b * x */
-                    double cov_00, cov_01, cov_11, sumsq;
-
-                    do_fit(id,&n,&a,&b,&cov_00,&cov_01,&cov_11,&sumsq);
-                    if (n > 0) {
-                        cerr << GET_DSM_ID(id) << ',' << GET_SPS_ID(id) << ": " <<
-                                "n=" << n << ", a=" << a << " b=" << b <<
-                                " sumsq=" << sumsq <<
-                                " sd=" << sqrt(sumsq / (n-2.0)) << endl;
-                        write_samps(id,sorter,a,b);
-                    }
-                }
+                csat_fit_output(sorter);
+                fixed_fit_output(sorter);
+                int maxneg,maxpos;
+                output_other(sorter,&maxneg,&maxpos);
+                cerr << "output other, maxneg=" << maxneg << " maxpos=" << maxpos << endl;
                 endTime = tt + _fitUsecs - (tt % _fitUsecs);
                 // cerr << "tt=" << tt << " endTime=" << endTime << endl;
             }
 
-            dsm_sample_id_t id = samp->getId();
+            dsm_sample_id_t inid = samp->getId();
+            _dsmSampleNumbers[GET_DSM_ID(inid)]++;
 
-            if (_csatRates.find(id) != _csatRates.end()) {
+            if (_csatRates.find(inid) != _csatRates.end()) {
 
                 int cseq = get_csat_seq(samp);
                 if (cseq >= 0) {
 
-                    list<csat_save>& samps = _csat_samples[id];
-                    dsm_time_t ttx = 0;
-                    size_t snum = 0;
+                    list<samp_save>& samps = _csat_samples[inid];
+                    gsl_fit_sums& sums = _csat_sums[inid];
+
+                    size_t sampleNumber = 0;        // x value in fit
+                    dsm_time_t ttx = 0;             // y value in fit
 
                     if (samps.size() > 0) {
 
-                        struct csat_save& last_csat = samps.back();
+                        struct samp_save& last_csat = samps.back();
                         const Sample* last = last_csat.samp;
+
+                        int sampleDt = USECS_PER_SEC / _csatRates[inid];
+
+                        int dseq = cseq - last_csat.seq;
+                        if (dseq < -32) dseq += 64;
+                        else if (dseq >  32) dseq -= 64;
 
                         int dt = tt - last->getTimeTag();
 
-                        int DELTAT_MAX = 5 * USECS_PER_SEC;
-                        if (dt >= DELTAT_MAX) {
+                        bool newfit = true;
+
+                        // Try to screen ridiculous pairs of dseq and dt here.
+                        // dseq=0 is a wierd value, same as 64
+                        // It is hard to screen values without looking ahead.
+                        // Need to screen values after the fit.
+                        // Any way to estimate a weight for a clock value?
+
+                        if (dseq != 0 && abs(dseq) < 32 && abs(dt) < 64 * sampleDt)
+                                newfit = false;
+                        // cerr << "dseq=" << dseq << " dt=" << dt << " sampleDt=" << sampleDt << endl;
+                        if (newfit) {
                             size_t n;
                             double a,b; /* y = a + b * x */
                             double cov_00, cov_01, cov_11, sumsq;
-                            do_fit(id,&n,&a,&b,&cov_00,&cov_01,&cov_11,&sumsq);
+
+                            do_fit(samps,sums,&n,&a,&b,&cov_00,&cov_01,&cov_11,&sumsq);
                             if (n > 0) {
-                                cerr << GET_DSM_ID(id) << ',' << GET_SPS_ID(id) << ": " <<
+                                int maxneg,maxpos;
+                                write_samps(samps,sorter,a,b,&maxneg,&maxpos);
+                                cerr << GET_DSM_ID(inid) << ',' << GET_SPS_ID(inid) << ": " <<
                                         "n=" << n << ", a=" << a << " b=" << b <<
                                         " sumsq=" << sumsq <<
-                                        " sd=" << sqrt(sumsq / (n-2.0)) << endl;
-                                write_samps(id,sorter,a,b);
+                                        " sd=" << sqrt(sumsq / (n-2.0)) <<
+                                        " maxneg=" << maxneg << " maxpos=" << maxpos << endl;
                             }
                         }
                         else {
-                            int dseq = cseq - last_csat.seq;
-                            if (dseq < -32) dseq += 64;
-                            snum = last_csat.snum + dseq;
+                            sampleNumber = last_csat.sampleNumber + dseq;
                             ttx =  tt - samps.front().samp->getTimeTag();
                         }
                     }
 
-                    struct csat_save csat;
+                    struct samp_save csat;
                     csat.samp = samp;
                     csat.seq = cseq;
-                    csat.snum = snum;
+                    csat.sampleNumber = sampleNumber;
+                    csat.dsmSampleNumber = _dsmSampleNumbers[GET_DSM_ID(inid)];
                     samps.push_back(csat);
 
-                    // cerr << "ttx=" << ttx << " snum=" << snum << " cseq=" << cseq << endl;
-                    gsl_fit_linear_add_point((double)snum,(double)ttx, &_csat_sums[id]);
+                    // cerr << "ttx=" << ttx << " sampleNumber=" << sampleNumber << " cseq=" << cseq << endl;
+                    gsl_fit_linear_add_point((double)sampleNumber,(double)ttx, &sums);
                 }
             }
+            else if (_fixedRates.find(inid) != _fixedRates.end()) {
+
+                list<samp_save>& samps = _fixed_rate_samples[inid];
+                gsl_fit_sums& sums = _fixed_sums[inid];
+
+                dsm_time_t ttx = 0;
+                size_t sampleNumber = 0;
+
+                if (samps.size() > 0) {
+
+                    struct samp_save& last_samp = samps.back();
+                    const Sample* last = last_samp.samp;
+
+                    int dt = tt - last->getTimeTag();
+
+                    int DELTAT_MAX = 100 * USECS_PER_SEC / _fixedRates[inid];
+                    if (dt >= DELTAT_MAX) {
+                        size_t n;
+                        double a,b; /* y = a + b * x */
+                        double cov_00, cov_01, cov_11, sumsq;
+
+                        do_fit(samps,sums,&n,&a,&b,&cov_00,&cov_01,&cov_11,&sumsq);
+                        if (n > 0) {
+                            int maxneg,maxpos;
+                            write_samps(samps,sorter,a,b,&maxneg,&maxpos);
+                            cerr << GET_DSM_ID(inid) << ',' << GET_SPS_ID(inid) << ": " <<
+                                    "n=" << n << ", a=" << a << " b=" << b <<
+                                    " sumsq=" << sumsq <<
+                                    " sd=" << sqrt(sumsq / (n-2.0)) <<
+                                    " maxneg=" << maxneg << " maxpos=" << maxpos << endl;
+                        }
+                    }
+                    else {
+                        sampleNumber = last_samp.sampleNumber + 1;
+                        ttx =  tt - samps.front().samp->getTimeTag();
+                    }
+                }
+
+                struct samp_save save;
+                save.samp = samp;
+                save.sampleNumber = sampleNumber;
+                save.dsmSampleNumber = _dsmSampleNumbers[GET_DSM_ID(inid)];
+                samps.push_back(save);
+
+                // cerr << "ttx=" << ttx << " sampleNumber=" << sampleNumber << " cseq=" << cseq << endl;
+                gsl_fit_linear_add_point((double)sampleNumber,(double)ttx, &sums);
+            }
+            else {
+                struct samp_save save;
+                save.samp = samp;
+                save.dsmSampleNumber = _dsmSampleNumbers[GET_DSM_ID(inid)];
+                _other_samples.push_back(save);
+            }
         }
+        csat_fit_output(sorter);
+        fixed_fit_output(sorter);
+        int maxneg,maxpos;
+        output_other(sorter,&maxneg,&maxpos);
+        cerr << "output other, maxneg=" << maxneg << " maxpos=" << maxpos << endl;
+        sorter.finish();
+        outStream.close();
     }
     catch (n_u::IOException& ioe) {
         cerr << ioe.what() << endl;
