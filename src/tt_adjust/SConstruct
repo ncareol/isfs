@@ -1,11 +1,12 @@
 
 env = Environment(platform = 'posix').Clone(tools=['sharedlibrary'])
 
-p1 = env.Program("tt_adjust", "tt_adjust.cc",
+p1 = env.Program("tt_adjust", ["tt_adjust.cc","gsl.cc"],
     LIBS=["nidas_util","nidas","nidas_dynld"],
     LIBPATH=["/opt/local/nidas/x86/" + env["LIBDIR"],"."],
-    CPPPATH="/opt/local/nidas/x86/include")
-#     CXXFLAGS=['-g','-pg'],LINKFLAGS="-pg")
+    CPPPATH="/opt/local/nidas/x86/include",
+    CXXFLAGS=['-g','-Wall'])
+#     CXXFLAGS=['-g','-pg','-Wall'],LINKFLAGS="-pg")
 
 env.Install('$PREFIX/bin',[p1])
 env.Alias('install', [ '$PREFIX/bin' ])

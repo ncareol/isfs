@@ -28,6 +28,7 @@
 
 #include <iomanip>
 #include <limits>
+#include <math.h>
 
 using namespace nidas::core;
 using namespace nidas::dynld;
@@ -42,121 +43,131 @@ string formatId(dsm_sample_id_t id)
     return ost.str();
 }
 
-string formatTime(dsm_time_t tt)
+string formatTime(dsm_time_t tt,bool terse=false)
 {
+    if (terse) return n_u::UTime(tt).format(true,"%H:%M:%S.%3f");
     return n_u::UTime(tt).format(true,"%Y %m %d %H:%M:%S.%3f");
 }
 
 /*
- * Least squares fitting code taken from GNU Scientific Library (gsl),
- * function gsl_fit_linear.  That function computes the fit in one call,
- * if passed x and y input arguments of double arrays. In order
- * to avoid creating separate x and y arrays, and instead add x,y values
- * to the sums as they are determined, we split the function into several
- * passes, using a struct to hold the results of the sums:
+ * Do a least squares fit of the time tags of a
+ * list of samples to the sample numbers.
  *
- * initialize the gsl_fit_sums structure.
- * gsl_fit_init(struct gsl_fit_sums*)
+ * tlast0: uncorrected time of first sample of last fit
  *
- * add an x,y point to the sums
- * gsl_fit_linear_add_point(double x,double y,struct gsl_fit_sums*)
- *
- * compute the fit: y = c0 + c1 * x
- * gsl_fit_linear_compute(struct gsl_fit_sums*,  double *c0, double *c1)
- *
- * To compute the sum of the residuals, one must pass over the data
- * again, after computing the above results:
- * gsl_fit_linear_add_resid(double x, double y,struct gsl_fit_sums* sums)
- *
- * Compute the covariance matrix and residuals
- * gsl_fit_linear_compute_resid(struct gsl_fit_sums* sums,
- *   double *cov_00, double *cov_01, double *cov_11, double *sumsq)
- *
- */
-
-void gsl_fit_init(struct gsl_fit_sums* sums)
-{
-    memset(sums,0,sizeof(*sums));
-}
-
-void gsl_fit_linear_add_point(double x, double y,struct gsl_fit_sums* sums)
-{
-    sums->x += x;
-    sums->y += y;
-    sums->xx += x * x;
-    sums->xy += x * y;
-    sums->n++;
-}
-
-void gsl_fit_linear_compute(struct gsl_fit_sums* sums, double *c0, double *c1)
-{
-    sums->x /= sums->n;
-    sums->y /= sums->n;
-    sums->xx = sums->xx / sums->n - sums->x * sums->x;
-    sums->xy = sums->xy / sums->n - sums->x * sums->y;
-
-    double b = sums->xy / sums->xx;
-    double a = sums->y - sums->x * b;
-    *c0 = a;
-    sums->c1 = *c1 = b;
-}
-
-void gsl_fit_linear_add_resid(double x, double y,struct gsl_fit_sums* sums)
-{
-    double dx = x - sums->x;
-    double dy = y - sums->y;
-    double d = dy - sums->c1 * dx;
-    sums->d2 += d * d;
-}
-
-void gsl_fit_linear_compute_resid(struct gsl_fit_sums* sums,
-     double *cov_00, double *cov_01, double *cov_11, double *sumsq)
-{
-    double s2;
-    s2 = sums->d2 / (sums->n - 2.0);        /* chisq per degree of freedom */
-
-    *cov_00 = s2 * (1.0 / sums->n) * (1 + sums->x * sums->x / sums->xx);
-    *cov_11 = s2 * 1.0 / (sums->n * sums->xx);
-    *cov_01 = s2 * (-sums->x) / (sums->n * sums->xx);
-    *sumsq = sums->d2;
-}
-
-/*
- * Function to do a least squares fit of the time tags of a
- * list of samples to the sample number.
+ * @param nexclude: number of points excluded from the fit
+ *          based on their differrence from time tags computed 
+ *          by extrapolating the last fit
  */
 size_t do_fit(list<samp_save>& samps,gsl_fit_sums& sums,
         double* a, double* b, double* cov_00, double* cov_01, double* cov_11,
-        double* sumsq)
+        double* sumsq,
+        double lasta, double lastb, double dev, size_t lastn, dsm_time_t tlast0,
+        size_t& nexclude)
 {
     if (samps.empty()) return 0;
 
-    list<samp_save>::const_iterator si;
+    list<samp_save>::iterator si;
+
+    nexclude = 0;
 
     // sum the samples if it hasn't been done
     if (sums.n == 0) {
         si = samps.begin();
+
+        // last fit time
+        dsm_time_t ttestl = (long long)(lasta + lastn * lastb) + tlast0;
+
         dsm_time_t tt0 =  si->samp->getTimeTag();
+        int dtfit = tt0 - tlast0;
         for (size_t n = 0; si != samps.end(); ++si,n++) {
-            const samp_save& save = *si;
+            samp_save& save = *si;
             const Sample* samp = save.samp;
-            double ttx =  samp->getTimeTag() - tt0;
-            gsl_fit_linear_add_point((double)n,ttx, &sums);
+            double ttx = samp->getTimeTag() - tt0;
+
+            // Guess at a weight for the y value from the deviation
+            // from the last fit.
+            // Using continuously varying weights, as is done if
+            // USE_WEIGHTS is defined, seems to screw up the results,
+            // apparently systematically giving lower weight to later
+            // points in the fit - perhaps due to sonic oscillator drift
+            // from the period of the last fit.
+
+            // Using a binary 0 or 1 weighting based on an absolute
+            // limit for the difference between an observed timetag
+            // from a predicted timetag, as done in DISCARD_BAD, seems to work better.
+            
+
+#define DISCARD_BAD
+#ifdef DISCARD_BAD
+            // hack: exclude samples with timetags
+            if (lastn > 0) {
+                // estimate timetag from last fit.
+                if (n == 0) {
+                    // If first point doesn't fit, don't use last fit.
+                    // Try every quartile point? Not easy since samples are in lists.
+                    if (llabs(samp->getTimeTag()-ttestl) > USECS_PER_SEC / 4) lastn = 0;
+                    gsl_fit_linear_add_point((double)n,ttx,sums);
+                }
+                else {
+                    int ttest = lasta + (lastn + n) * lastb - dtfit;
+                    if (abs(ttx-ttest) < USECS_PER_SEC / 4)
+                        gsl_fit_linear_add_point((double)n,ttx,sums);
+                    else
+                        nexclude++;
+                }
+            }
+            else
+                    gsl_fit_linear_add_point((double)n,ttx,sums);
+#else
+#ifdef USE_WEIGHTS
+            save.weight = 1.0;
+            if (lastn > 0 && dev > 0.0) {
+                // estimate timetag from last fit.
+                double dt = fabs(lasta + (lastn + n) * lastb - dtfit - ttx);
+                // attempt at a gaussian with width 5*dev
+                save.weight = 1.0 / exp(dt * dt/(2.0 * 25.0 * dev * dev));
+#ifdef DEBUG
+                if (samp->getDSMId() == 1 && samp->getSpSId()== 210) {
+                    int ttest = lasta + (lastn + n) * lastb - dtfit;
+                    cerr << "99 " << n << ' ' << ttest << ' ' <<
+                        ttx << ' ' << (samp->getTimeTag()-tt0) << ' ' <<
+                        dt << ' ' << save.weight << endl;
+                }
+#endif
+            }
+            gsl_fit_wlinear_add_point((double)n,save.weight,ttx,sums);
+#else
+            gsl_fit_linear_add_point((double)n,ttx,sums);
+#endif
+#endif
         }
     }
 
-    gsl_fit_linear_compute(&sums,a,b);
+#ifdef USE_WEIGHTS
+    gsl_fit_wlinear_compute(sums,a,b);
+#else
+    gsl_fit_linear_compute(sums,a,b);
+#endif
 
     si = samps.begin();
     dsm_time_t tt0 =  si->samp->getTimeTag();
     for (unsigned int n = 0; si != samps.end(); ++si,n++) {
         const samp_save& save = *si;
         const Sample* samp = save.samp;
-        double ttx =  samp->getTimeTag() - tt0;
-        gsl_fit_linear_add_resid((double)n,ttx,&sums);
+        double ttx = samp->getTimeTag() - tt0;
+#ifdef USE_WEIGHTS
+        gsl_fit_wlinear_add_resid((double)n,save.weight,ttx,sums);
+#else
+        gsl_fit_linear_add_resid((double)n,ttx,sums);
+#endif
     }
 
-    gsl_fit_linear_compute_resid(&sums,cov_00, cov_01, cov_11, sumsq);
+#ifdef USE_WEIGHTS
+    gsl_fit_wlinear_compute_resid(sums,cov_00, cov_01, cov_11, sumsq);
+#else
+    gsl_fit_linear_compute_resid(sums,cov_00, cov_01, cov_11, sumsq);
+#endif
     size_t n = sums.n;
     sums.zero();      // we're done, zero the sums
     return n;
@@ -171,40 +182,398 @@ void CSAT3Fold::addSample(const Sample* samp, int cseq, long long dsmSampleNumbe
     if (_samples.empty()) {
         _firstTime = samp->getTimeTag();
         _firstSeq = cseq;
+        _size = 0;
     }
     _samples.push_back(save);
     _lastTime = samp->getTimeTag();
     _lastSeq = cseq;
+    _unmatched = 0;
+    _size++;
 
     // cerr << "addSample, id=" << formatId(samp->getId()) << " time=" <<
       //       formatTime(_lastTime) << endl;
 }
 
-CSAT3Sensor::CSAT3Sensor(TT_Adjust* adjuster, dsm_sample_id_t id,double rate):
-    _adjuster(adjuster),_id(id),_rate(rate),_lastTime(0),_lastFitTime(0),
-    _nfolds(0),_unmatchedFold0Counter(0),_maxNumFolds(0)
+void CSAT3Fold::append(CSAT3Fold& fold)
 {
+    if (_samples.empty()) {
+        _firstTime = fold.getFirstTime();
+        _firstSeq = fold.getFirstSeq();
+    }
+    _samples.splice(_samples.end(),fold.getSamples());
+    _size += fold.getSize();
+    _lastTime = fold.getLastTime();
+    _lastSeq = fold.getLastSeq();
+    _unmatched = fold.getNotMatched();
+    fold.clear();   // splice clears the list, but also clear the other info
 }
 
-/* extract the CSAT3 sequence number from a sample */
+void CSAT3Fold::clear()
+{
+    _samples.clear();
+    _lastTime = _firstTime = 0;
+    _lastSeq = _firstSeq = -99;
+    _size = 0;
+    _unmatched = 0;
+}
+
+const Sample* CSAT3Fold::getLastSample() const
+{
+    if (_samples.empty()) return 0;
+    return _samples.back().samp;
+}
+
+const Sample* CSAT3Fold::getNextToLastSample() const
+{
+    list<samp_save>::const_iterator si = _samples.end();
+    if (si == _samples.begin()) return 0;
+    --si;
+    if (si == _samples.begin()) return 0;
+    --si;
+    return si->samp;
+}
+
+const Sample* CSAT3Fold::popLast(long long& dsmSampleNumber)
+{
+    if (_samples.empty()) return 0;
+    const Sample* samp = _samples.back().samp;
+    dsmSampleNumber =  _samples.back().dsmSampleNumber;
+    _samples.pop_back();
+    _size--;
+
+    const Sample* lsamp = getLastSample();
+    if (lsamp) {
+        _lastTime = lsamp->getTimeTag();
+        _lastSeq = CSAT3Sensor::getSequenceNumber(lsamp);
+    }
+    else {
+        _lastTime = 0;
+        _lastSeq = -99;
+    }
+    return samp;
+}
+
+/* static */
+const nidas::util::EndianConverter* CSAT3Sensor::_endianConverter = 
+    n_u::EndianConverter::getConverter(n_u::EndianConverter::EC_LITTLE_ENDIAN);
+
+CSAT3Sensor::CSAT3Sensor(TT_Adjust* adjuster, dsm_sample_id_t id,double rate):
+    _adjuster(adjuster),_id(id),
+    _lastTime(0),_lastFitTime(0), _nfolds(0),_maxNumFolds(0),_lastn(0)
+{
+    setRate(rate);
+}
+
+void CSAT3Sensor::setRate(double val)
+{ 
+    _rate = val;
+    if (_rate != 0.0) _sampleDt = (int)rint(USECS_PER_SEC / _rate);
+}
+
+/* extract the CSAT3 sequence number from a sample
+ * If it can't be determined, return -99, which can't
+ * be sequenced with 0-63.
+ */
 int CSAT3Sensor::getSequenceNumber(const Sample* samp)
 {
     size_t inlen = samp->getDataByteLength();
-    if (inlen < 12) return -1;       // not enough data
+    const unsigned int minimumLength = 12;   // two bytes each for u,v,w,tc,diag, and 0x55aa
+    if (inlen < minimumLength) return -99;
 
     const char* dptr = (const char*) samp->getConstVoidDataPtr();
 
     // check for correct termination bytes
-    if (dptr[inlen-2] != '\x55' || dptr[inlen-1] != '\xaa') return -1;
+    if (dptr[inlen-2] != '\x55' || dptr[inlen-1] != '\xaa') return -99;
 
+    // check for NaN diag
+    const short* sptr = (const short*) dptr;
+    unsigned short diag = _endianConverter->uint16Value(sptr+4);
+    if (diag == 61503 || diag == 61440) return -99;
     return (dptr[8] & 0x3f);
+}
+
+bool CSAT3Sensor::processSample(const Sample* samp,vector<float>& res)
+{
+    size_t inlen = samp->getDataByteLength();
+
+    const unsigned int minimumLength = 12;   // two bytes each for u,v,w,tc,diag, and 0x55aa
+    const char* dinptr = (const char*) samp->getConstVoidDataPtr();
+
+    res.resize(4);
+
+    if (inlen < minimumLength || dinptr[inlen-2] != '\x55' || dinptr[inlen-1] != '\xaa') {
+        for (int i = 0; i < 4; i++) 
+            res[i] = floatNAN;
+        return false;
+    }
+
+    const short* sptr = (const short*) dinptr;
+
+    unsigned short diag = _endianConverter->uint16Value(sptr+4);
+
+    // special NaN encodings of diagnostic value
+    // (F03F=61503 and F000=61440):
+    // all diag bits (bits 12 to 15) set and counter
+    // value of 0 or 63, range codes all 0.
+    //
+    // We'll also just NaN the data if any diag bits are set
+    // (so checks for 61503,61440 are actually unnecessary)
+    if ((diag & 0xf000) || diag == 61503 || diag == 61440) {
+        for (int i = 0; i < 4; i++) 
+            res[i] = floatNAN;
+        diag = (diag & 0xf000) >> 12;
+    }
+    else {
+        int range[3];
+        range[0] = (diag & 0x0c00) >> 10;
+        range[1] = (diag & 0x0300) >> 8;
+        range[2] = (diag & 0x00c0) >> 6;
+        const float scale[] = {0.002,0.001,0.0005,0.00025};
+        diag = (diag & 0xf000) >> 12;
+
+        int nmissing = 0;
+        signed short w;
+        for (int i = 0; i < 3; i++) {
+            w =  _endianConverter->int16Value(sptr + i);
+            /* Screen NaN encodings of wind components */
+            if (w == -32768) {
+                res[i] = floatNAN;
+                nmissing++;
+            }
+            else
+                res[i] = w * scale[range[i]];
+        }
+        /*
+         * Documentation also says speed of sound should be a NaN if
+         * ALL the wind components are NaNs.
+         */
+        w =  _endianConverter->int16Value(sptr + 3);
+        if (nmissing == 3 || w == -32768)
+            res[3] = floatNAN;
+        else {
+            /* convert to speed of sound */
+            float c = (w * 0.001) + 340.0;
+            /* Convert speed of sound to Tc */
+            c /= 20.067;
+            res[3] = c * c - 273.15;
+        }
+    }
+    return true;
+}
+
+void CSAT3Sensor::matchFoldsToFold0()
+{
+    list<CSAT3Fold>::iterator matchingFold = _folds.begin();
+
+    while (matchingFold != _folds.end()) {
+
+        matchingFold = _folds.end();
+
+        dsm_time_t toldest = std::numeric_limits<long long>::max();
+        matchingFold = _folds.end();
+        int mfold = -1;
+
+        list<CSAT3Fold>::iterator fi = _folds.begin();
+        CSAT3Fold& fold0 = *fi++;
+
+        // find oldest matching fold
+        for (int ifold = 1; fi != _folds.end(); ++fi,ifold++) {
+            CSAT3Fold& fold = *fi;
+            assert(!fold.empty());
+            if (fold0.getLastSeq() < 0 || fold.getFirstSeq() == (fold0.getLastSeq() + 1) % 64) {
+                if (fold.getFirstTime() < toldest) {
+                    matchingFold = fi;
+                    mfold = ifold;
+                    toldest = fold.getFirstTime();
+                }
+            }
+        }
+        if (matchingFold != _folds.end()) {
+#ifdef DEBUG
+            cerr << "debug: " << formatTime(matchingFold->getFirstTime()) <<
+                ", id=" << formatId(_id) <<
+                ", #unmatched=" << fold0.getNotMatched() <<
+                ", nfolds=" << _nfolds <<
+                ", splicing matched fold " << mfold <<
+                " to fold 0, f0 last seq=0x" << hex << fold0.getLastSeq() << dec <<
+                ", fold " << mfold << " first seq=0x" << hex << matchingFold->getFirstSeq() << dec << endl;
+#endif
+            fold0.append(*matchingFold);
+            _folds.erase(matchingFold);
+            _nfolds--;
+        }
+    }
+}
+
+/**
+ *  2 CSAT3 samples, a and b, have the same sequence number.
+ *  c has a sequence number which is 1 different than a and b.
+ *  Use the length of the wind vector differences and the temperature differences
+ *  to find the best sequence matchup.
+ *     if |a-c| < |b-c|, then c matches best with a (return 0),
+ *     else c matches with b and return 1.
+ */
+int CSAT3Sensor::bestSampleMatch(const Sample* sa, const Sample* sb,const Sample* sc)
+{
+    vector <float> da;
+    processSample(sa,da);
+
+    vector <float> db;
+    processSample(sb,db);
+
+    vector <float> dc;
+    processSample(sc,dc);
+
+    // wind difference between sample a and c
+    float wdac = 0.0;
+    for (int i = 0; i < 3; i++) {
+        float dw = da[i] - dc[i];
+        wdac += dw * dw;
+    }
+    wdac = sqrt(wdac);
+    float tdac = fabsf(da[3] - dc[3]);
+
+    // wind difference between sample b and c
+    float wdbc = 0.0;
+    for (int i = 0; i < 3; i++) {
+        float dw = db[i] - dc[i];
+        wdbc += dw * dw;
+    }
+    wdbc = sqrt(wdbc);
+    float tdbc = fabsf(db[3] - dc[3]);
+
+    if (!isnan(wdac) && !isnan(wdbc)) {
+        float dw = fabsf(wdac - wdbc);
+        if (dw < 0.01) {
+            // better than 0.02 m/s agreement, check temperature
+            // otherwise don't know how to compare m/s with degC
+            // I guess it should depend on the current variances...
+            if (tdac < tdbc) return 0;
+            return 1;
+        }
+        else if (wdac < wdbc) return 0;
+        else return 1;
+    }
+    else {
+        bool wanan = false;
+        for (int i = 0; i < 3; i++) if (isnan(da[i])) wanan = true;
+
+        bool wbnan = false;
+        for (int i = 0; i < 3; i++) if (isnan(db[i])) wbnan = true;
+
+        bool wcnan = false;
+        for (int i = 0; i < 3; i++) if (isnan(dc[i])) wcnan = true;
+
+        if (wcnan) {
+            if (wanan && !wbnan) return 0;
+            if (wbnan && !wanan) return 1;
+            if (isnan(dc[4])) {
+                if (isnan(da[4]) && !isnan(db[4])) return 0;
+                if (isnan(db[4]) && !isnan(da[4])) return 1;
+            }
+            // cannot determine best match, c is NaN, but not a or b
+            // or both a and b are NaN
+            return -1;
+        }
+        else if (!wanan) return 0;
+        else if (!wbnan) return 1;
+        // cannot determine best match, sample c is not NaN, but a and b both are
+    }
+    return -1;
+}
+
+/**
+ *  2 CSAT3 samples, a and b, have the same sequence number.
+ *  c and d have the same sequence number which is 1 different than a and b.
+ *  Use the length of the wind vector differences and the temperature differences
+ *  to find the best sequence matchup:
+ *     if |a-c| + |b-d| < |a-d| + |b-c|, then a matches best with c and b with d (return 0)
+ *     else a matches with d and b matches with c (return 1)
+ */
+int CSAT3Sensor::bestSampleMatch(const Sample* sa, const Sample* sb, const Sample* sc, const Sample *sd)
+{
+    vector <float> da;
+    processSample(sa,da);
+
+    vector <float> db;
+    processSample(sb,db);
+
+    vector <float> dc;
+    processSample(sc,dc);
+
+    vector <float> dd;
+    processSample(sd,dd);
+
+    // wind difference between sample a and c
+    float wdac = 0.0;
+    for (int i = 0; i < 3; i++) {
+        float dw = da[i] - dc[i];
+        wdac += dw * dw;
+    }
+    wdac = sqrt(wdac);
+    float tdac = fabsf(da[3] - dc[3]);
+
+    // wind difference between sample a and d
+    float wdad = 0.0;
+    for (int i = 0; i < 3; i++) {
+        float dw = da[i] - dd[i];
+        wdad += dw * dw;
+    }
+    wdad = sqrt(wdad);
+    float tdad = fabsf(da[3] - dd[3]);
+
+    // wind difference between sample b and c
+    float wdbc = 0.0;
+    for (int i = 0; i < 3; i++) {
+        float dw = db[i] - dc[i];
+        wdbc += dw * dw;
+    }
+    wdbc = sqrt(wdbc);
+    float tdbc = fabsf(db[3] - dc[3]);
+
+    // wind difference between sample b and d
+    float wdbd = 0.0;
+    for (int i = 0; i < 3; i++) {
+        float dw = db[i] - dd[i];
+        wdbd += dw * dw;
+    }
+    wdbd = sqrt(wdbd);
+    float tdbd = fabsf(db[3] - dd[3]);
+
+    if (!isnan(wdac) && !isnan(wdbd) && !isnan(tdac) && !isnan(tdbd)) {
+        // no NaNs
+        float dw = fabsf(wdac + wdbd - wdad - wdbc);
+        if (dw < 0.01) {
+            if (tdac + tdbd <= tdad + tdbc) return 0;
+            return 1;
+        }
+        if (wdac + wdbd <= wdad + wdbc) return 0;
+        return 1;
+    }
+    else {
+        // this isn't a complete attempt to matchup the NaNs
+        if (!isnan(wdac) && isnan(wdbd)) return 0;
+        if (!isnan(wdad) && isnan(wdbc)) return 1;
+    }
+    return -1;
 }
 
 void CSAT3Sensor::addSample(const Sample* samp, long long dsmSampleNumber)
 {
     int cseq = getSequenceNumber(samp);
 
-    if (cseq < 0) return;
+    // doesn't have a sequence number, so not a wind sample, probably a
+    // ?? output, or reset message, or a sample with missing data:
+    //      00 80 00 80 00 80 00 80 3f f0 55 aa 
+    // Add it to the "other" sensor output.
+    // In a missing data sample, the wind and tc data will be NaN,
+    // and the resampler ignores NaNs.
+    if (cseq < 0) {
+        list<CSAT3Fold>::iterator fi = _folds.begin();
+        for (; fi != _folds.end(); ++fi) fi->sampleNotMatched();
+        _adjuster->otherSample(samp,dsmSampleNumber);
+        return;
+    }
 
     dsm_time_t tt = samp->getTimeTag();
 
@@ -212,53 +581,117 @@ void CSAT3Sensor::addSample(const Sample* samp, long long dsmSampleNumber)
     // on this csat.  If large positive, restart fit
     long long dt = tt - _lastTime;
     if (dt > MAJOR_DATA_GAP && _lastTime != 0) {
+
         // Deltat bigger than any expected clock jump for this CSAT
         // Assume a data system restart, or sensor unplugged/plugged
         // splice all folds for this CSAT onto fold[0], then output.
         // We're just splicing in numeric fold order, may want to look
         // at this further
+
+        matchFoldsToFold0();
+
         if (!_folds.empty()) {
             list<CSAT3Fold>::iterator fi = _folds.begin();
             CSAT3Fold& fold0 = *fi++;
-            for ( ; fi != _folds.end(); ) {
+            fitAndOutput(fold0);
+            discardLastFit();
+            for (int ifold=1; fi != _folds.end(); ifold++) {
                 CSAT3Fold& fold = *fi;
-                cerr << "id=" << formatId(_id) << "MAJOR_DATA_GAP, nfolds=" << _nfolds << ", splicing fold " << 1 <<
-                    " to fold 0, dt=" << dt << endl;
-                fold0.append(fold);
+                cerr << "warning: " << formatTime(fold.getFirstTime()) <<
+                    ", id=" << formatId(_id) << ", nfolds=" << _nfolds <<
+                    ", major data gap, saving unmatched fold " << ifold << ' ' <<
+                    formatTime(fold.getFirstTime(),true) << '-' << formatTime(fold.getLastTime(),true) <<
+                    ",0x" << hex << fold.getFirstSeq() << dec << "-0x" <<
+                    hex << fold.getLastSeq() << dec << ',' << fold.getSize() << endl;
+                list<samp_save>& samps = fold.getSamples();
+                _adjuster->writeUnmatchedSamples(samps);
+                fold.clear();
                 fi = _folds.erase(fi);
                 _nfolds--;
-                _unmatchedFold0Counter = 0;
             }
             assert(_nfolds == 1);
-            fitAndOutput();
         }
     }
 
     _lastTime = tt;
 
-    spliceAbandonedFolds(tt);
 
     // Find a fold that this sample belongs to by checking
     // whether its csat3 sequence number is one greater than
     // the sequence number of the last sample in the fold.
+    //
 
     list<CSAT3Fold>::iterator matchingFold = _folds.end();
     int mfold = -1;
 
-    long long closestDt = OLD_FOLD_MAX_DT;
+    // only an empty fold 0
+    if (_nfolds == 1 && _folds.begin()->empty()) {
+        matchingFold = _folds.begin();
+        mfold = 0;
+    }
+    else {
+        // If this sample has the same sequence number as the last sample added to a fold,
+        // perhaps it should replace that sample.
+        list<CSAT3Fold>::iterator fi = _folds.begin();
+        for (int ifold = 0; fi != _folds.end(); ++fi,ifold++) {
+            CSAT3Fold& fold = *fi;
+            if (fold.getLastSeq() == cseq) {
+                if (fold.getSize() > 1) {
+                    list<CSAT3Fold>::iterator fi2 = _folds.begin();
+                    for (int ifold2 = 0; fi2 != _folds.end(); ++fi2,ifold2++) {
+                        if (fi2 == fi) continue;
+                        CSAT3Fold& fold2 = *fi2;
+                        if (cseq == ((fold2.getLastSeq() + 1) % 64)) {
+                            if (bestSampleMatch(fold.getNextToLastSample(),fold2.getLastSample(),
+                                        fold.getLastSample(),samp) == 1) {
+                                cerr << formatTime(tt) <<  ' ' << formatId(_id) <<
+                                    ", sample with seq=0x" << hex << cseq << dec <<
+                                    " matches better to ifold " << ifold << " than previous with time " << 
+                                    formatTime(fold.getLastSample()->getTimeTag()) << endl;
+                                long long dx;
+                                const Sample* sx = fold.popLast(dx);
+                                fold.addSample(samp,cseq,dsmSampleNumber);
+                                samp = sx;
+                                dsmSampleNumber = dx;
+                                // by continuing here we can conceivably correct other mismatches.
+                                // Haven't thought it through though (how's that for alliteration...)
+                                // 
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
-    list<CSAT3Fold>::iterator fi = _folds.begin();
-    for (int ifold = 0; fi != _folds.end(); ++fi,ifold++) {
-        CSAT3Fold& fold = *fi;
-        if (cseq == ((fold.getLastSeq() + 1) % 64) && dt < closestDt) {
-            matchingFold = fi;
-            mfold = ifold;
-            closestDt = dt;
+        // match the sample to the fold by sequence number. If more than
+        // one sequence number match, check for best match of the data
+        fi = _folds.begin();
+        for (int ifold = 0; fi != _folds.end(); ++fi,ifold++) {
+            CSAT3Fold& fold = *fi;
+            if (cseq == ((fold.getLastSeq() + 1) % 64)) {
+                if (matchingFold != _folds.end()) {
+
+                    // if more than one matching fold, compare the wind vectors
+                    // and virtual temperature, tc. Look for best fit:
+                    //  current sample to prev matching fold
+                    //  current sample to current matching fold
+                    int match = bestSampleMatch(matchingFold->getLastSample(),fold.getLastSample(),samp);
+                    if (match == 1) {
+                        matchingFold = fi;
+                        mfold = ifold;
+                    }
+                }
+                else {
+                    matchingFold = fi;
+                    mfold = ifold;
+                }
+            }
         }
     }
     
-    // no match, add a fold
+    // no match. 
     if (matchingFold == _folds.end()) {
+        list<CSAT3Fold>::iterator fi = _folds.begin();
         _folds.push_back(CSAT3Fold());
         mfold = _nfolds++;
         matchingFold = _folds.end();
@@ -281,134 +714,147 @@ void CSAT3Sensor::addSample(const Sample* samp, long long dsmSampleNumber)
 
     matchingFold->addSample(samp,cseq,dsmSampleNumber);
 
+    list<CSAT3Fold>::iterator fi = _folds.begin();
+    if (fi != matchingFold) fi->sampleNotMatched();
+    CSAT3Fold& fold0 = *fi++;
+
+    for (; fi != _folds.end(); ++fi) {
+        if (fi != matchingFold) fi->sampleNotMatched();
+    }
+
     _maxNumFolds = std::max(_maxNumFolds,_nfolds);
 
-    if (mfold == 0) _unmatchedFold0Counter = 0;
-    else {
-        if (++_unmatchedFold0Counter > _nfolds) {
-            // we're no longer getting samples for fold 0. 
-            // It may have ended.
-            // There must be at least 2 folds
-            // Look for a fold to splice to fold 0;
+    if (_nfolds != handleUnmatchedFolds()) fold0 = _folds.front();
 
-            assert(_nfolds > 1);
-            assert(!_folds.empty());
+    if (fold0.getNotMatched() > _nfolds) {
+        // we're no longer getting samples for fold 0. 
+        // It may have ended.
+        // There must be at least 2 folds
+        // Check for a fold to splice to fold 0;
+        assert(_nfolds > 1);
+        assert(!_folds.empty());
+        matchFoldsToFold0();
+    }
 
-            dsm_time_t toldest = tt;
-            matchingFold = _folds.end();
-            mfold = -1;
+    if (fold0.getNotMatched() > 10 + _nfolds) {
+        cerr << "warning: " << formatTime(tt) <<
+            ", id=" << formatId(_id) <<
+            ", nfolds=" << _nfolds <<
+            ", fit and output unmatched fold 0 " << 
+            formatTime(fold0.getFirstTime(),true) << '-' << formatTime(fold0.getLastTime(),true) <<
+            ",0x" << hex << fold0.getFirstSeq() << dec << "-0x" <<
+            hex << fold0.getLastSeq() << dec << ',' << fold0.getSize() <<
+            ", #unmatched=" << fold0.getNotMatched() << endl;
+        fitAndOutput(fold0);
+        discardLastFit();
 
-            list<CSAT3Fold>::iterator fi = _folds.begin();
-            CSAT3Fold& fold0 = *fi++;
-            assert(!fold0.empty());
+        // move oldest fold to fold0
+        dsm_time_t toldest = std::numeric_limits<long long>::max();
+        matchingFold = _folds.end();
+        mfold = -1;
 
-            // find oldest matching fold
-            for (int ifold = 1; fi != _folds.end(); ++fi,ifold++) {
-                CSAT3Fold& fold = *fi;
-                assert(!fold.empty());
-                if (fold.getFirstSeq() == (fold0.getLastSeq() + 1) % 64) {
-                    if (fold.getFirstTime() < toldest) {
-                        matchingFold = fi;
-                        mfold = ifold;
-                        toldest = fold.getFirstTime();
-                    }
-                }
+        list<CSAT3Fold>::iterator fi = _folds.begin();
+        CSAT3Fold& fold0 = *fi++;
+        for (int ifold = 1; fi != _folds.end(); ++fi,ifold++) {
+            CSAT3Fold& fold = *fi;
+            assert(!fold.empty());
+            if (fold.getFirstTime() < toldest) {
+                matchingFold = fi;
+                mfold = ifold;
+                toldest = fold.getFirstTime();
             }
-            if (matchingFold != _folds.end()) {
-#ifdef DEBUG
-                cerr << formatTime(matchingFold->getFirstTime()) <<
-                    ", id=" << formatId(_id) <<
-                    ", #unmatched=" << _unmatchedFold0Counter <<
-                    ", nfolds=" << _nfolds <<
-                    ", splicing matched fold " << mfold <<
-                    " to fold 0, f0 seq=0x" << hex << fold0.getLastSeq() << dec <<
-                    ", fold " << mfold << " seq=0x" << hex << matchingFold->getFirstSeq() << dec << endl;
-#endif
-                fold0.append(*matchingFold);
-                _folds.erase(matchingFold);
-                _nfolds--;
-                _unmatchedFold0Counter = 0;
-            } else if (_unmatchedFold0Counter > 20) {
-                // only force an unmatched fold splice to fold 0
-                // there has been a long period of no fold0 samples
-                // find oldest fold
-                dsm_time_t toldest = tt;
-                matchingFold = _folds.end();
-                mfold = -1;
-
-                list<CSAT3Fold>::iterator fi = _folds.begin();
-                CSAT3Fold& fold0 = *fi++;
-                for (int ifold = 1; fi != _folds.end(); ++fi,ifold++) {
-                    CSAT3Fold& fold = *fi;
-                    assert(!fold.empty());
-                    if (fold.getFirstTime() < toldest) {
-                        matchingFold = fi;
-                        mfold = ifold;
-                        toldest = fold.getFirstTime();
-                    }
-                }
-                if (matchingFold != _folds.end()) {
-                    cerr << formatTime(matchingFold->getFirstTime()) <<
-                        ", id=" << formatId(_id) <<
-                        ", #unmatched=" << _unmatchedFold0Counter <<
-                        ", nfolds=" << _nfolds <<
-                        ", splicing unmatched fold " << mfold <<
-                        " to fold 0, f0 seq=0x" << hex << fold0.getLastSeq() << dec <<
-                        ", fold " << mfold << " seq=0x" << hex << matchingFold->getFirstSeq() << dec << endl;
-                    fold0.append(*matchingFold);
-                    _folds.erase(matchingFold);
-                    _nfolds--;
-                    _unmatchedFold0Counter = 0;
-                }
-            }
+        }
+        if (matchingFold != _folds.end()) {
+            cerr << "warning: " << formatTime(matchingFold->getFirstTime()) <<
+                ", id=" << formatId(_id) <<
+                ", nfolds=" << _nfolds <<
+                ", moving fold " << mfold << ' ' <<
+                formatTime(matchingFold->getFirstTime(),true) << '-' << formatTime(matchingFold->getLastTime(),true) <<
+                ",0x" << hex << matchingFold->getFirstSeq() << dec << "-0x" <<
+                hex << matchingFold->getLastSeq() << dec << ',' << matchingFold->getSize() <<
+                " to fold 0 " << endl;
+            fold0.append(*matchingFold);
+            _folds.erase(matchingFold);
+            _nfolds--;
         }
     }
 }
 
 size_t CSAT3Sensor::fitAndOutput()
 {
-    // may be called without any data.
-    if (_nfolds == 0) return 0;
-
-    assert(_nfolds == 1);
-
+    if (_folds.empty()) return 0;
     list<CSAT3Fold>::iterator fi = _folds.begin();
     CSAT3Fold& fold0 = *fi++;
-    assert(fi == _folds.end());
-
-    if (fold0.empty()) return 0;
+    return fitAndOutput(fold0);
+}
+size_t CSAT3Sensor::fitAndOutput(CSAT3Fold& fold)
+{
+    // fit and output fold 0
+    if (fold.empty()) return 0;
 
     double a,b; /* y = a + b * x */
     double cov_00, cov_01, cov_11, sumsq;
 
     struct gsl_fit_sums sums;
 
-    size_t n = do_fit(fold0.getSamples(),sums,&a,&b,&cov_00,&cov_01,&cov_11,&sumsq);
-    if (n == 0) return n;
+    size_t nexclude;
+    size_t n = do_fit(fold.getSamples(),sums,&a,&b,
+            &cov_00,&cov_01,&cov_11,&sumsq,_lasta,_lastb,_dev,_lastn,_tlast0,nexclude);
+    assert(fold.getSize() == n + nexclude);
+    if (n == 0 && nexclude == 0) return n;
 
     int maxneg,maxpos;
-    dsm_time_t tout = fold0.getFirstTime();
     dsm_time_t tlastfit = _lastFitTime;
     dsm_time_t tfirst,tlast;
-    _adjuster->writeSamples(fold0.getSamples(),a,b,&maxneg,&maxpos,tfirst,tlast);
-    cout << 
-        formatTime(fold0.getFirstTime()) << ' ' <<
-        formatId(_id) << ' ' <<
-        setw(6) << n << ' ' <<
-        setw(10) << fixed << setprecision(2) << a << ' ' <<
-        setw(10) << b << ' ' <<
-        setw(10) << sqrt(sumsq / (n-2.0)) << ' ' <<
-        setw(10) << maxneg << ' ' << 
-        setw(10) << maxpos <<  ' ' <<
-        setw(10) << (tlastfit == 0 ? 0 : tfirst-tlastfit) << ' ' <<
-        setw(3) << _maxNumFolds << endl;
-    _lastFitTime = tlast;
-    _maxNumFolds = 0;
-    _unmatchedFold0Counter = 0;
+    if (n > 2) {
+        _adjuster->writeSamples(fold.getSamples(),a,b,&maxneg,&maxpos,tfirst,tlast);
+        cout << 
+            formatTime(fold.getFirstTime()) << ' ' <<
+            formatId(_id) << ' ' <<
+            setw(6) << n << ' ' <<
+            setw(4) << nexclude << ' ' <<
+            setw(10) << fixed << setprecision(2) << a << ' ' <<
+            setw(10) << b << ' ' <<
+            setw(10) << sqrt(sumsq / (n-2.0)) << ' ' <<
+            setw(10) << maxneg << ' ' << 
+            setw(10) << maxpos <<  ' ' <<
+            setw(10) << (tlastfit == 0 ? 0 : tfirst-tlastfit) << ' ' <<
+            setw(3) << _maxNumFolds << endl;
+        _lastFitTime = tlast;
+        _maxNumFolds = 0;
+
+        // save results of fit
+        _lasta = a;
+        _lastb = b;
+        _dev = sqrt(sumsq / (n - 2.0));
+
+        // more than 10% discards is a problem
+        if (n > 0 && (float)nexclude / n > 0.1) _lastn = 0;
+        else _lastn = n + nexclude;
+
+        _tlast0 = fold.getFirstTime();
+    }
+    else {
+        cerr << "warning: " << formatTime(fold.getFirstTime()) <<
+            ", id=" << formatId(_id) << ", saving small fold, n=" << n << " nexclude=" << nexclude << ' ' <<
+            formatTime(fold.getFirstTime(),true) << '-' << formatTime(fold.getLastTime(),true) <<
+            ",0x" << hex << fold.getFirstSeq() << dec << "-0x" <<
+            hex << fold.getLastSeq() << dec << ',' << fold.getSize() << endl;
+        _adjuster->writeUnmatchedSamples(fold.getSamples());
+        discardLastFit();
+    }
+    fold.clear();
     return n;
 }
 
-int CSAT3Sensor::spliceAbandonedFolds(dsm_time_t tt)
+void CSAT3Sensor::discardLastFit()
+{
+    _dev = 0;
+    _lastn = 0;
+}
+
+
+int CSAT3Sensor::handleUnmatchedFolds()
 {
 
     if (_folds.empty()) {
@@ -417,42 +863,44 @@ int CSAT3Sensor::spliceAbandonedFolds(dsm_time_t tt)
     }
     assert(_nfolds > 0);
 
-    // splice abandoned folds to fold0, oldest first
+    // output unmatched folds to their own output.
     list<CSAT3Fold>::iterator matchfi = _folds.begin();
 
     while (_nfolds > 1 && matchfi != _folds.end()) {
 
-        dsm_time_t oldestTime = std::numeric_limits<long long>::max();
         matchfi = _folds.end();
 
         list<CSAT3Fold>::iterator fi = _folds.begin();
-        CSAT3Fold& fold0 = *fi++;
+        fi++;
 
         int ifold;
-        for (ifold = 1; fi != _folds.end(); ++fi,ifold++) {
+        for (ifold = 1; fi != _folds.end(); ifold++) {
             CSAT3Fold& fold = *fi;
 
             // folds other than 0 should not be empty
             assert(!fold.empty());
 
+#ifdef CHECK_BY_TIME
             long long dt = tt - fold.getLastTime();
-            if (dt > OLD_FOLD_MAX_DT) {
-                if (fold.getFirstTime() < oldestTime) {
-                    cerr << "dt=" << dt << " ifold=" << ifold << endl;
-                    matchfi = fi;
-                    oldestTime = fold.getFirstTime();
-                }
+            if (dt > OLD_FOLD_MAX_DT)
+#else
+            if (fold.getNotMatched() > 10 + _nfolds)
+#endif
+            {
+                cerr << "warning: " << formatTime(fold.getFirstTime()) <<
+                    ", id=" << formatId(_id) << ", nfolds=" << _nfolds <<
+                    ", saving unmatched fold " << ifold << ' ' <<
+                    formatTime(fold.getFirstTime(),true) << '-' << formatTime(fold.getLastTime(),true) <<
+                    ",0x" << hex << fold.getFirstSeq() << dec << "-0x" <<
+                    hex << fold.getLastSeq() << dec << ',' << fold.getSize() <<
+                    ", unmatched=" << fold.getNotMatched() << endl;
+                list<samp_save>& samps = fold.getSamples();
+                _adjuster->writeUnmatchedSamples(samps);
+                fold.clear();
+                fi = _folds.erase(fi);
+                _nfolds--;
             }
-        }
-        if (matchfi != _folds.end()) {
-            cerr << formatTime(matchfi->getLastTime()) << ", id=" << formatId(_id) <<
-                "splicing abandoned fold " << ifold <<
-            " to fold 0, dt=" << (tt - matchfi->getLastTime()) << endl;
-
-            fold0.append(*matchfi);
-            _folds.erase(matchfi);
-            _nfolds--;
-            _unmatchedFold0Counter = 0;
+            else ++fi;
         }
     }
     return _nfolds;
@@ -486,14 +934,13 @@ int CSAT3Sensor::spliceAllFolds()
         fold0.append(*matchfi);
         _folds.erase(matchfi);
         _nfolds--;
-        _unmatchedFold0Counter = 0;
     }
     return _nfolds;
 }
 
 FixedRateSensor::FixedRateSensor(TT_Adjust* adjuster,dsm_sample_id_t id, double rate):
     _adjuster(adjuster),_id(id),_rate(rate),_sampleDt((int)rint(USECS_PER_SEC / _rate)),
-    _nsamp(0),_firstTime(0),_lastTime(0),_lastFitTime(0)
+    _size(0),_firstTime(0),_lastTime(0),_lastFitTime(0)
 {
 }
 
@@ -501,27 +948,26 @@ void FixedRateSensor::addSample(const Sample* samp, long long dsmSampleNumber)
 {
 
     dsm_time_t tt = samp->getTimeTag();
-    dsm_time_t ttx = 0;
 
     // check for a data gap. If so, fit and output the samples we have.
     if (!_samples.empty()) {
         int dt = tt - _lastTime;
-        if (abs(dt) > 64 * _sampleDt) fitAndOutput();
+        if (abs(dt) > 64 * _sampleDt) {
+            fitAndOutput();
+            discardLastFit();
+        }
     }
     if (_samples.empty()) {
         _firstTime = samp->getTimeTag();
-        _nsamp = 0;
+        _size = 0;
     }
-    ttx =  tt - _firstTime;
     _lastTime = tt;
 
     samp_save save;
     save.samp = samp;
     save.dsmSampleNumber = dsmSampleNumber;
     _samples.push_back(save);
-
-    // cerr << "ttx=" << ttx << " sampleNumber=" << sampleNumber << " cseq=" << cseq << endl;
-    gsl_fit_linear_add_point(_nsamp++,(double)ttx, &_sums);
+    _size++;
 }
 
 size_t FixedRateSensor::fitAndOutput()
@@ -530,16 +976,19 @@ size_t FixedRateSensor::fitAndOutput()
     double a,b; /* y = a + b * x */
     double cov_00, cov_01, cov_11, sumsq;
 
-    n = do_fit(_samples,_sums,&a,&b,&cov_00,&cov_01,&cov_11,&sumsq);
+    size_t nexclude;
+    n = do_fit(_samples,_sums,&a,&b,
+            &cov_00,&cov_01,&cov_11,&sumsq,_lasta,_lastb,_dev,_lastn,_tlast0,nexclude);
     if (n > 0) {
         int maxneg,maxpos;
         dsm_time_t tlastfit = _lastFitTime;
-        dsm_time_t tfirst,tlast;
+        dsm_time_t tfirst;
         _adjuster->writeSamples(_samples,a,b,&maxneg,&maxpos,tfirst,_lastFitTime);
         cout << 
             formatTime(_firstTime) << ' ' <<
             formatId(_id) << ' ' <<
             setw(6) << n << ' ' <<
+            setw(4) << nexclude << ' ' <<
             setw(10) << fixed << setprecision(2) << a << ' ' <<
             setw(10) << b << ' ' <<
             setw(10) << sqrt(sumsq / (n-2.0)) << ' ' <<
@@ -547,7 +996,21 @@ size_t FixedRateSensor::fitAndOutput()
             setw(10) << maxpos << ' ' <<
             setw(10) << (tlastfit == 0 ? 0 : tfirst-tlastfit) << endl;
     }
+    // save results of fit
+    _lasta = a;
+    _lastb = b;
+    if (n > 2)
+        _dev = sqrt(sumsq / (n - 2.0));
+    else _dev = _sampleDt / 4;
+    _lastn = n + nexclude;
+    _tlast0 = _firstTime;
     return n;
+}
+
+void FixedRateSensor::discardLastFit()
+{
+    _dev = 0;
+    _lastn = 0;
 }
 
 int main(int argc, char** argv)
@@ -572,7 +1035,7 @@ int TT_Adjust::parseRunstring(int argc, char** argv)
     const char* cp;
     char* cp2;
 
-    while ((opt_char = getopt(argc, argv, "c:f:l:o:r:s:")) != -1) {
+    while ((opt_char = getopt(argc, argv, "c:f:l:o:r:s:u:")) != -1) {
 	switch (opt_char) {
         case 'c':
             {
@@ -607,6 +1070,7 @@ int TT_Adjust::parseRunstring(int argc, char** argv)
 	    break;
 	case 'l':
 	    _outputFileLength = atoi(optarg);
+	    _unmatchedFileLength = _outputFileLength;
 	    break;
 	case 'o':
 	    _outputFileName = optarg;
@@ -638,6 +1102,9 @@ int TT_Adjust::parseRunstring(int argc, char** argv)
                         make_pair<dsm_sample_id_t,FixedRateSensor>(id,FixedRateSensor(this,id,rate)));
             }
             break;
+	case 'u':
+	    _unmatchedFileName = optarg;
+	    break;
 	case '?':
 	    return usage(argv[0]);
 	}
@@ -656,7 +1123,6 @@ int TT_Adjust::parseRunstring(int argc, char** argv)
     return 0;
 }
 
-
 /* static */
 int TT_Adjust::usage(const char* argv0)
 {
@@ -664,6 +1130,7 @@ int TT_Adjust::usage(const char* argv0)
 Usage: " << argv0 << "-o output [-l output_file_length] [-r secs_per_fit]\n\n\
         input ...\n\
     -o output: output file name or file name format\n\
+    -u output: output file name or file name format for unmatched samples\n\
     -l output_file_length: length of output files, in seconds\n\
     -r secs_per_fit: time period of least squares fit of timetags to record number\n\
     input ...:  one or more input files\n\
@@ -722,6 +1189,14 @@ void TT_Adjust::setupSignals()
     sigaction(SIGTERM,&act,(struct sigaction *)0);
 }
 
+void TT_Adjust::otherSample(const Sample* samp,long long dsmSampleNumber)
+{
+    struct samp_save save;
+    save.samp = samp;
+    save.dsmSampleNumber = dsmSampleNumber;
+    _other_samples[samp->getDSMId()].push_back(save);
+}
+
 void TT_Adjust::writeSamples(list<samp_save>& samps,
         double a, double b,int* maxnegp, int* maxposp,
         dsm_time_t& tfirst, dsm_time_t& tlast)
@@ -762,77 +1237,109 @@ void TT_Adjust::writeSamples(list<samp_save>& samps,
     tlast = newtt;
 }
 
+void TT_Adjust::writeUnmatchedSamples(list<samp_save>& samps)
+{
+    list<samp_save>::iterator si = samps.begin();
+    for ( ; si != samps.end(); ++si) {
+        samp_save& save = *si;
+        const Sample* samp = save.samp;
+        _unmatchedOutput.receive(samp);
+        samp->freeReference();
+    }
+    samps.clear();
+}
+
 void TT_Adjust::output_other()
 {
-    int maxneg = 0;
-    int maxpos = 0;
+    map<int,list<samp_save> >::iterator di = _other_samples.begin();
+    for ( ; di != _other_samples.end(); ++di) {
+        int dsmid = di->first;
+        list<samp_save>& samps = di->second;
 
-    list<samp_save>::iterator si = _other_samples.begin();
-    size_t ndiscards = 0;
-    size_t n;
-    for (n = 0; si != _other_samples.end(); ++si,n++) {
-        samp_save& save = *si;
-        Sample* samp = const_cast<Sample*>(save.samp);
-        unsigned int dsmid = samp->getDSMId();
+        size_t ndiscards = 0;
+        size_t n;
+        int maxneg = 0;
+        int maxpos = 0;
 
         set<pair<long long,int>,SequenceComparator>& offsets = _clockOffsets[dsmid];
 
-        dsm_time_t tt = samp->getTimeTag();
-        if (!offsets.empty()) {
-            // create a key containing the sample number
-            pair<long long,int> p(save.dsmSampleNumber,0);
+        list<samp_save>::iterator si = samps.begin();
+        for (n = 0; si != samps.end(); ++si,n++) {
 
-            // find iterator pointing to first element > key, giving us the
-            // timetag of the sample with record number > save.dsmSampleNumber.
-            set<pair<long long,int>,SequenceComparator>::const_iterator i1 = offsets.upper_bound(p);
+            samp_save& save = *si;
+            Sample* samp = const_cast<Sample*>(save.samp);
 
-            // extrapolate backwards if first element is > key
-            if (i1 == offsets.begin()) ++i1;   
+            dsm_time_t tt = samp->getTimeTag();
+            if (!offsets.empty()) {
+                // create a key containing the sample number
+                pair<long long,int> p(save.dsmSampleNumber,0);
 
-            set<pair<long long,int>,SequenceComparator>::const_iterator i0 = i1;
-            // since offsets is not empty, i0 is a valid iterator after this decrement
-            --i0;
+                // find iterator pointing to first element > key, giving us the
+                // timetag of the sample with record number > save.dsmSampleNumber.
+                set<pair<long long,int>,SequenceComparator>::const_iterator i1 = offsets.upper_bound(p);
 
-            if (i1 != offsets.end()) {
+                // extrapolate backwards if first element is > key
+                if (i1 == offsets.begin()) ++i1;   
 
-                // if the clock correction takes a big jump, then discard this sample,
-                // because we don't know which side of the jump it should be
-                // associated with.
-                if (abs((i1->second - i0->second)) > USECS_PER_SEC / 4) {
-                    samp->freeReference();
-                    ndiscards++;
-                    continue;
-                }
-                int dt = i0->second +
-                    (int)((i1->second - i0->second) / (float)(i1->first - i0->first) *
-                    (save.dsmSampleNumber - i0->first));
-                tt += dt;
+                set<pair<long long,int>,SequenceComparator>::const_iterator i0 = i1;
+                // since offsets is not empty, i0 is a valid iterator after this decrement
+                --i0;
+
+                if (i1 != offsets.end()) {
+
+                    // if the clock correction takes a big jump, then discard this sample,
+                    // because we don't know which side of the jump it should be
+                    // associated with.
+                    if (abs((i1->second - i0->second)) > USECS_PER_SEC / 4) {
+                        samp->freeReference();
+                        ndiscards++;
+                        continue;
+                    }
+                    int dt = i0->second +
+                        (int)((i1->second - i0->second) / (float)(i1->first - i0->first) *
+                        (save.dsmSampleNumber - i0->first));
+                    tt += dt;
 #ifdef DEBUG
-                cerr << samp->getDSMId() << ',' << samp->getSpSId() << ": " <<
-                    save.dsmSampleNumber << ',' << samp->getTimeTag() << 
-                    ", i0=" << i0->first << ',' << i0->second <<
-                    ", i1=" << i1->first << ',' << i1->second <<
-                    ", dt=" << dt <<
-                    ", recdiff = " << i1->first - i0->first << 
-                    ", timediff = " << i1->second - i0->second <<
-                    ", recdiff = " << save.dsmSampleNumber - i0->first << endl;
+                    cerr << samp->getDSMId() << ',' << samp->getSpSId() << ": " <<
+                        save.dsmSampleNumber << ',' << samp->getTimeTag() << 
+                        ", i0=" << i0->first << ',' << i0->second <<
+                        ", i1=" << i1->first << ',' << i1->second <<
+                        ", dt=" << dt <<
+                        ", recdiff = " << i1->first - i0->first << 
+                        ", timediff = " << i1->second - i0->second <<
+                        ", recdiff = " << save.dsmSampleNumber - i0->first << endl;
 #endif
+                }
             }
+
+            int dt = tt - samp->getTimeTag();
+
+            if (dt < 0) maxneg = std::min(dt,maxneg);
+            else if (dt > 0) maxpos = std::max(dt,maxpos);
+
+            samp->setTimeTag(tt);
+            _sorter.receive(samp);
+            samp->freeReference();
         }
+        if (!samps.empty()) {
+            samp_save& save = samps.front();
 
-        int dt = tt - samp->getTimeTag();
+            dsm_sample_id_t id = 0;
+            id = SET_DSM_ID(id,dsmid);
 
-        if (dt < 0) maxneg = std::min(dt,maxneg);
-        else if (dt > 0) maxpos = std::max(dt,maxpos);
-
-        samp->setTimeTag(tt);
-        _sorter.receive(samp);
-        samp->freeReference();
+            cout << formatTime(save.samp->getTimeTag()) << ' ' <<
+                formatId(id) << ' ' <<
+                setw(6) << n << ' ' <<
+                setw(4) << ndiscards << ' ' <<
+                setw(10) << fixed << setprecision(2) << 0 << ' ' <<
+                setw(10) << 0 << ' ' <<
+                setw(10) << 0 << ' ' <<
+                setw(10) << maxneg << ' ' << 
+                setw(10) << maxpos <<  ' ' << endl;
+        }
+        samps.clear();
+        offsets.clear();
     }
-    if (!_other_samples.empty())
-            cout << "output other, n=" << n << ", ndiscards=" << ndiscards << ", maxneg=" << maxneg << ", maxpos=" << maxpos << endl;
-    _other_samples.clear();
-    _clockOffsets.clear();
 }
 
 void TT_Adjust::fixed_fit_output()
@@ -865,6 +1372,15 @@ int TT_Adjust::run() throw()
         _sorter.setLengthSecs(1.1 * _fitUsecs / USECS_PER_SEC);
         _sorter.start();
 
+	nidas::core::FileSet* orphSet = 0;
+        if (_unmatchedFileName.find(".bz2") != string::npos)
+            orphSet = new nidas::core::Bzip2FileSet();
+        else
+            orphSet = new nidas::core::FileSet();
+	orphSet->setFileName(_unmatchedFileName);
+	orphSet->setFileLengthSecs(_unmatchedFileLength);
+        _unmatchedOutput.connected(orphSet);
+
         nidas::core::FileSet* fset = nidas::core::FileSet::getFileSet(_inputFileNames);
 
         dsm_time_t endTime = 0;
@@ -896,7 +1412,7 @@ int TT_Adjust::run() throw()
                 //  if all csats have only one fold, then fit and output
                 //      them all
                 //  one or more with multiple folds:
-                //      detect abandoned folds, if last time of a fold
+                //      detect unmatched folds, if last time of a fold
                 //      is old, splice it to fold[0]
                 //  if one or more csats still have multiple folds,
                 //      then wait to fit and output
@@ -905,10 +1421,11 @@ int TT_Adjust::run() throw()
 
                 for ( ; ci != _csats.end(); ++ci) {
                     CSAT3Sensor& csat = ci->second;
-                    int nfold = csat.spliceAbandonedFolds(tt);
+                    int nfold = csat.handleUnmatchedFolds();
                     if (nfold > 1) {
-                        cerr << "after spliceAbandonedFolds(), id=" <<
-                            formatId(ci->first) << " nfold=" << nfold << endl;
+                        cerr << "warning: " << formatTime(tt) <<
+                            " id=" << formatId(ci->first) <<
+                            " after handleUnmatchedFolds(), nfold=" << nfold << endl;
                         allSingleFolds = false;
                     }
                 }
@@ -941,20 +1458,22 @@ int TT_Adjust::run() throw()
             struct samp_save save;
             save.samp = samp;
             save.dsmSampleNumber = dsmSampleNumber;
-            _other_samples.push_back(save);
+            _other_samples[samp->getDSMId()].push_back(save);
         }
         if (!_interrupted) {
             map<dsm_sample_id_t,CSAT3Sensor>::iterator ci = _csats.begin();
             for ( ; ci != _csats.end(); ++ci) {
                 CSAT3Sensor& csat = ci->second;
-                csat.spliceAllFolds();
+                csat.matchFoldsToFold0();
                 csat.fitAndOutput();
             }
             fixed_fit_output();
             output_other();
-            _sorter.finish();
         }
+        _sorter.finish();
         outStream.close();
+        _unmatchedOutput.finish();
+        _unmatchedOutput.close();
     }
     catch (n_u::IOException& ioe) {
         cerr << ioe.what() << endl;
