@@ -6,11 +6,11 @@
 
     $LastChangedDate: 2010-10-14 15:01:57 -0600 (Thu, 14 Oct 2010) $
 
-    $LastChangedRevision: 5772 $
+    $LastChangedRevision: $
 
-    $LastChangedBy: tbaltzer $
+    $LastChangedBy: $
 
-    $HeadURL: http://svn.eol.ucar.edu/svn/nidas/trunk/src/nidas/apps/nidsmerge.cc $
+    $HeadURL: http://svn.eol.ucar.edu/svn/isff/trunk/src/tt_adjust
  ********************************************************************
 */
 
@@ -398,6 +398,7 @@ void CSAT3Sensor::matchFoldsToFold0()
                 " to fold 0, f0 last seq=0x" << hex << fold0.getLastSeq() << dec <<
                 ", fold " << mfold << " first seq=0x" << hex << matchingFold->getFirstSeq() << dec << endl;
 #endif
+            _foldLengths.push_back(matchingFold->getSize());
             fold0.append(*matchingFold);
             _folds.erase(matchingFold);
             _nfolds--;
@@ -603,6 +604,7 @@ void CSAT3Sensor::addSample(const Sample* samp, long long dsmSampleNumber)
                     formatTime(fold.getFirstTime(),true) << '-' << formatTime(fold.getLastTime(),true) <<
                     ",0x" << hex << fold.getFirstSeq() << dec << "-0x" <<
                     hex << fold.getLastSeq() << dec << ',' << fold.getSize() << endl;
+                _foldLengths.push_back(-(signed)fold.getSize());
                 list<samp_save>& samps = fold.getSamples();
                 _adjuster->writeUnmatchedSamples(samps);
                 fold.clear();
@@ -773,6 +775,7 @@ void CSAT3Sensor::addSample(const Sample* samp, long long dsmSampleNumber)
                 ",0x" << hex << matchingFold->getFirstSeq() << dec << "-0x" <<
                 hex << matchingFold->getLastSeq() << dec << ',' << matchingFold->getSize() <<
                 " to fold 0 " << endl;
+            _foldLengths.push_back(matchingFold->getSize());
             fold0.append(*matchingFold);
             _folds.erase(matchingFold);
             _nfolds--;
@@ -783,8 +786,7 @@ void CSAT3Sensor::addSample(const Sample* samp, long long dsmSampleNumber)
 size_t CSAT3Sensor::fitAndOutput()
 {
     if (_folds.empty()) return 0;
-    list<CSAT3Fold>::iterator fi = _folds.begin();
-    CSAT3Fold& fold0 = *fi++;
+    CSAT3Fold& fold0 = _folds.front();
     return fitAndOutput(fold0);
 }
 size_t CSAT3Sensor::fitAndOutput(CSAT3Fold& fold)
@@ -819,7 +821,10 @@ size_t CSAT3Sensor::fitAndOutput(CSAT3Fold& fold)
             setw(10) << maxneg << ' ' << 
             setw(10) << maxpos <<  ' ' <<
             setw(10) << (tlastfit == 0 ? 0 : tfirst-tlastfit) << ' ' <<
-            setw(3) << _maxNumFolds << endl;
+            setw(3) << _maxNumFolds;
+        for (unsigned int i = 0; i < _foldLengths.size(); i++)
+            cout << ' ' << _foldLengths[i];
+        cout << endl;
         _lastFitTime = tlast;
         _maxNumFolds = 0;
 
@@ -844,6 +849,7 @@ size_t CSAT3Sensor::fitAndOutput(CSAT3Fold& fold)
         discardLastFit();
     }
     fold.clear();
+    _foldLengths.clear();
     return n;
 }
 
@@ -894,6 +900,7 @@ int CSAT3Sensor::handleUnmatchedFolds()
                     ",0x" << hex << fold.getFirstSeq() << dec << "-0x" <<
                     hex << fold.getLastSeq() << dec << ',' << fold.getSize() <<
                     ", unmatched=" << fold.getNotMatched() << endl;
+                _foldLengths.push_back(-(signed)fold.getSize());
                 list<samp_save>& samps = fold.getSamples();
                 _adjuster->writeUnmatchedSamples(samps);
                 fold.clear();
@@ -931,6 +938,7 @@ int CSAT3Sensor::spliceAllFolds()
             }
         }
         assert(matchfi != _folds.end());
+        _foldLengths.push_back(matchfi->getSize());
         fold0.append(*matchfi);
         _folds.erase(matchfi);
         _nfolds--;

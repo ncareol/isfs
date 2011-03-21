@@ -249,6 +249,8 @@ private:
     size_t _lastn;
 
     static const nidas::util::EndianConverter* _endianConverter;
+
+    std::vector<ssize_t> _foldLengths;
 };
 
 /**
