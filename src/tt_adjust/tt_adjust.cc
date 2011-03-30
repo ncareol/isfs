@@ -1118,6 +1118,7 @@ int TT_Adjust::parseRunstring(int argc, char** argv)
 	}
     }
     if (_outputFileName.length() == 0) return usage(argv[0]);
+    if (_unmatchedFileName.length() == 0) return usage(argv[0]);
 
     for ( ; optind < argc; optind++) _inputFileNames.push_back(argv[optind]);
     if (_inputFileNames.empty()) return usage(argv[0]);
@@ -1135,12 +1136,16 @@ int TT_Adjust::parseRunstring(int argc, char** argv)
 int TT_Adjust::usage(const char* argv0)
 {
     cerr << "\
-Usage: " << argv0 << "-o output [-l output_file_length] [-r secs_per_fit]\n\n\
-        input ...\n\
+Usage: " << argv0 << "[-c d,s[,rate] ...] [-r rate] [-s d,s[,rate] ...] [-f secs_per_fit]\n\
+    -o output  -u unmatched_file_name [-l output_file_length] input ...\n\
+\n\
+    -c d,s,rate: dsm and sensor id of CSAT3 sonic\n\
+    -r rate: default rate of all CSAT3 sonics\n\
+    -s d,s,rate: dsm and sensor id of a sensor with a fixed rate output\n\
+    -f secs_per_fit: time period of least squares fit of timetags to record number\n\
     -o output: output file name or file name format\n\
     -u output: output file name or file name format for unmatched samples\n\
-    -l output_file_length: length of output files, in seconds\n\
-    -r secs_per_fit: time period of least squares fit of timetags to record number\n\
+    -l output_file_length: length of output files, in seconds, default=0, unlimited\n\
     input ...:  one or more input files\n\
 " << endl;
     return 1;
