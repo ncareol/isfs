@@ -20,8 +20,7 @@ Server for NetCDF file writing.
 %package devel
 Summary: nc_server library and header file
 Group: Applications/Engineering
-# Allow this package to be relocatable to other places than /opt/local/nidas/x86
-# rpm --relocate /opt/local/nidas/x86=/usr --relocate /opt/local/nidas/share=/usr/share
+
 %description devel
 libnc_server_rpc.so library and header file
 
@@ -29,8 +28,7 @@ libnc_server_rpc.so library and header file
 Summary: nc_server auxillary programs
 Group: Applications/Engineering
 Requires: nc_server-devel
-# Allow this package to be relocatable to other places than /opt/local/nidas/x86
-# rpm --relocate /opt/local/nidas/x86=/usr --relocate /opt/local/nidas/share=/usr/share
+
 %description auxprogs
 nc_server auxillary programs
 
@@ -50,18 +48,20 @@ cp etc/init.d/* $RPM_BUILD_ROOT%{_sysconfdir}/init.d
 cp scripts/* ${RPM_BUILD_ROOT}/usr/bin
 
 %pre
-if [ "$1" -eq 1 ]; then
-    addnidas=true
-    addeol=true
-    # check if NIS is running
-    if which ypwhich > /dev/null 2>&1 && ypwhich > /dev/null 2>&1; then
-        ypmatch nidas passwd > /dev/null 2>&1 /dev/null && addnidas=false
-        ypmatch eol group > /dev/null 2>&1 /dev/null && addeol=false
-    fi
 
-    $addeol && /usr/sbin/groupadd -g 1342 -f -r eol >/dev/null 2>&1 || :;
-    $addnidas && /usr/sbin/useradd  -u 11009 -N -M -g eol -s /sbin/nologin -d /tmp -c NIDAS -K PASS_MAX_DAYS=-1 nidas >/dev/null 2>&1 || :;
-fi;
+adduser=false
+addgroup=false
+grep -q ^nidas /etc/passwd || adduser=true
+grep -q ^eol /etc/group || addgroup=true
+
+# check if NIS is running. If so, check if nidas.eol is known to NIS
+if which ypwhich > /dev/null 2>&1 && ypwhich > /dev/null 2>&1; then
+    ypmatch nidas passwd > /dev/null 2>&1 && adduser=false
+    ypmatch eol group > /dev/null 2>&1 && addgroup=false
+fi
+
+$addgroup && /usr/sbin/groupadd -g 1342 -o eol
+$adduser && /usr/sbin/useradd  -u 11009 -o -N -M -g eol -s /sbin/nologin -d /tmp -c NIDAS -K PASS_MAX_DAYS=-1 nidas || :
 
 %post
 ldconfig
@@ -93,6 +93,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %changelog
 * Fri Apr 15 2011 Gordon Maclean <maclean@ucar.edu> 1.0-2
-- added /etc/init.d/nc_server boot script, and useradd of nidas.eol user
+- added /etc/init.d/nc_server boot script. %pre does useradd/groupadd of nidas.eol.
+- nc_server has -g runstring option to set the group. sudo is not needed to start.
 * Mon Jun  7 2010 Gordon Maclean <maclean@ucar.edu> 1.0-1
 - original
