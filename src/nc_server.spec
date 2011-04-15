@@ -1,7 +1,7 @@
 Summary: Server for NetCDF file writing.
 Name: nc_server
 Version: 1.0
-Release: 1%{?dist}
+Release: 2%{?dist}
 License: GPL
 Group: Applications/Engineering
 Url: http://www.eol.ucar.edu/
@@ -45,15 +45,59 @@ scons PREFIX=${RPM_BUILD_ROOT}/usr
 rm -rf $RPM_BUILD_ROOT
 scons PREFIX=${RPM_BUILD_ROOT}/usr install
 cp scripts/* ${RPM_BUILD_ROOT}/usr/bin
+install -d $RPM_BUILD_ROOT%{_sysconfdir}/init.d
+cp etc/init.d/* $RPM_BUILD_ROOT%{_sysconfdir}/init.d
+cp scripts/* ${RPM_BUILD_ROOT}/usr/bin
+
+%pre
+if [ "$1" -eq 1 ]; then
+    addnidas=true
+    addeol=true
+    # check if NIS is running
+    if which ypwhich > /dev/null 2>&1 && ypwhich > /dev/null; then
+        ypmatch nidas passwd > /dev/null 2>&1 /dev/null && addnidas=false
+        ypmatch eol group > /dev/null 2>&1 /dev/null && addeol=false
+    fi
+
+    $addeol || /usr/sbin/groupadd -g 1342 -f -r eol >/dev/null 2>&1 || :;
+    $addnidas || /usr/sbin/useradd  -u 11009 -N -M -g eol -s /sbin/nologin -d /tmp -c NIDAS -K PASS_MAX_DAYS=-1 -K UMASK=0002 nidas >/dev/null 2>&1 || :;
+fi;
+
+%triggerin -- sudo
+
+sudo=/tmp/sudoers_$$
+cp /etc/sudoers $tmpsudo
+
+# Remove requiretty requirement for nidas account so that we can
+# do sudo from bootup scripts.
+if grep -E -q "^Defaults[[:space:]]+requiretty" $tmpsudo; then
+    if ! grep -E -q '^Defaults[[:space:]]*:[[:space:]]*[^[:space:]]+[[:space:]]+!requiretty/' $tmpsudo; then
+        sed -i '
+/^Defaults[[:space:]]*requiretty/a\
+Defaults:nidas !requiretty' $tmpsudo
+    fi
+fi
+
+if ! grep -q nc_server $tmpsudo; then
+cat << \EOD >> $tmpsudo
+nidas ALL=NOPASSWD: SETENV: /usr/bin/nc_server
+EOD
+fi
 
 %post
 ldconfig
+
+# To enable the boot script, uncomment this:
+# if ! chkconfig --level 3 nc_server; then
+#     chkconfig --add nc_server 
+# fi
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %files
 /usr/bin/nc_server
+/etc/init.d/nc_server
 
 %files auxprogs
 /usr/bin/nc_sync
@@ -69,5 +113,7 @@ rm -rf $RPM_BUILD_ROOT
 %_libdir/libnc_server_rpc.so
 
 %changelog
+* Fri Apr 15 2011 Gordon Maclean <maclean@ucar.edu> 1.0-2
+- added /etc/init.d/nc_server boot script, and useradd of nidas.eol user
 * Mon Jun  7 2010 Gordon Maclean <maclean@ucar.edu> 1.0-1
 - original
