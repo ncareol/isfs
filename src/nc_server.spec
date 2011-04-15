@@ -54,35 +54,14 @@ if [ "$1" -eq 1 ]; then
     addnidas=true
     addeol=true
     # check if NIS is running
-    if which ypwhich > /dev/null 2>&1 && ypwhich > /dev/null; then
+    if which ypwhich > /dev/null 2>&1 && ypwhich > /dev/null 2>&1; then
         ypmatch nidas passwd > /dev/null 2>&1 /dev/null && addnidas=false
         ypmatch eol group > /dev/null 2>&1 /dev/null && addeol=false
     fi
 
-    $addeol || /usr/sbin/groupadd -g 1342 -f -r eol >/dev/null 2>&1 || :;
-    $addnidas || /usr/sbin/useradd  -u 11009 -N -M -g eol -s /sbin/nologin -d /tmp -c NIDAS -K PASS_MAX_DAYS=-1 -K UMASK=0002 nidas >/dev/null 2>&1 || :;
+    $addeol && /usr/sbin/groupadd -g 1342 -f -r eol >/dev/null 2>&1 || :;
+    $addnidas && /usr/sbin/useradd  -u 11009 -N -M -g eol -s /sbin/nologin -d /tmp -c NIDAS -K PASS_MAX_DAYS=-1 nidas >/dev/null 2>&1 || :;
 fi;
-
-%triggerin -- sudo
-
-sudo=/tmp/sudoers_$$
-cp /etc/sudoers $tmpsudo
-
-# Remove requiretty requirement for nidas account so that we can
-# do sudo from bootup scripts.
-if grep -E -q "^Defaults[[:space:]]+requiretty" $tmpsudo; then
-    if ! grep -E -q '^Defaults[[:space:]]*:[[:space:]]*[^[:space:]]+[[:space:]]+!requiretty/' $tmpsudo; then
-        sed -i '
-/^Defaults[[:space:]]*requiretty/a\
-Defaults:nidas !requiretty' $tmpsudo
-    fi
-fi
-
-if ! grep -q nc_server $tmpsudo; then
-cat << \EOD >> $tmpsudo
-nidas ALL=NOPASSWD: SETENV: /usr/bin/nc_server
-EOD
-fi
 
 %post
 ldconfig
