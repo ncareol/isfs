@@ -67,9 +67,9 @@ $adduser && /usr/sbin/useradd  -u 10035 -o -N -M -g eol -s /sbin/nologin -d /tmp
 ldconfig
 
 # To enable the boot script, uncomment this:
-# if ! chkconfig --level 3 nc_server; then
-#     chkconfig --add nc_server 
-# fi
+if ! chkconfig --level 3 nc_server; then
+    chkconfig --add nc_server 
+fi
 
 if ! chkconfig --list nc_server > /dev/null 2>&1; then
     echo "nc_server is not setup to run at boot time"
