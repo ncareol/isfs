@@ -61,7 +61,7 @@ if which ypwhich > /dev/null 2>&1 && ypwhich > /dev/null 2>&1; then
 fi
 
 $addgroup && /usr/sbin/groupadd -g 1342 -o eol
-$adduser && /usr/sbin/useradd  -u 11009 -o -N -M -g eol -s /sbin/nologin -d /tmp -c NIDAS -K PASS_MAX_DAYS=-1 nidas || :
+$adduser && /usr/sbin/useradd  -u 10035 -o -N -M -g eol -s /sbin/nologin -d /tmp -c NIDAS -K PASS_MAX_DAYS=-1 nidas || :
 
 %post
 ldconfig
@@ -70,6 +70,42 @@ ldconfig
 # if ! chkconfig --level 3 nc_server; then
 #     chkconfig --add nc_server 
 # fi
+
+if ! chkconfig --list nc_server > /dev/null 2>&1; then
+    echo "nc_server is not setup to run at boot time"
+    chkconfig --list nc_server
+fi
+
+%triggerin -- sudo
+
+sudo=/tmp/sudoers_$$
+cp /etc/sudoers $tmpsudo
+
+# Remove requiretty requirement for nidas account so that we can
+# do sudo from bootup scripts.
+if grep -E -q "^Defaults[[:space:]]+requiretty" $tmpsudo; then
+    if ! grep -E -q '^Defaults[[:space:]]*:[[:space:]]*[^[:space:]]+[[:space:]]+!requiretty/' $tmpsudo; then
+        sed -i '
+/^Defaults[[:space:]]*requiretty/a\
+# The /usr/bin/nc_server.check script starts nc_server via sudo, which may be\
+# handy if it needs to be started from a crontab or at other than boot time.\
+# The following statements add permission for the "nidas" user to start nc_server via sudo.\
+# If nidas is not a login account, change "nidas" to a login account that will want\
+# to run nc_server.check or otherwise start nc_server via sudo. Change this !requiretty\
+# line and the nc_server line below.\
+Defaults:nidas !requiretty\
+' $tmpsudo
+    fi
+fi
+
+if ! grep -q nc_server $tmpsudo; then
+cat << \EOD >> $tmpsudo
+nidas ALL=NOPASSWD: SETENV: /usr/bin/nc_server
+EOD
+fi
+
+visudo -c -f $tmpsudo && cp $tmpsudo /etc/sudoers
+rm -f $tmpsudo
 
 %clean
 rm -rf $RPM_BUILD_ROOT
