@@ -100,7 +100,6 @@ size_t do_fit(list<samp_save>& samps,gsl_fit_sums& sums,
 
 #define DISCARD_BAD
 #ifdef DISCARD_BAD
-            // hack: exclude samples with timetags
             if (lastn > 0) {
                 // estimate timetag from last fit.
                 if (n == 0) {
@@ -110,7 +109,7 @@ size_t do_fit(list<samp_save>& samps,gsl_fit_sums& sums,
                     gsl_fit_linear_add_point((double)n,ttx,sums);
                 }
                 else {
-                    int ttest = lasta + (lastn + n) * lastb - dtfit;
+                    double ttest = lasta + (lastn + n) * lastb - dtfit;
                     if (abs(ttx-ttest) < USECS_PER_SEC / 4)
                         gsl_fit_linear_add_point((double)n,ttx,sums);
                     else
@@ -277,8 +276,13 @@ void CSAT3Sensor::setRate(double val)
 int CSAT3Sensor::getSequenceNumber(const Sample* samp)
 {
     size_t inlen = samp->getDataByteLength();
-    const unsigned int minimumLength = 12;   // two bytes each for u,v,w,tc,diag, and 0x55aa
-    if (inlen < minimumLength) return -99;
+    const unsigned int csat3Length = 12;   // two bytes each for u,v,w,tc,diag, and 0x55aa
+
+    // discard short and long records. CSAT3's will serializer have extra 2 bytes.
+    // In CHATS some records looked like so, which should be junked:
+    // 00 80 00 80 00 80 00 80 00 80 00 80 00 80 00 80 3f f0 55 aa
+    // 2007 05 26 00:39:22.3604, sonic 2,150
+    if (inlen < csat3Length || inlen > csat3Length+2) return -99;
 
     const char* dptr = (const char*) samp->getConstVoidDataPtr();
 
@@ -296,12 +300,12 @@ bool CSAT3Sensor::processSample(const Sample* samp,vector<float>& res)
 {
     size_t inlen = samp->getDataByteLength();
 
-    const unsigned int minimumLength = 12;   // two bytes each for u,v,w,tc,diag, and 0x55aa
+    const unsigned int csat3Length = 12;   // two bytes each for u,v,w,tc,diag, and 0x55aa
     const char* dinptr = (const char*) samp->getConstVoidDataPtr();
 
     res.resize(4);
 
-    if (inlen < minimumLength || dinptr[inlen-2] != '\x55' || dinptr[inlen-1] != '\xaa') {
+    if (inlen < csat3Length || inlen > csat3Length+2 || dinptr[inlen-2] != '\x55' || dinptr[inlen-1] != '\xaa') {
         for (int i = 0; i < 4; i++) 
             res[i] = floatNAN;
         return false;
@@ -1400,6 +1404,21 @@ int TT_Adjust::run() throw()
 
         // SampleInputStream owns the fset ptr.
         RawSampleInputStream input(fset);
+
+        // save header for later writing to output
+        try {
+            input.readInputHeader();
+        }
+        catch(const n_u::EOFException& e) {
+            cerr << e.what() << endl;
+            outStream.close();
+            _unmatchedOutput.close();
+            return 1;
+        }
+
+        HeaderSrc hsrc(input.getInputHeader());
+        outStream.setHeaderSource(&hsrc);
+        _unmatchedOutput.setHeaderSource(&hsrc);
 
         for (;;) {
             Sample* samp;

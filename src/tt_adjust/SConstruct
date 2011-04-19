@@ -1,5 +1,17 @@
 
+import os
+import subprocess
+
 env = Environment(platform = 'posix').Clone(tools=['sharedlibrary'])
+env['ISFF'] = os.environ['ISFF']
+
+kmach = subprocess.Popen(['uname','-m'],stdout=subprocess.PIPE).communicate()[0].rstrip("\n")
+if kmach == "x86_64":
+    env['BINDIR'] = "bin64"
+    env['LIBDIR'] = "lib64"
+else:
+    env['BINDIR'] = "bin"
+    env['LIBDIR'] = "lib"
 
 p1 = env.Program("tt_adjust", ["tt_adjust.cc","gsl.cc"],
     LIBS=["nidas_util","nidas","nidas_dynld"],
@@ -8,6 +20,7 @@ p1 = env.Program("tt_adjust", ["tt_adjust.cc","gsl.cc"],
     CXXFLAGS=['-g','-Wall'])
 #     CXXFLAGS=['-g','-pg','-Wall'],LINKFLAGS="-pg")
 
-env.Install('$PREFIX/bin',[p1])
-env.Alias('install', [ '$PREFIX/bin' ])
+env.Install('$ISFF/$BINDIR',p1)
+
+env.Alias('install', [ '$ISFF/$BINDIR' ])
 
