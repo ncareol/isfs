@@ -36,6 +36,8 @@
 
 #include <nidas/core/Sample.h>
 #include <nidas/core/SampleSorter.h>
+#include <nidas/core/SampleInputHeader.h>
+#include <nidas/core/HeaderSource.h>
 #include <nidas/dynld/RawSampleOutputStream.h>
 #include <nidas/util/EndianConverter.h>
 
@@ -441,5 +443,16 @@ private:
      */
     std::map<unsigned int, std::set<std::pair<long long,int>,SequenceComparator> > _clockOffsets;
 
-};
+    class HeaderSrc: public nidas::core::HeaderSource
+    {
+    public:
+        HeaderSrc(const nidas::core::SampleInputHeader& header) : _header(header) {}
+        void sendHeader(nidas::core::dsm_time_t thead,nidas::core::SampleOutput* out) throw(nidas::util::IOException)
+        {
+            _header.write(out);
+        }
+    private:
+        nidas::core::SampleInputHeader _header;
+    };
 
+};
