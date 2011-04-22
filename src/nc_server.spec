@@ -51,8 +51,8 @@ cp scripts/* ${RPM_BUILD_ROOT}/usr/bin
 
 adduser=false
 addgroup=false
-grep -q ^nidas /etc/passwd || adduser=true
-grep -q ^eol /etc/group || addgroup=true
+grep -q ^nidas %{_sysconfdir}/passwd || adduser=true
+grep -q ^eol %{_sysconfdir}/group || addgroup=true
 
 # check if NIS is running. If so, check if nidas.eol is known to NIS
 if which ypwhich > /dev/null 2>&1 && ypwhich > /dev/null 2>&1; then
@@ -81,7 +81,7 @@ exit 0
 %triggerin -- sudo
 
 tmpsudo=/tmp/sudoers_$$
-cp /etc/sudoers $tmpsudo
+cp %{_sysconfdir}/sudoers $tmpsudo
 
 # Remove requiretty requirement for nidas account so that we can
 # do sudo from non-login (crontab) scripts.
@@ -107,7 +107,7 @@ nidas ALL=NOPASSWD: SETENV: /usr/bin/nc_server
 EOD
 fi
 
-visudo -c -f $tmpsudo && cp $tmpsudo /etc/sudoers
+visudo -c -f $tmpsudo && cp $tmpsudo %{_sysconfdir}/sudoers
 rm -f $tmpsudo
 
 %clean
@@ -115,7 +115,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 /usr/bin/nc_server
-/etc/init.d/nc_server
+%config %{_sysconfdir}/init.d/nc_server
 
 %files auxprogs
 /usr/bin/nc_sync
