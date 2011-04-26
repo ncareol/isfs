@@ -40,6 +40,7 @@
 #include <nidas/core/HeaderSource.h>
 #include <nidas/dynld/RawSampleOutputStream.h>
 #include <nidas/util/EndianConverter.h>
+#include <nidas/util/UTime.h>
 
 #include "gsl.h"
 
@@ -378,6 +379,10 @@ public:
 private:
 
     static bool _interrupted;
+
+    nidas::util::UTime _startTime;
+
+    nidas::util::UTime _endTime;
 
     std::list<std::string> _inputFileNames;
 

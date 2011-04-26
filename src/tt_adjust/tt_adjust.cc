@@ -24,11 +24,12 @@
 #include <nidas/dynld/RawSampleInputStream.h>
 #include <nidas/dynld/RawSampleOutputStream.h>
 #include <nidas/util/EOFException.h>
-#include <nidas/util/UTime.h>
+#include <nidas/util/Process.h>
 
 #include <iomanip>
 #include <limits>
 #include <math.h>
+#include <sys/resource.h>
 
 using namespace nidas::core;
 using namespace nidas::dynld;
@@ -743,6 +744,7 @@ void CSAT3Sensor::addSample(const Sample* samp, long long dsmSampleNumber)
     }
 
     if (fold0.getNotMatched() > 10 + _nfolds) {
+#ifdef DEBUG_FOLDS
         cerr << "warning: " << formatTime(tt) <<
             ", id=" << formatId(_id) <<
             ", nfolds=" << _nfolds <<
@@ -751,6 +753,7 @@ void CSAT3Sensor::addSample(const Sample* samp, long long dsmSampleNumber)
             ",0x" << hex << fold0.getFirstSeq() << dec << "-0x" <<
             hex << fold0.getLastSeq() << dec << ',' << fold0.getSize() <<
             ", #unmatched=" << fold0.getNotMatched() << endl;
+#endif
         fitAndOutput(fold0);
         discardLastFit();
 
@@ -771,6 +774,7 @@ void CSAT3Sensor::addSample(const Sample* samp, long long dsmSampleNumber)
             }
         }
         if (matchingFold != _folds.end()) {
+#ifdef DEBUG_FOLDS
             cerr << "warning: " << formatTime(matchingFold->getFirstTime()) <<
                 ", id=" << formatId(_id) <<
                 ", nfolds=" << _nfolds <<
@@ -779,6 +783,7 @@ void CSAT3Sensor::addSample(const Sample* samp, long long dsmSampleNumber)
                 ",0x" << hex << matchingFold->getFirstSeq() << dec << "-0x" <<
                 hex << matchingFold->getLastSeq() << dec << ',' << matchingFold->getSize() <<
                 " to fold 0 " << endl;
+#endif
             _foldLengths.push_back(matchingFold->getSize());
             fold0.append(*matchingFold);
             _folds.erase(matchingFold);
@@ -806,8 +811,9 @@ size_t CSAT3Sensor::fitAndOutput(CSAT3Fold& fold)
     size_t nexclude;
     size_t n = do_fit(fold.getSamples(),sums,&a,&b,
             &cov_00,&cov_01,&cov_11,&sumsq,_lasta,_lastb,_dev,_lastn,_tlast0,nexclude);
+
     assert(fold.getSize() == n + nexclude);
-    if (n == 0 && nexclude == 0) return n;
+    assert(n + nexclude > 0);
 
     int maxneg,maxpos;
     dsm_time_t tlastfit = _lastFitTime;
@@ -844,11 +850,13 @@ size_t CSAT3Sensor::fitAndOutput(CSAT3Fold& fold)
         _tlast0 = fold.getFirstTime();
     }
     else {
+#ifdef DEBUG
         cerr << "warning: " << formatTime(fold.getFirstTime()) <<
             ", id=" << formatId(_id) << ", saving small fold, n=" << n << " nexclude=" << nexclude << ' ' <<
             formatTime(fold.getFirstTime(),true) << '-' << formatTime(fold.getLastTime(),true) <<
             ",0x" << hex << fold.getFirstSeq() << dec << "-0x" <<
             hex << fold.getLastSeq() << dec << ',' << fold.getSize() << endl;
+#endif
         _adjuster->writeUnmatchedSamples(fold.getSamples());
         discardLastFit();
     }
@@ -873,7 +881,6 @@ int CSAT3Sensor::handleUnmatchedFolds()
     }
     assert(_nfolds > 0);
 
-    // output unmatched folds to their own output.
     list<CSAT3Fold>::iterator matchfi = _folds.begin();
 
     while (_nfolds > 1 && matchfi != _folds.end()) {
@@ -897,13 +904,16 @@ int CSAT3Sensor::handleUnmatchedFolds()
             if (fold.getNotMatched() > 10 + _nfolds)
 #endif
             {
-                cerr << "warning: " << formatTime(fold.getFirstTime()) <<
-                    ", id=" << formatId(_id) << ", nfolds=" << _nfolds <<
-                    ", saving unmatched fold " << ifold << ' ' <<
-                    formatTime(fold.getFirstTime(),true) << '-' << formatTime(fold.getLastTime(),true) <<
-                    ",0x" << hex << fold.getFirstSeq() << dec << "-0x" <<
-                    hex << fold.getLastSeq() << dec << ',' << fold.getSize() <<
-                    ", unmatched=" << fold.getNotMatched() << endl;
+#ifdef DEBUG_FOLDS
+                if (fold.getSize() > 10) 
+                    cerr << "warning: " << formatTime(fold.getFirstTime()) <<
+                        ", id=" << formatId(_id) << ", nfolds=" << _nfolds <<
+                        ", saving unmatched fold " << ifold << ' ' <<
+                        formatTime(fold.getFirstTime(),true) << '-' << formatTime(fold.getLastTime(),true) <<
+                        ",0x" << hex << fold.getFirstSeq() << dec << "-0x" <<
+                        hex << fold.getLastSeq() << dec << ',' << fold.getSize() <<
+                        ", unmatched=" << fold.getNotMatched() << endl;
+#endif
                 _foldLengths.push_back(-(signed)fold.getSize());
                 list<samp_save>& samps = fold.getSamples();
                 _adjuster->writeUnmatchedSamples(samps);
@@ -1034,7 +1044,8 @@ int main(int argc, char** argv)
 bool TT_Adjust::_interrupted = false;
 
 TT_Adjust::TT_Adjust():
-    _fitUsecs(30*USECS_PER_SEC),_outputFileLength(0),_csatRate(0.0),
+    _startTime((time_t)0),_endTime((time_t)0),_fitUsecs(30*USECS_PER_SEC),
+    _outputFileLength(0),_csatRate(0.0),
     _sorter("output sorter",true)
 {
 }
@@ -1047,8 +1058,17 @@ int TT_Adjust::parseRunstring(int argc, char** argv)
     const char* cp;
     char* cp2;
 
-    while ((opt_char = getopt(argc, argv, "c:f:l:o:r:s:u:")) != -1) {
+    while ((opt_char = getopt(argc, argv, "B:c:E:f:l:i:o:r:s:u:")) != -1) {
 	switch (opt_char) {
+        case 'B':
+            try {
+                _startTime = n_u::UTime::parse(true,optarg);
+            }
+            catch (const n_u::ParseException& pe) {
+                cerr << pe.what() << endl;
+                return usage(argv[0]);
+            }
+            break;
         case 'c':
             {
                 unsigned int dsmid;
@@ -1075,10 +1095,22 @@ int TT_Adjust::parseRunstring(int argc, char** argv)
                         make_pair<dsm_sample_id_t,CSAT3Sensor>(id,CSAT3Sensor(this,id,rate)));
             }
             break;
+        case 'E':
+            try {
+                _endTime = n_u::UTime::parse(true,optarg);
+            }
+            catch (const n_u::ParseException& pe) {
+                cerr << pe.what() << endl;
+                return usage(argv[0]);
+            }
+            break;
 	case 'f':
             cp = optarg;
 	    _fitUsecs = (long long)(strtod(cp,&cp2) * USECS_PER_SEC);
             if (cp2 == cp) return usage(argv[0]);
+	    break;
+	case 'i':
+	    _inputFileNames.push_back(optarg);
 	    break;
 	case 'l':
 	    _outputFileLength = atoi(optarg);
@@ -1165,6 +1197,11 @@ int TT_Adjust::main(int argc, char** argv) throw()
     int res;
     
     if ((res = adjuster.parseRunstring(argc,argv)) != 0) return res;
+
+    nidas::util::Logger* logger = n_u::Logger::createInstance(&std::cerr);
+    n_u::LogConfig lc;
+    lc.level = 6;
+    logger->setScheme(n_u::LogScheme("tt_adjust").addConfig (lc));
 
     return adjuster.run();
 }
@@ -1280,7 +1317,13 @@ void TT_Adjust::output_other()
 
         set<pair<long long,int>,SequenceComparator>& offsets = _clockOffsets[dsmid];
 
+        // save first time
+        dsm_time_t tt0 = 0;
+
         list<samp_save>::iterator si = samps.begin();
+
+        if (si != samps.end()) tt0 = si->samp->getTimeTag();
+
         for (n = 0; si != samps.end(); ++si,n++) {
 
             samp_save& save = *si;
@@ -1339,12 +1382,9 @@ void TT_Adjust::output_other()
             samp->freeReference();
         }
         if (!samps.empty()) {
-            samp_save& save = samps.front();
-
             dsm_sample_id_t id = 0;
             id = SET_DSM_ID(id,dsmid);
-
-            cout << formatTime(save.samp->getTimeTag()) << ' ' <<
+            cout << formatTime(tt0) << ' ' <<
                 formatId(id) << ' ' <<
                 setw(6) << n << ' ' <<
                 setw(4) << ndiscards << ' ' <<
@@ -1398,9 +1438,28 @@ int TT_Adjust::run() throw()
 	orphSet->setFileLengthSecs(_unmatchedFileLength);
         _unmatchedOutput.connected(orphSet);
 
-        nidas::core::FileSet* fset = nidas::core::FileSet::getFileSet(_inputFileNames);
+        nidas::core::FileSet* fset;
+        if (_inputFileNames.size() > 1) {
+            fset = nidas::core::FileSet::getFileSet(_inputFileNames);
+        }
+        else {
+            if (_inputFileNames.front().find(".bz2") != string::npos) {
+#ifdef HAS_BZLIB_H
+                fset = new nidas::core::Bzip2FileSet();
+#else
+                cerr << "Sorry, no support for Bzip2 files on this system" << endl;
+                exit(1);
+#endif
+            }
+            else {
+                fset = new nidas::core::FileSet();
+            }
+            fset->setFileName(_inputFileNames.front());
+            if (_startTime.toUsecs() != 0) fset->setStartTime(_startTime);
+            if (_endTime.toUsecs() != 0) fset->setEndTime(_endTime);
+        }
 
-        dsm_time_t endTime = 0;
+        dsm_time_t fitEndTime = 0;
 
         // SampleInputStream owns the fset ptr.
         RawSampleInputStream input(fset);
@@ -1419,6 +1478,8 @@ int TT_Adjust::run() throw()
         HeaderSrc hsrc(input.getInputHeader());
         outStream.setHeaderSource(&hsrc);
         _unmatchedOutput.setHeaderSource(&hsrc);
+
+        unsigned long lastVsize = 0;
 
         for (;;) {
             Sample* samp;
@@ -1440,7 +1501,7 @@ int TT_Adjust::run() throw()
                 cerr << "sample num for dsm " << GET_DSM_ID(inid) << "=" <<
                         _dsmSampleNumbers[GET_DSM_ID(inid)] << endl;
 #endif
-            if (tt > endTime) {
+            if (tt > fitEndTime) {
                 //  if all csats have only one fold, then fit and output
                 //      them all
                 //  one or more with multiple folds:
@@ -1455,9 +1516,11 @@ int TT_Adjust::run() throw()
                     CSAT3Sensor& csat = ci->second;
                     int nfold = csat.handleUnmatchedFolds();
                     if (nfold > 1) {
+#ifdef DEBUG
                         cerr << "warning: " << formatTime(tt) <<
                             " id=" << formatId(ci->first) <<
                             " after handleUnmatchedFolds(), nfold=" << nfold << endl;
+#endif
                         allSingleFolds = false;
                     }
                 }
@@ -1469,9 +1532,39 @@ int TT_Adjust::run() throw()
                     }
                     fixed_fit_output();
                     output_other();
-                    // only increment endTime if all single folds
-                    endTime = tt + _fitUsecs - (tt % _fitUsecs);
+                    // only increment fitEndTime if all single folds
+                    fitEndTime = tt + _fitUsecs - (tt % _fitUsecs);
                 }
+#ifdef DEBUG
+                else {
+                    ci = _csats.begin();
+                    for ( ; ci != _csats.end(); ++ci) {
+                        CSAT3Sensor& csat = ci->second;
+                        if (csat.getNfolds() > 1)
+                            cout << formatTime(fitEndTime) << formatId(ci->first) <<
+                                ", nfolds=" << csat.getNfolds() << endl;
+                    }
+                }
+#endif
+
+                // output some memory info
+                unsigned long vsize = n_u::Process::getVMemSize();
+                cout << "virtual memory=" << vsize/1000/1000 << " Mbytes" <<
+                    ", increase=" << (signed)(vsize - lastVsize)/1000 << " kbytes" <<
+                    ", maxRSS=" << n_u::Process::getMaxRSS()/1000/1000 << " Mbytes" << endl;
+                std::list<SamplePoolInterface*> pools = SamplePools::getInstance()->getPools();
+                std::list<SamplePoolInterface*>::const_iterator pi = pools.begin();
+                for ( ; pi != pools.end(); ++pi) {
+                    unsigned long nout = (*pi)->getNSamplesOut();
+                    unsigned long ssize = _sorter.size();
+                    cout << "samp alloc=" << (*pi)->getNSamplesAlloc()/1000 << "K" << 
+                        ", out=" << nout << 
+                        ", smallin=" << (*pi)->getNSmallSamplesIn() << 
+                        ", mediumin=" << (*pi)->getNMediumSamplesIn() << 
+                        ", largein=" << (*pi)->getNLargeSamplesIn() <<
+                        ", sorter.size=" << ssize << ", out-sorter=" << (nout - ssize) << endl;
+                }
+                lastVsize = vsize;
             }
 
             map<dsm_sample_id_t,CSAT3Sensor>::iterator ci = _csats.find(inid);
