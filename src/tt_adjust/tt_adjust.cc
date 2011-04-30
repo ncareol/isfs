@@ -372,8 +372,6 @@ void CSAT3Sensor::matchFoldsToFold0()
 
     while (matchingFold != _folds.end()) {
 
-        matchingFold = _folds.end();
-
         dsm_time_t toldest = std::numeric_limits<long long>::max();
         matchingFold = _folds.end();
         int mfold = -1;
@@ -568,19 +566,6 @@ void CSAT3Sensor::addSample(const Sample* samp, long long dsmSampleNumber)
 {
     int cseq = getSequenceNumber(samp);
 
-    // doesn't have a sequence number, so not a wind sample, probably a
-    // ?? output, or reset message, or a sample with missing data:
-    //      00 80 00 80 00 80 00 80 3f f0 55 aa 
-    // Add it to the "other" sensor output.
-    // In a missing data sample, the wind and tc data will be NaN,
-    // and the resampler ignores NaNs.
-    if (cseq < 0) {
-        list<CSAT3Fold>::iterator fi = _folds.begin();
-        for (; fi != _folds.end(); ++fi) fi->sampleNotMatched();
-        _adjuster->otherSample(samp,dsmSampleNumber);
-        return;
-    }
-
     dsm_time_t tt = samp->getTimeTag();
 
     // check time difference from last sample received
@@ -619,6 +604,20 @@ void CSAT3Sensor::addSample(const Sample* samp, long long dsmSampleNumber)
             assert(_nfolds == 1);
         }
     }
+
+    // doesn't have a sequence number, so not a wind sample, probably a
+    // ?? output, or reset message, or a sample with missing data:
+    //      00 80 00 80 00 80 00 80 3f f0 55 aa 
+    // Add it to the "other" sensor output.
+    // In a missing data sample, the wind and tc data will be NaN,
+    // and the resampler ignores NaNs.  We don't save _lastTime
+    if (cseq < 0) {
+        list<CSAT3Fold>::iterator fi = _folds.begin();
+        for (; fi != _folds.end(); ++fi) fi->sampleNotMatched();
+        _adjuster->otherSample(samp,dsmSampleNumber);
+        return;
+    }
+
 
     _lastTime = tt;
 
@@ -731,7 +730,7 @@ void CSAT3Sensor::addSample(const Sample* samp, long long dsmSampleNumber)
 
     _maxNumFolds = std::max(_maxNumFolds,_nfolds);
 
-    if (_nfolds != handleUnmatchedFolds()) fold0 = _folds.front();
+    if (_nfolds != handleUnmatchedFolds(tt)) fold0 = _folds.front();
 
     if (fold0.getNotMatched() > _nfolds) {
         // we're no longer getting samples for fold 0. 
@@ -872,7 +871,7 @@ void CSAT3Sensor::discardLastFit()
 }
 
 
-int CSAT3Sensor::handleUnmatchedFolds()
+int CSAT3Sensor::handleUnmatchedFolds(dsm_time_t tt)
 {
 
     if (_folds.empty()) {
@@ -897,12 +896,8 @@ int CSAT3Sensor::handleUnmatchedFolds()
             // folds other than 0 should not be empty
             assert(!fold.empty());
 
-#ifdef CHECK_BY_TIME
             long long dt = tt - fold.getLastTime();
-            if (dt > OLD_FOLD_MAX_DT)
-#else
-            if (fold.getNotMatched() > 10 + _nfolds)
-#endif
+            if (fold.getNotMatched() > 10 + _nfolds || dt > _sampleDt * 20)
             {
 #ifdef DEBUG_FOLDS
                 if (fold.getSize() > 10) 
@@ -1514,12 +1509,22 @@ int TT_Adjust::run() throw()
 
                 for ( ; ci != _csats.end(); ++ci) {
                     CSAT3Sensor& csat = ci->second;
-                    int nfold = csat.handleUnmatchedFolds();
+                    int nfold = csat.getNfolds();
+                    if (nfold > 1) nfold = csat.handleUnmatchedFolds(tt);
                     if (nfold > 1) {
-#ifdef DEBUG
+#define DEBUG_FOLDS
+#ifdef DEBUG_FOLDS
                         cerr << "warning: " << formatTime(tt) <<
                             " id=" << formatId(ci->first) <<
-                            " after handleUnmatchedFolds(), nfold=" << nfold << endl;
+                            " tt > fitEndTime and nfold=" << nfold << endl;
+                            list<CSAT3Fold>::const_iterator fi = csat.getFoldsBegin();
+                        int ifold;
+                        for (ifold = 0; fi != csat.getFoldsEnd(); ++fi,ifold++) {
+                            const CSAT3Fold& fold = *fi;
+                            assert(!fold.empty());
+                            cerr << formatId(csat.getId()) << ", fold=" << ifold << ", not matched=" << fold.getNotMatched() << endl;
+                        }
+#undef DEBUG_FOLDS
 #endif
                         allSingleFolds = false;
                     }
@@ -1534,6 +1539,25 @@ int TT_Adjust::run() throw()
                     output_other();
                     // only increment fitEndTime if all single folds
                     fitEndTime = tt + _fitUsecs - (tt % _fitUsecs);
+
+                    // output some memory info
+                    unsigned long vsize = n_u::Process::getVMemSize();
+                    cout << "virtual memory=" << vsize/1000/1000 << " Mbytes" <<
+                        ", increase=" << (signed)(vsize - lastVsize)/1000 << " kbytes" <<
+                        ", maxRSS=" << n_u::Process::getMaxRSS()/1000/1000 << " Mbytes" << endl;
+                    std::list<SamplePoolInterface*> pools = SamplePools::getInstance()->getPools();
+                    std::list<SamplePoolInterface*>::const_iterator pi = pools.begin();
+                    for ( ; pi != pools.end(); ++pi) {
+                        unsigned long nout = (*pi)->getNSamplesOut();
+                        unsigned long ssize = _sorter.size();
+                        cout << "samp alloc=" << (*pi)->getNSamplesAlloc()/1000 << "K" << 
+                            ", out=" << nout << 
+                            ", smallin=" << (*pi)->getNSmallSamplesIn() << 
+                            ", mediumin=" << (*pi)->getNMediumSamplesIn() << 
+                            ", largein=" << (*pi)->getNLargeSamplesIn() <<
+                            ", sorter.size=" << ssize << ", out-sorter=" << (nout - ssize) << endl;
+                    }
+                    lastVsize = vsize;
                 }
 #ifdef DEBUG
                 else {
@@ -1546,25 +1570,6 @@ int TT_Adjust::run() throw()
                     }
                 }
 #endif
-
-                // output some memory info
-                unsigned long vsize = n_u::Process::getVMemSize();
-                cout << "virtual memory=" << vsize/1000/1000 << " Mbytes" <<
-                    ", increase=" << (signed)(vsize - lastVsize)/1000 << " kbytes" <<
-                    ", maxRSS=" << n_u::Process::getMaxRSS()/1000/1000 << " Mbytes" << endl;
-                std::list<SamplePoolInterface*> pools = SamplePools::getInstance()->getPools();
-                std::list<SamplePoolInterface*>::const_iterator pi = pools.begin();
-                for ( ; pi != pools.end(); ++pi) {
-                    unsigned long nout = (*pi)->getNSamplesOut();
-                    unsigned long ssize = _sorter.size();
-                    cout << "samp alloc=" << (*pi)->getNSamplesAlloc()/1000 << "K" << 
-                        ", out=" << nout << 
-                        ", smallin=" << (*pi)->getNSmallSamplesIn() << 
-                        ", mediumin=" << (*pi)->getNMediumSamplesIn() << 
-                        ", largein=" << (*pi)->getNLargeSamplesIn() <<
-                        ", sorter.size=" << ssize << ", out-sorter=" << (nout - ssize) << endl;
-                }
-                lastVsize = vsize;
             }
 
             map<dsm_sample_id_t,CSAT3Sensor>::iterator ci = _csats.find(inid);

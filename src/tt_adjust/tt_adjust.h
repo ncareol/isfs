@@ -146,16 +146,30 @@ class CSAT3Sensor
 public:
     CSAT3Sensor(TT_Adjust* adjuster, nidas::core::dsm_sample_id_t id,double rate);
 
+    nidas::core::dsm_sample_id_t getId() const
+    {
+        return _id;
+    }
+
     void addSample(const nidas::core::Sample* s, long long dsmSampleNumber);
 
     int getNfolds() const { return _nfolds; }
 
-    int handleUnmatchedFolds();
+    int handleUnmatchedFolds(nidas::core::dsm_time_t tt);
 
     int spliceAllFolds();
 
     void matchFoldsToFold0();
 
+    std::list<CSAT3Fold>::const_iterator getFoldsBegin()
+    {
+        return _folds.begin();
+    }
+
+    std::list<CSAT3Fold>::const_iterator getFoldsEnd()
+    {
+        return _folds.end();
+    }
 
     /**
      * Do a least squares fit of the timetags in a fold,
@@ -207,6 +221,11 @@ public:
      */
     int bestSampleMatch(const nidas::core::Sample* a, const nidas::core::Sample* b,
             const nidas::core::Sample* c, const nidas::core::Sample* d);
+
+    nidas::core::dsm_time_t getLastTime() const
+    {
+        return _lastTime;
+    }
 
 private:
 
