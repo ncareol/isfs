@@ -87,3 +87,5 @@
 # PCAPS Where is first cal?
 # second PCAPS calibration with shorter path length
 2010 Nov 30 00:00:00    -0.17   5804.4  1.359    0.0     22.0
+# CWEX, calibration done at 25 C
+2011 Jun 15 00:00:00	-0.154	3766.5	1.359	0.0	22.0
