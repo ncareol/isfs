@@ -1,0 +1,24 @@
+
+env = Environment(platform = 'posix')
+
+conf = Configure(env)
+
+opts = Variables()
+opts.AddVariables(PathVariable('PREFIX','installation path',
+    '/opt/local/nidas/x86', PathVariable.PathAccept))
+opts.Update(env)
+
+env['CCFLAGS'] = [ '-g', '-Wall', '-O2' ]
+
+srcs = Split("""
+    nc_server.cc
+    nc_server_rpc_procs.cc
+    nc_server_rpc_svc.c
+""")
+
+p1 = env.Program('ncprint','ncprint.cc',
+    LIBS=["netcdf_c++","netcdf","hdf5","hdf5_hl"])
+
+env.Install('$PREFIX/bin',[p1])
+env.Alias('install', [ '$PREFIX' ])
+
