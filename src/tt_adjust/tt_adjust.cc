@@ -50,11 +50,18 @@ string formatTime(dsm_time_t tt,bool terse=false)
     return n_u::UTime(tt).format(true,"%Y %m %d %H:%M:%S.%3f");
 }
 
+dsm_time_t timeTagFromFit(dsm_time_t t0, double a, double b,size_t n)
+{
+    return (dsm_time_t)(a + n * b) + t0;
+}
+
 /*
  * Do a least squares fit of the time tags of a
  * list of samples to the sample numbers.
  *
- * tlast0: uncorrected time of first sample of last fit
+ * tlast0: absolute time that was subtracted from each sample before the last fit.
+ *  This value must be added to the results of the last fit to generate
+ *  absolute times.
  *
  * @param nexclude: number of points excluded from the fit
  *          based on their differrence from time tags computed 
@@ -74,73 +81,44 @@ size_t do_fit(list<samp_save>& samps,gsl_fit_sums& sums,
 
     // sum the samples if it hasn't been done
     if (sums.n == 0) {
+
+        // how many samples in the current bunch have rough agreement with the last fit?
+        size_t ngood = 0;
+        size_t nsamps = 0;
         si = samps.begin();
+        for ( ; si != samps.end(); ++si,nsamps++) {
+            samp_save& save = *si;
+            const Sample* samp = save.samp;
+            dsm_time_t tfit = timeTagFromFit(tlast0,lasta,lastb,lastn+nsamps);
+            if (llabs(samp->getTimeTag()-tfit) < USECS_PER_SEC / 4) ngood++;
+        }
 
-        // last fit time
-        dsm_time_t ttestl = (long long)(lasta + lastn * lastb) + tlast0;
+        // Don't use last fit if 50% or more of the current points don't have a
+        // rough agreement with it.
+        if (ngood < nsamps/2) lastn = 0;
 
+        si = samps.begin();
         dsm_time_t tt0 =  si->samp->getTimeTag();
-        int dtfit = tt0 - tlast0;
         for (size_t n = 0; si != samps.end(); ++si,n++) {
             samp_save& save = *si;
             const Sample* samp = save.samp;
             double ttx = samp->getTimeTag() - tt0;
 
-            // Guess at a weight for the y value from the deviation
-            // from the last fit.
-            // Using continuously varying weights, as is done if
-            // USE_WEIGHTS is defined, seems to screw up the results,
-            // apparently systematically giving lower weight to later
-            // points in the fit - perhaps due to sonic oscillator drift
-            // from the period of the last fit.
-
-            // Using a binary 0 or 1 weighting based on an absolute
+            // Use a binary 0 or 1 weighting based on an absolute
             // limit for the difference between an observed timetag
-            // from a predicted timetag, as done in DISCARD_BAD, seems to work better.
+            // from a predicted timetag.
             
-
-#define DISCARD_BAD
-#ifdef DISCARD_BAD
             if (lastn > 0) {
                 // estimate timetag from last fit.
-                if (n == 0) {
-                    // If first point doesn't fit, don't use last fit.
-                    // Try every quartile point? Not easy since samples are in lists.
-                    if (llabs(samp->getTimeTag()-ttestl) > USECS_PER_SEC / 4) lastn = 0;
+                dsm_time_t tfit = timeTagFromFit(tlast0,lasta,lastb,lastn+n);
+                if (llabs(samp->getTimeTag()-tfit) < USECS_PER_SEC / 4) {
                     gsl_fit_linear_add_point((double)n,ttx,sums);
                 }
-                else {
-                    double ttest = lasta + (lastn + n) * lastb - dtfit;
-                    if (abs(ttx-ttest) < USECS_PER_SEC / 4)
-                        gsl_fit_linear_add_point((double)n,ttx,sums);
-                    else
-                        nexclude++;
-                }
+                else
+                    nexclude++;
             }
             else
                     gsl_fit_linear_add_point((double)n,ttx,sums);
-#else
-#ifdef USE_WEIGHTS
-            save.weight = 1.0;
-            if (lastn > 0 && dev > 0.0) {
-                // estimate timetag from last fit.
-                double dt = fabs(lasta + (lastn + n) * lastb - dtfit - ttx);
-                // attempt at a gaussian with width 5*dev
-                save.weight = 1.0 / exp(dt * dt/(2.0 * 25.0 * dev * dev));
-#ifdef DEBUG
-                if (samp->getDSMId() == 1 && samp->getSpSId()== 210) {
-                    int ttest = lasta + (lastn + n) * lastb - dtfit;
-                    cerr << "99 " << n << ' ' << ttest << ' ' <<
-                        ttx << ' ' << (samp->getTimeTag()-tt0) << ' ' <<
-                        dt << ' ' << save.weight << endl;
-                }
-#endif
-            }
-            gsl_fit_wlinear_add_point((double)n,save.weight,ttx,sums);
-#else
-            gsl_fit_linear_add_point((double)n,ttx,sums);
-#endif
-#endif
         }
     }
 
@@ -817,7 +795,7 @@ size_t CSAT3Sensor::fitAndOutput(CSAT3Fold& fold)
     int maxneg,maxpos;
     dsm_time_t tlastfit = _lastFitTime;
     dsm_time_t tfirst,tlast;
-    if (n > 2) {
+    if (n > 10 && fabs(b-_sampleDt) < USECS_PER_SEC / 100) {
         _adjuster->writeSamples(fold.getSamples(),a,b,&maxneg,&maxpos,tfirst,tlast);
         cout << 
             formatTime(fold.getFirstTime()) << ' ' <<
@@ -1418,7 +1396,7 @@ int TT_Adjust::run() throw()
 
         RawSampleOutputStream outStream(outSet);
 
-        _sorter.setHeapMax(1000 * 1000 * 1000);
+        _sorter.setHeapMax(500 * 1000 * 1000);
         _sorter.setHeapBlock(true);
         _sorter.addSampleClient(&outStream);
         _sorter.setLengthSecs(1.1 * _fitUsecs / USECS_PER_SEC);
