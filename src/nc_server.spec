@@ -134,7 +134,9 @@ rm -rf $RPM_BUILD_ROOT
 * Wed Aug 10 2011 Gordon Maclean <maclean@ucar.edu> 1.0-4
 - Keep incrementing connecionId to avoid the possibility of a paused process
 - attempting writes after the connection has timed out and the id has been
-- given to another process.  Cleanup of some counts variable handling.
+- given to another process.
+- Much rework of counts variable handling.
+- Fix bug in /etc/init.d/nc_server stop - was killing itself.
 * Fri Apr 22 2011 Gordon Maclean <maclean@ucar.edu> 1.0-3
 - Support more than one -g option to add supplemental group ids to this process.
 - Add SET_SETGID capability for the setgroups() call.
