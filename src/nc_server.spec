@@ -1,7 +1,7 @@
 Summary: Server for NetCDF file writing.
 Name: nc_server
 Version: 1.0
-Release: 4%{?dist}
+Release: 5%{?dist}
 License: GPL
 Group: Applications/Engineering
 Url: http://www.eol.ucar.edu/
@@ -131,6 +131,8 @@ rm -rf $RPM_BUILD_ROOT
 %_libdir/libnc_server_rpc.so
 
 %changelog
+* Mon Aug 21 2011 Gordon Maclean <maclean@ucar.edu> 1.0-5
+- Fix usage of getpwnam_r, getgrnam_r, getgrid_r.
 * Wed Aug 10 2011 Gordon Maclean <maclean@ucar.edu> 1.0-4
 - Keep incrementing connecionId to avoid the possibility of a paused process
 - attempting writes after the connection has timed out and the id has been
