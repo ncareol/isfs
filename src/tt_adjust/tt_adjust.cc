@@ -795,7 +795,7 @@ size_t CSAT3Sensor::fitAndOutput(CSAT3Fold& fold)
     int maxneg,maxpos;
     dsm_time_t tlastfit = _lastFitTime;
     dsm_time_t tfirst,tlast;
-    if (n > 10 && fabs(b-_sampleDt) < USECS_PER_SEC / 100) {
+    if (n > 10 && fabs(b-_sampleDt) < 3 * USECS_PER_SEC / 1000) {
         _adjuster->writeSamples(fold.getSamples(),a,b,&maxneg,&maxpos,tfirst,tlast);
         cout << 
             formatTime(fold.getFirstTime()) << ' ' <<
