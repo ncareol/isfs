@@ -1,7 +1,7 @@
 Summary: Server for NetCDF file writing.
 Name: nc_server
 Version: 1.0
-Release: 5%{?dist}
+Release: 6%{?dist}
 License: GPL
 Group: Applications/Engineering
 Url: http://www.eol.ucar.edu/
@@ -89,21 +89,28 @@ if grep -E -q "^Defaults[[:space:]]+requiretty" $tmpsudo; then
     if ! grep -E -q '^Defaults[[:space:]]*:[[:space:]]*[^[:space:]]+[[:space:]]+!requiretty' $tmpsudo; then
         sed -i '
 /^Defaults[[:space:]]*requiretty/a\
-# The /usr/bin/nc_server.check script starts nc_server via sudo, which may be\
-# handy if it needs to be started from a crontab or at other than boot time.\
+# The /usr/bin/nc_server.check script runs /etc/init.d/nc_server via sudo,\
+# which may be handy if it needs to be started from a crontab or at other\
+# than boot time.\
 # The following statements add permission for the "nidas" user to start\
 # nc_server via sudo. If nidas is not a login account, change "nidas"\
 # to a login account that will want to run nc_server.check or otherwise\
 # start nc_server via sudo. Change this !requiretty\ line and the\
-# /usr/bin/nc_server line below.\
+# nc_server lines below.\
 Defaults:nidas !requiretty\
 ' $tmpsudo
     fi
 fi
 
-if ! { grep NOPASSWD $tmpsudo | grep -q nc_server; }; then
+if ! { grep NOPASSWD $tmpsudo | grep -q /etc/init.d/nc_server; }; then
 cat << \EOD >> $tmpsudo
-nidas ALL=NOPASSWD: SETENV: /usr/bin/nc_server
+nidas ALL=NOPASSWD: /etc/init.d/nc_server
+EOD
+fi
+
+if ! { grep NOPASSWD $tmpsudo | grep -q /usr/bin/nc_server; }; then
+cat << \EOD >> $tmpsudo
+nidas ALL=NOPASSWD: /usr/bin/nc_server
 EOD
 fi
 
@@ -131,6 +138,10 @@ rm -rf $RPM_BUILD_ROOT
 %_libdir/libnc_server_rpc.so
 
 %changelog
+* Sun Oct  2 2011 Gordon Maclean <maclean@ucar.edu> 1.0-6
+- Reduced SYNC_CHECK_INTERVAL from 60 to 5 seconds.
+- Cleaned up nc_server.check, which now runs /etc/init.d/nc_server
+- instead of nc_server directly.
 * Mon Aug 21 2011 Gordon Maclean <maclean@ucar.edu> 1.0-5
 - Fix usage of getpwnam_r, getgrnam_r, getgrid_r.
 * Wed Aug 10 2011 Gordon Maclean <maclean@ucar.edu> 1.0-4
