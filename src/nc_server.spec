@@ -1,7 +1,7 @@
 Summary: Server for NetCDF file writing.
 Name: nc_server
 Version: 1.0
-Release: 6%{?dist}
+Release: 7%{?dist}
 License: GPL
 Group: Applications/Engineering
 Url: http://www.eol.ucar.edu/
@@ -10,7 +10,6 @@ Packager: Gordon Maclean <maclean@ucar.edu>
 # becomes RPM_BUILD_ROOT, except on newer versions of rpmbuild
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 Vendor: UCAR
-BuildArch: i386 x86_64
 Source: %{name}-%{version}.tar.gz
 BuildRequires: nidas-x86-build netcdf-devel
 Requires: nidas nc_server-devel netcdf
@@ -138,6 +137,8 @@ rm -rf $RPM_BUILD_ROOT
 %_libdir/libnc_server_rpc.so
 
 %changelog
+* Tue Oct 11 2011 Gordon Maclean <maclean@ucar.edu> 1.0-7
+- Added CHECKERROR procedure for batch writers to use instead of NULLPROC.
 * Sun Oct  2 2011 Gordon Maclean <maclean@ucar.edu> 1.0-6
 - Reduced SYNC_CHECK_INTERVAL from 60 to 5 seconds.
 - Cleaned up nc_server.check, which now runs /etc/init.d/nc_server
