@@ -1,7 +1,7 @@
 Summary: Server for NetCDF file writing.
 Name: nc_server
 Version: 1.0
-Release: 7%{?dist}
+Release: 8%{?dist}
 License: GPL
 Group: Applications/Engineering
 Url: http://www.eol.ucar.edu/
@@ -137,6 +137,8 @@ rm -rf $RPM_BUILD_ROOT
 %_libdir/libnc_server_rpc.so
 
 %changelog
+* Thu Oct 13 2011 Gordon Maclean <maclean@ucar.edu> 1.0-8
+- Improved error handling in definedatarec call.
 * Tue Oct 11 2011 Gordon Maclean <maclean@ucar.edu> 1.0-7
 - Added CHECKERROR procedure for batch writers to use instead of NULLPROC.
 * Sun Oct  2 2011 Gordon Maclean <maclean@ucar.edu> 1.0-6
