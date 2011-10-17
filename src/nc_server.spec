@@ -16,7 +16,14 @@ Vendor: UCAR
 Source: %{name}-%{version}.tar.gz
 BuildRequires: nidas-x86-build netcdf-devel
 Obsoletes: nc_server-auxprogs
-Requires: nidas netcdf
+
+# The nc_server RPM does drastic things like adding to the PATH of all
+# users, via files in /etc/profile.d, and adding /opt/nc_server/lib
+# to ld.so.conf.d, which we may not want to do on the EOL servers.
+# So, if one just wants to link and run against the nc_server libraries
+# you install nc_server-devel, which contains the actual libraries,
+# and the libnc_server.so symbolic link, but not the nc_server programs.
+Requires: nidas netcdf nc_server-devel
 %description
 Server for NetCDF file writing.
 
@@ -128,15 +135,15 @@ rm -rf $RPM_BUILD_ROOT
 /opt/nc_server/bin/nc_check
 /opt/nc_server/bin/nc_ping
 /opt/nc_server/bin/nc_server.check
-/opt/nc_server/lib/libnc_server_rpc.so.*
 %config %{_sysconfdir}/init.d/nc_server
 %config %{_sysconfdir}/profile.d/nc_server.sh
 %config %{_sysconfdir}/profile.d/nc_server.csh
-%config %{_sysconfdir}/ld.so.conf.d/nc_server.conf
 
 %files devel
 /opt/nc_server/include/nc_server_rpc.h
+/opt/nc_server/lib/libnc_server_rpc.so.*
 /opt/nc_server/lib/libnc_server_rpc.so
+%config %{_sysconfdir}/ld.so.conf.d/nc_server.conf
 
 %changelog
 * Sun Oct 16 2011 Gordon Maclean <maclean@ucar.edu> 1.0-9
