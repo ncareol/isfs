@@ -1,18 +1,22 @@
 Summary: Server for NetCDF file writing.
 Name: nc_server
 Version: 1.0
-Release: 8%{?dist}
+Release: 9%{?dist}
 License: GPL
 Group: Applications/Engineering
 Url: http://www.eol.ucar.edu/
 Packager: Gordon Maclean <maclean@ucar.edu>
+# Allow this package to be relocatable to other places than /opt/nc_server
+# rpm --relocate /opt/nc_server=/usr
+Prefix: /opt/nc_server
 
 # becomes RPM_BUILD_ROOT, except on newer versions of rpmbuild
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 Vendor: UCAR
 Source: %{name}-%{version}.tar.gz
 BuildRequires: nidas-x86-build netcdf-devel
-Requires: nidas nc_server-devel netcdf
+Obsoletes: nc_server-auxprogs
+Requires: nidas netcdf
 %description
 Server for NetCDF file writing.
 
@@ -23,28 +27,20 @@ Group: Applications/Engineering
 %description devel
 libnc_server_rpc.so library and header file
 
-%package auxprogs
-Summary: nc_server auxillary programs
-Group: Applications/Engineering
-Requires: nc_server-devel
-
-%description auxprogs
-nc_server auxillary programs
-
 %prep
 %setup -n nc_server
 
 %build
 pwd
-scons PREFIX=${RPM_BUILD_ROOT}/usr
+scons PREFIX=${RPM_BUILD_ROOT}/opt/nc_server
  
 %install
 rm -rf $RPM_BUILD_ROOT
-scons PREFIX=${RPM_BUILD_ROOT}/usr install
-cp scripts/* ${RPM_BUILD_ROOT}/usr/bin
+scons PREFIX=${RPM_BUILD_ROOT}/opt/nc_server install
+cp scripts/* ${RPM_BUILD_ROOT}/opt/nc_server/bin
 install -d $RPM_BUILD_ROOT%{_sysconfdir}/init.d
-cp etc/init.d/* $RPM_BUILD_ROOT%{_sysconfdir}/init.d
-cp scripts/* ${RPM_BUILD_ROOT}/usr/bin
+install -d $RPM_BUILD_ROOT%{_sysconfdir}/ld.so.conf.d
+cp -r etc/* $RPM_BUILD_ROOT%{_sysconfdir}
 
 %pre
 
@@ -88,7 +84,7 @@ if grep -E -q "^Defaults[[:space:]]+requiretty" $tmpsudo; then
     if ! grep -E -q '^Defaults[[:space:]]*:[[:space:]]*[^[:space:]]+[[:space:]]+!requiretty' $tmpsudo; then
         sed -i '
 /^Defaults[[:space:]]*requiretty/a\
-# The /usr/bin/nc_server.check script runs /etc/init.d/nc_server via sudo,\
+# The /opt/nc_server/bin/nc_server.check script runs /etc/init.d/nc_server via sudo,\
 # which may be handy if it needs to be started from a crontab or at other\
 # than boot time.\
 # The following statements add permission for the "nidas" user to start\
@@ -107,10 +103,15 @@ nidas ALL=NOPASSWD: /etc/init.d/nc_server
 EOD
 fi
 
-if ! { grep NOPASSWD $tmpsudo | grep -q /usr/bin/nc_server; }; then
+if ! { grep NOPASSWD $tmpsudo | grep -q /opt/nc_server/bin/nc_server; }; then
 cat << \EOD >> $tmpsudo
-nidas ALL=NOPASSWD: /usr/bin/nc_server
+nidas ALL=NOPASSWD: /opt/nc_server/bin/nc_server
 EOD
+fi
+
+# remove old sudo entries
+if grep -q /usr/bin/nc_server $tmpsudo; then
+    sed -i \\,/usr/bin/nc_server,d $tmpsudo
 fi
 
 visudo -c -f $tmpsudo && cp $tmpsudo %{_sysconfdir}/sudoers
@@ -120,23 +121,26 @@ rm -f $tmpsudo
 rm -rf $RPM_BUILD_ROOT
 
 %files
-/usr/bin/nc_server
+/opt/nc_server/bin/nc_server
+/opt/nc_server/bin/nc_sync
+/opt/nc_server/bin/nc_shutdown
+/opt/nc_server/bin/nc_close
+/opt/nc_server/bin/nc_check
+/opt/nc_server/bin/nc_ping
+/opt/nc_server/bin/nc_server.check
+/opt/nc_server/lib/libnc_server_rpc.so.*
 %config %{_sysconfdir}/init.d/nc_server
-
-%files auxprogs
-/usr/bin/nc_sync
-/usr/bin/nc_shutdown
-/usr/bin/nc_close
-/usr/bin/nc_check
-/usr/bin/nc_ping
-/usr/bin/nc_server.check
+%config %{_sysconfdir}/profile.d/nc_server.sh
+%config %{_sysconfdir}/profile.d/nc_server.csh
+%config %{_sysconfdir}/ld.so.conf.d/nc_server.conf
 
 %files devel
-/usr/include/nc_server_rpc.h
-%_libdir/libnc_server_rpc.so.*
-%_libdir/libnc_server_rpc.so
+/opt/nc_server/include/nc_server_rpc.h
+/opt/nc_server/lib/libnc_server_rpc.so
 
 %changelog
+* Sun Oct 16 2011 Gordon Maclean <maclean@ucar.edu> 1.0-9
+- Everything now installed to /opt/nc_server, and always to lib, not lib64.
 * Thu Oct 13 2011 Gordon Maclean <maclean@ucar.edu> 1.0-8
 - Improved error handling in definedatarec call.
 * Tue Oct 11 2011 Gordon Maclean <maclean@ucar.edu> 1.0-7
