@@ -48,6 +48,8 @@ cp scripts/* ${RPM_BUILD_ROOT}/opt/nc_server/bin
 install -d $RPM_BUILD_ROOT%{_sysconfdir}/init.d
 install -d $RPM_BUILD_ROOT%{_sysconfdir}/ld.so.conf.d
 cp -r etc/* $RPM_BUILD_ROOT%{_sysconfdir}
+install -d $RPM_BUILD_ROOT%{_libdir}/pkgconfig
+cp -r usr/lib/pkgconfig/* $RPM_BUILD_ROOT%{_libdir}/pkgconfig
 
 %pre
 
@@ -66,8 +68,6 @@ $addgroup && /usr/sbin/groupadd -g 1342 -o eol
 $adduser && /usr/sbin/useradd  -u 10035 -o -N -M -g eol -s /sbin/nologin -d /tmp -c NIDAS -K PASS_MAX_DAYS=-1 nidas || :
 
 %post
-ldconfig
-
 # To enable the boot script, uncomment this:
 if ! chkconfig --level 3 nc_server; then
     chkconfig --add nc_server 
@@ -77,7 +77,10 @@ if ! chkconfig --list nc_server > /dev/null 2>&1; then
     echo "nc_server is not setup to run at boot time"
     chkconfig --list nc_server
 fi
+exit 0
 
+%post -n nc_server-devel
+ldconfig
 exit 0
 
 %triggerin -- sudo
@@ -144,6 +147,7 @@ rm -rf $RPM_BUILD_ROOT
 /opt/nc_server/lib/libnc_server_rpc.so.*
 /opt/nc_server/lib/libnc_server_rpc.so
 %config %{_sysconfdir}/ld.so.conf.d/nc_server.conf
+%config %{_libdir}/pkgconfig/nc_server.pc
 
 %changelog
 * Sun Oct 16 2011 Gordon Maclean <maclean@ucar.edu> 1.0-9
