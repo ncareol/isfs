@@ -1,7 +1,7 @@
 Summary: Server for NetCDF file writing.
 Name: nc_server
 Version: 1.0
-Release: 9%{?dist}
+Release: 10%{?dist}
 License: GPL
 Group: Applications/Engineering
 Url: http://www.eol.ucar.edu/
@@ -15,24 +15,22 @@ BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 Vendor: UCAR
 Source: %{name}-%{version}.tar.gz
 BuildRequires: nidas-x86-build netcdf-devel
-Obsoletes: nc_server-auxprogs
-
-# The nc_server RPM does drastic things like adding to the PATH of all
-# users, via files in /etc/profile.d, and adding /opt/nc_server/lib
-# to ld.so.conf.d, which we may not want to do on the EOL servers.
-# So, if one just wants to link and run against the nc_server libraries
-# you install nc_server-devel, which contains the actual libraries,
-# and the libnc_server.so symbolic link, but not the nc_server programs.
-Requires: nidas netcdf nc_server-devel
+Requires: nc_server-clients
 %description
 Server for NetCDF file writing.
 
 %package devel
 Summary: nc_server library and header file
 Group: Applications/Engineering
-
 %description devel
 libnc_server_rpc.so library and header file
+
+%package clients
+Summary: Some client programs of nc_server
+Group: Applications/Engineering
+Obsoletes: nc_server-auxprogs
+%description clients
+Some client programs of nc_server
 
 %prep
 %setup -n nc_server
@@ -84,6 +82,7 @@ ldconfig
 exit 0
 
 %triggerin -- sudo
+# trigger script for nc_server
 
 tmpsudo=/tmp/sudoers_$$
 cp %{_sysconfdir}/sudoers $tmpsudo
@@ -132,15 +131,9 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 /opt/nc_server/bin/nc_server
-/opt/nc_server/bin/nc_sync
 /opt/nc_server/bin/nc_shutdown
-/opt/nc_server/bin/nc_close
-/opt/nc_server/bin/nc_check
-/opt/nc_server/bin/nc_ping
 /opt/nc_server/bin/nc_server.check
-%config %{_sysconfdir}/init.d/nc_server
-%config %{_sysconfdir}/profile.d/nc_server.sh
-%config %{_sysconfdir}/profile.d/nc_server.csh
+%config(noreplace) %{_sysconfdir}/init.d/nc_server
 
 %files devel
 /opt/nc_server/include/nc_server_rpc.h
@@ -149,7 +142,20 @@ rm -rf $RPM_BUILD_ROOT
 %config %{_sysconfdir}/ld.so.conf.d/nc_server.conf
 %config %{_libdir}/pkgconfig/nc_server.pc
 
+%files clients
+/opt/nc_server/bin/nc_check
+/opt/nc_server/bin/nc_ping
+/opt/nc_server/bin/nc_close
+/opt/nc_server/bin/nc_sync
+%config(noreplace) %{_sysconfdir}/profile.d/nc_server.sh
+%config(noreplace) %{_sysconfdir}/profile.d/nc_server.csh
+
 %changelog
+* Tue Oct 18 2011 Gordon Maclean <maclean@ucar.edu> 1.0-10
+- Put client programs in nc_server-clients.
+- Path setting in /etc/profile.d/nc_server.*sh is commented out,
+- so by default users must add nc_server to their own path.
+- /etc/init.d/nc_server sets its path.
 * Sun Oct 16 2011 Gordon Maclean <maclean@ucar.edu> 1.0-9
 - Everything now installed to /opt/nc_server, and always to lib, not lib64.
 * Thu Oct 13 2011 Gordon Maclean <maclean@ucar.edu> 1.0-8
