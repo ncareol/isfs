@@ -1,7 +1,7 @@
 Summary: Server for NetCDF file writing.
 Name: nc_server
 Version: 1.0
-Release: 10%{?dist}
+Release: 11%{?dist}
 License: GPL
 Group: Applications/Engineering
 Url: http://www.eol.ucar.edu/
@@ -151,6 +151,9 @@ rm -rf $RPM_BUILD_ROOT
 %config(noreplace) %{_sysconfdir}/profile.d/nc_server.csh
 
 %changelog
+* Tue Jan  2 2012 Gordon Maclean <maclean@ucar.edu> 1.0-11
+- Fix -Weffc++ warnings. Don't set process timezone to GMT.
+- Always update units attributes on connection.
 * Tue Oct 18 2011 Gordon Maclean <maclean@ucar.edu> 1.0-10
 - Put client programs in nc_server-clients.
 - Path setting in /etc/profile.d/nc_server.*sh is commented out,
