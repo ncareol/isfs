@@ -1,7 +1,7 @@
 Summary: Server for NetCDF file writing.
 Name: nc_server
 Version: 1.0
-Release: 11%{?dist}
+Release: 12%{?dist}
 License: GPL
 Group: Applications/Engineering
 Url: http://www.eol.ucar.edu/
@@ -14,7 +14,7 @@ Prefix: /opt/nc_server
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 Vendor: UCAR
 Source: %{name}-%{version}.tar.gz
-BuildRequires: nidas-x86-build netcdf-devel
+BuildRequires: nidas-x86-build netcdf-devel libcap-devel
 Requires: nc_server-clients
 %description
 Server for NetCDF file writing.
@@ -151,6 +151,8 @@ rm -rf $RPM_BUILD_ROOT
 %config(noreplace) %{_sysconfdir}/profile.d/nc_server.csh
 
 %changelog
+* Mon Apr  2 2012 Gordon Maclean <maclean@ucar.edu> 1.0-12
+- Create counts variable in existing variable group if necessary.
 * Tue Jan  2 2012 Gordon Maclean <maclean@ucar.edu> 1.0-11
 - Fix -Weffc++ warnings. Don't set process timezone to GMT.
 - Always update units attributes on connection.
