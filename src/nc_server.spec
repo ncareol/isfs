@@ -14,7 +14,7 @@ Prefix: /opt/nc_server
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 Vendor: UCAR
 Source: %{name}-%{version}.tar.gz
-BuildRequires: nidas-x86-build netcdf-devel libcap-devel
+BuildRequires: netcdf-devel libcap-devel
 Requires: nc_server-clients
 %description
 Server for NetCDF file writing.
