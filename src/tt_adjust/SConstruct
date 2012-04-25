@@ -2,21 +2,16 @@
 import os
 import subprocess
 
-env = Environment(platform = 'posix').Clone(tools=['sharedlibrary'])
+env = Environment(platform = 'posix',tools=['default','nidas'])
 env['ISFF'] = os.environ['ISFF']
 
 kmach = subprocess.Popen(['uname','-m'],stdout=subprocess.PIPE).communicate()[0].rstrip("\n")
 if kmach == "x86_64":
     env['BINDIR'] = "bin64"
-    env['LIBDIR'] = "lib64"
 else:
     env['BINDIR'] = "bin"
-    env['LIBDIR'] = "lib"
 
 p1 = env.Program("tt_adjust", ["tt_adjust.cc","gsl.cc"],
-    LIBS=["nidas_util","nidas","nidas_dynld"],
-    LIBPATH=["/opt/local/nidas/x86/" + env["LIBDIR"],"."],
-    CPPPATH="/opt/local/nidas/x86/include",
     CXXFLAGS=['-g','-Wall'])
 #     CXXFLAGS=['-g','-pg','-Wall'],LINKFLAGS="-pg")
 
