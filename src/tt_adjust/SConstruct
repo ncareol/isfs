@@ -1,19 +1,18 @@
-
 import os
-import subprocess
+import platform
 
 env = Environment(tools=['default','nidas'])
-env['ISFF'] = os.environ['ISFF']
-
-kmach = subprocess.Popen(['uname','-m'],stdout=subprocess.PIPE).communicate()[0].rstrip("\n")
-if kmach == "x86_64":
-    env['BINDIR'] = "bin64"
-else:
-    env['BINDIR'] = "bin"
 
 p1 = env.Program("tt_adjust", ["tt_adjust.cc","gsl.cc"],
     CXXFLAGS=['-g','-Wall'])
 #     CXXFLAGS=['-g','-pg','-Wall'],LINKFLAGS="-pg")
+
+env['ISFF'] = os.environ['ISFF']
+
+if platform.machine() == "x86_64":
+    env['BINDIR'] = "bin64"
+else:
+    env['BINDIR'] = "bin"
 
 env.Install('$ISFF/$BINDIR',p1)
 
