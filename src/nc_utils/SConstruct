@@ -1,7 +1,7 @@
 import os
 import subprocess
 
-env = Environment(platform = 'posix',tools=['default','nidas'])
+env = Environment(tools=['default','nidas'])
 
 env['ISFF'] = os.environ['ISFF']
 
