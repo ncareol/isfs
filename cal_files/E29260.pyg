@@ -12,8 +12,8 @@
 # Revision 1.1  2002/09/27 19:06:51  maclean
 # initial checkin
 #
-# Used by java CalFile class
-# dateFormat = "yyyy MMM dd HH:mm"
+# Used by java CalFile class and CalFile parser
+# dateFormat = "%Y %b %d %H:%M"
 # timeZone = "GMT"
 #
 # Calibration factors for Eppy pyrgeometer SN29260
@@ -23,14 +23,14 @@
 #  k(unitless) is B value for dome&case correction.
 #  swcor: fraction (%) of shortwave radiation that should be removed
 #         from the long wave.  These are usually determined from a shadow
-#         test. 999 means unknown.
+#         test. nan means unknown.
 #  
 # Date of NOAA cal     c	k	swcor
 #		    uV/(W/m^2)           (%)
 # 1999 feb 02 00:00     3.260	3.1
 # 1999 feb 04 00:00     3.270	3.0
 # average the 2 above
-1999 feb 04 00:00     3.265	3.05	999
+1999 feb 04 00:00     3.265	3.05	nan
 #
 # Pre-IHOP cal
 # swcor from shadow test during IHOP
