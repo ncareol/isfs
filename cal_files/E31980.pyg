@@ -9,8 +9,8 @@
 # Revision 1.1  2003/01/13 17:18:38  maclean
 # *** empty log message ***
 #
-# Used by java CalFile class
-# dateFormat = "yyyy MMM dd HH:mm"
+# Used by java CalFile class and CalFile parser
+# dateFormat = "%Y %b %d %H:%M"
 # timeZone = "GMT"
 #
 #
@@ -21,14 +21,28 @@
 #  k(unitless) is B value for dome&case correction.
 #  swcor: fraction (%) of shortwave radiation that should be removed
 #         from the long wave.  These are usually determined from a shadow
-#         test. 999 means unknown.
+#         test. nan means unknown.
 #  
 # Date of NOAA cal     c	k	swcor
 #		    uV/(W/m^2)           (%)
 # Taken from CASES99 dpar.init.
-1999 sep 23 00:00     1.e37	3.90	999
+1999 sep 23 00:00     1.e37	3.90	nan
 
 # Post-FLOSSII cal
 # c from NOAA cal 17-19 jun 03
 # B and swcor from shadow test on roof
 2003 may 12 00:00    3.516      1.9     1.2
+
+# Pre-TREX NOAA calibration 10-11 Jan 2006
+# 2006 jan 10        3.565      3.8
+# 2006 jan 11        3.595      3.6
+# average the 2 above
+# Ellsworth says add 0.3 to k and round up to nearest 0.5
+2006 jan 12 00:00    3.58       4.0     nan
+
+# Post-PCAPS NOAA calibration 9 & 16 mar 2011
+# 2011 mar 9         3.625      3.2
+# 2011 mar 16        3.544      3.87
+# average the 2 above
+# Ellsworth says add 0.3 to k and round up to nearest 0.5
+2010 nov 1 00:00     3.58       4.0     nan

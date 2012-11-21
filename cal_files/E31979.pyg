@@ -12,8 +12,8 @@
 # Revision 1.1  2002/09/27 19:06:53  maclean
 # initial checkin
 #
-# Used by java CalFile class
-# dateFormat = "yyyy MMM dd HH:mm"
+# Used by java CalFile class and CalFile parser
+# dateFormat = "%Y %b %d %H:%M"
 # timeZone = "GMT"
 #
 # Calibration factors for Eppy pyrgeometer SN31979
@@ -23,31 +23,44 @@
 #  k(unitless) is B value for dome&case correction.
 #  swcor: fraction (%) of shortwave radiation that should be removed
 #         from the long wave.  These are usually determined from a shadow
-#         test. 999 means unknown.
+#         test. nan means unknown.
 #  
 # Date of NOAA cal     c	k	swcor
 #		    uV/(W/m^2)           (%)
 # 1997 aug 07 00:00     3.814	2.7
 # 1997 aug 08 00:00     3.698	3.3
 # average the 2 above
-1997 aug 08 00:00     3.756	3.0	999
+1997 aug 08 00:00     3.756	3.0	nan
 #
 # 1999 jan 28 00:00     3.878	2.6
 # 1999 jan 29 00:00     3.894	3.3
 # 1999 feb 12 00:00     3.926	2.4
 # average the 3 above
-1999 feb 12 00:00     3.899	2.77	999
+1999 feb 12 00:00     3.899	2.77	nan
 #
 # 1999 sep 22 00:00     3.700	3.3
 # 1999 sep 23 00:00     3.691	3.4
 # average the 2 above
-1999 sep 23 00:00     3.696	3.35	999
+1999 sep 23 00:00     3.696	3.35	nan
 #
 # Pre-IHOP cal
 # This was down-looking during IHOP. Shadow test not done.
-2002 apr 02 00:00	3.800	3.2	999
+2002 apr 02 00:00	3.800	3.2	nan
 
 # Post-FLOSSII cal
 # c from NOAA cal 17-19 jun 03
 # B and swcor from shadow test on roof
 2003 may 12 00:00    4.030      2.7     0.8
+
+# Pre-TREX NOAA calibration 10-11 Jan 2006
+# 2006 jan 10        NA? 	NA?
+# 2006 jan 11        3.988      3.4
+# Ellsworth says add 0.3 to k and round up to nearest 0.5
+2006 jan 12 00:00    3.99       4.0     nan
+
+# Post-PCAPS NOAA calibration 9 & 16 mar 2011
+# 2011 mar 9         3.835      3.99
+# 2011 mar 16        3.780      4.34
+# average the 2 above
+# Ellsworth says add 0.3 to k and round up to nearest 0.5
+2010 nov 1 00:00     3.81       4.5     nan
