@@ -1,0 +1,20 @@
+#
+# Used by CalFile parser
+# dateFormat = "%Y %b %d %H:%M:%S"
+# timeZone = "MST7MDT"
+#
+# Results of Steve Oncley's calibrations of TP01 in agar gel,
+# before and after PCAPS, Sep 2010 and Apr 2011.
+# https://wiki.ucar.edu/x/0geKB
+#
+# TP01 200591
+# Measured Lambda: 686 (Sep), 684 (Apr) mW/(m K)
+#
+# See comments in tp01_200242.dat
+# 
+# factor = 600 / (lambdacal * 0.932)
+# where lambdacal = (mean of  Sep 2010 and Apr 2011 lambda)
+#
+# DateTime              offset factor
+#                       
+2010 Sep 01 00:00:00 	0.0     0.940
