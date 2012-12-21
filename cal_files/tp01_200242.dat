@@ -1,0 +1,29 @@
+#
+# Used by CalFile parser
+# dateFormat = "%Y %b %d %H:%M:%S"
+# timeZone = "MST7MDT"
+#
+# Results of Steve Oncley's calibrations of TP01 in agar gel,
+# before and after PCAPS, Sep 2010 and Apr 2011.
+# https://wiki.ucar.edu/x/0geKB
+#
+# TP01 200242
+# Measured Lambda: 600 mW/(m K), both times, (right on!)
+#
+# From the TP01 manual:
+# lambda = F(at) * E.lambda * Vheat^2 / ((Vpile.on - Vpile.off) * Re * L)
+# 
+# In the agar gel that Steve used for his cal tests
+# (https://wiki.ucar.edu/x/0geKB), a=0.143 mm^2/sec, t=180 sec, at=25.7,  and so
+# F(at) = 0.932  (using two terms from the numeric formula for F(at))
+# 
+# If we plan to multiply all our measured lambda values by a calculated F(at),
+# where a is the measured diffusivity from Tau63, then the correction factor for
+# TP01 conductivity should include the 0.932 factor:
+# 
+# factor = 600 / (lambdacal * 0.932)
+# where lambdacal = (mean of  Sep 2010 and Apr 2011 lambda)
+#
+# DateTime              offset factor
+#                       
+2010 Sep 01 00:00:00 	0.0     1.073
