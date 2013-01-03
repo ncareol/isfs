@@ -1,0 +1,32 @@
+#
+# Used by CalFile parser
+# dateFormat = "%Y %b %d %H:%M:%S"
+# timeZone = "MST7MDT"
+#
+# Results of Steve Oncley's calibrations of TP01 in agar gel,
+# before and after PCAPS, Sep 2010 and Apr 2011.
+# https://wiki.ucar.edu/x/0geKB
+#
+# TP01 200234
+# Measured Tau63: 1679 (Sep), 1673 (Apr) (0.01 s)
+#
+# Soil heat diffusivity is a linear function of 1/Tau63:
+#   asoil = a.ref * Tau63.ref / Tau63
+# Where a.ref=0.14e-6 m^2/s, is diffusifity of agar calibration gel,
+# Tau63.ref is the Tau63 measured with the gel.
+#
+# The nominal Tau63.ref is 19 seconds, but we want to apply the
+# measured values from the above calibration. This can be done
+# in either of two ways:
+# 1. apply the measured value of Tau63.ref for the given TP01 probe in
+#    the computation of diffusifity, dat.asoil, in Splus. 
+# 2. scale the raw values of Tau63 by a factor in NIDAS before computation of asoil
+#
+# The first method applies the calibration in one place, which is generally good.
+# However the second is easier, and at this point I've elected to do that.
+# 
+# factor = 19 / (mean of cal Tau63.ref)
+#
+# DateTime              offset factor
+#                       
+2010 Sep 01 00:00:00 	0.0     1.134
