@@ -1,0 +1,19 @@
+#
+# Used by CalFile parser
+# dateFormat = "%Y %b %d %H:%M:%S"
+# timeZone = "MST7MDT"
+#
+# Results of Steve Oncley's calibrations of TP01 in agar gel,
+# before and after PCAPS, Sep 2010 and Apr 2011.
+# https://wiki.ucar.edu/x/0geKB
+#
+# TP01 200236
+# Measured Tau63: 1877 (Sep), 1892 (Apr) (0.01s)
+#
+# See comments in tp01_tau63_200234.dat
+# 
+# factor = 19 / (mean of cal Tau63.ref)
+#
+# DateTime              offset factor
+#                       
+2010 Sep 01 00:00:00 	0.0     1.008
