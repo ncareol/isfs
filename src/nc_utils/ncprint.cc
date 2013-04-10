@@ -37,6 +37,7 @@ void Usage(char *argv0)
     cerr << "     -l does not effect -H or -S options" << endl;
     cerr << "  -H: print time as fractional hours since midnight GMT" << endl;
     cerr << "  -S: print time as seconds since midnight GMT" << endl;
+    cerr << "  -h: print header in first two lines, containing variable names and units" << endl;
     cerr << "  varnames is a list of 1 or more variable names, separated by blanks" << endl;
     cerr << "    Variables are matched by their NetCDF name, or the short_name or long_name attributes" << endl;
     cerr << endl << "Examples:" << endl;
@@ -103,16 +104,21 @@ int main(int argc, char **argv)
     const char *timefmt;
     timefmt = "%Y %m %d %H%M%S %Z";
 
+    bool printheader = false;
+
     localTZ = getenv("TZ");
     // if (localTZ == 0) localTZ = "GMT";
 
     const char *useTZ = "GMT";
     char TZenv[32];
 
-    while ((opt_char = getopt(argc, argv, "HlSs:t:")) != -1) {
+    while ((opt_char = getopt(argc, argv, "hHlSs:t:")) != -1) {
         switch (opt_char) {
         case 'H':
             printopt = FHOUR;
+            break;
+        case 'h':
+            printheader = true;
             break;
         case 'l':
             useTZ = localTZ;
@@ -177,6 +183,9 @@ int main(int argc, char **argv)
     char *attString;
     NcVar *btvar, *tvar;
 
+    std::ostringstream headerout;
+    std::ostringstream unitsout;
+
     n_u::UTime bt,ut,ut0;
 
     bt = 0;
@@ -240,19 +249,6 @@ int main(int argc, char **argv)
                     delete att;
                     delete [] attString;
                 }
-                // Check its ASTER_dids attribute
-                if ((att = var->get_att("ASTER_dids"))) {
-                    attString = 0;
-                    if (att->type() == ncChar && att->num_vals() > 0 &&
-                            (attString = att->as_string(0)) &&
-                            !strcmp(attString,varnames[iv])) {
-                        delete att;
-                        delete [] attString;
-                        break;  // match
-                    }
-                    delete att;
-                    delete [] attString;
-                }
             }
             if (jv == ncf.num_vars()) {
                 cerr << "Variable " << varnames[iv] << " not found in " << fname << endl;
@@ -260,6 +256,22 @@ int main(int argc, char **argv)
             }
         }
         if (var->id() == tvar->id()) continue;	// don't repeat time variable
+
+        if (printheader) {
+            headerout << varnames[iv] << ' ';
+            if ((att = var->get_att("units"))) {
+                attString = 0;
+                if (att->type() == ncChar && att->num_vals() > 0 &&
+                        (attString = att->as_string(0)))
+                    unitsout << '"' << attString << '"' << ' ';
+                else unitsout << '"' << "unknown" << '"' << ' ';
+
+                delete att;
+                delete [] attString;
+            }
+            else unitsout << '"' << "unknown" << '"' << ' ';
+        }
+
 
         vars.push_back(var);
         int nd = var->num_dims();
@@ -294,6 +306,11 @@ int main(int argc, char **argv)
         nvars++;
     }
 
+    if (printheader) {
+        cout << "# " << headerout.str() << endl;
+        cout << "# " << unitsout.str() << endl;
+    }
+
     long nrecs = ncf.rec_dim()->size();
     int doread;
 
@@ -306,6 +323,8 @@ int main(int argc, char **argv)
     else dt = 300 * USECS_PER_SEC;
 
     // cerr << "dt=" << dt << endl;
+    //
+
 
     for (n = 0; n < nrecs; n++) {
         ut0 = bt + readTime(tvar,n).toUsecs();
