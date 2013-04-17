@@ -179,7 +179,6 @@ int main(int argc, char **argv)
 
     NcAtt *att;
     NcDim *dim;
-    NcVar *var;
     char *attString;
     NcVar *btvar, *tvar;
 
@@ -205,11 +204,11 @@ int main(int argc, char **argv)
     // arrays of information for each requested variable
     vector<NcVar *> vars;
     vector<int> nstations;	// how many stations
-    vector<int> nsamples;		// how many samples
+    vector<int> nsamples;	// how many samples
     vector<long*> start;
     vector<long*> count;
-    vector<int> samplei;		// which dimension is the sample dimension
-    vector<int> stationi;		// which dimension is the station dimension
+    vector<int> samplei;	// which dimension is the sample dimension
+    vector<int> stationi;	// which dimension is the station dimension
     vector<long> otherdims;	// product of non-time, non-sample, non-station dims
     int maxnsamples = 1;
     long maxotherdims = 1;
@@ -218,86 +217,101 @@ int main(int argc, char **argv)
 
     for (iv = 0; iv < (signed) varnames.size(); iv++) {
         NcError ncerror(NcError::silent_nonfatal);
-        var=0;
+        NcVar *var;
         // cerr << varnames[iv] << endl;
         if (!(var = ncf.get_var(varnames[iv]))) {
             for (jv = 0; jv < ncf.num_vars(); jv++) {
-                var = ncf.get_var(jv);
+                NcVar *var2 = ncf.get_var(jv);
                 // Check its short_name attribute
-                if ((att = var->get_att("short_name"))) {
+                if ((att = var2->get_att("short_name"))) {
                     attString = 0;
                     if (att->type() == ncChar && att->num_vals() > 0 &&
                             (attString = att->as_string(0)) &&
                             !strcmp(attString,varnames[iv])) {
                         delete att;
                         delete [] attString;
+                        var = var2;
                         break;  // match
                     }
                     delete att;
                     delete [] attString;
                 }
-                // Check its long_name attribute
-                if ((att = var->get_att("long_name"))) {
-                    attString = 0;
-                    if (att->type() == ncChar && att->num_vals() > 0 &&
-                            (attString = att->as_string(0)) &&
-                            !strcmp(attString,varnames[iv])) {
-                        delete att;
-                        delete [] attString;
-                        break;  // match
-                    }
-                    delete att;
-                    delete [] attString;
-                }
-            }
-            if (jv == ncf.num_vars()) {
-                cerr << "Variable " << varnames[iv] << " not found in " << fname << endl;
-                exit(1);
             }
         }
-        if (var->id() == tvar->id()) continue;	// don't repeat time variable
+
+        if (!var) {
+            cerr << "Variable " << varnames[iv] << " not found in " << fname << ". Column will be all missing data" <<  endl;
+        }
+
+        if (var && var->id() == tvar->id()) continue;	// don't repeat time variable
 
         if (printheader) {
             headerout << varnames[iv] << ' ';
-            if ((att = var->get_att("units"))) {
-                attString = 0;
-                if (att->type() == ncChar && att->num_vals() > 0 &&
-                        (attString = att->as_string(0)))
-                    unitsout << '"' << attString << '"' << ' ';
-                else unitsout << '"' << "unknown" << '"' << ' ';
+            if (var) {
+                if ((att = var->get_att("units"))) {
+                    attString = 0;
+                    if (att->type() == ncChar && att->num_vals() > 0 &&
+                            (attString = att->as_string(0)))
+                        unitsout << '"' << attString << '"' << ' ';
+                    else unitsout << '"' << "unknown" << '"' << ' ';
 
-                delete att;
-                delete [] attString;
+                    delete att;
+                    delete [] attString;
+                }
+                else unitsout << '"' << "unknown" << '"' << ' ';
             }
             else unitsout << '"' << "unknown" << '"' << ' ';
         }
 
-
         vars.push_back(var);
-        int nd = var->num_dims();
-        nsamples.push_back(1);
-        nstations.push_back(0);
-        start.push_back(new long[nd]);
-        count.push_back(var->edges());
+        int nd = 0;
+        if (var) {
+            nd = var->num_dims();
+            nsamples.push_back(1);
+            nstations.push_back(0);
+            start.push_back(new long[nd]);
+            count.push_back(var->edges());
+        }
+        else {
+            nsamples.push_back(0);
+            nstations.push_back(0);
+            start.push_back(0);
+            count.push_back(0);
+        }
 
         samplei.push_back(-1);
         stationi.push_back(-1);
 
         long od = 1;
-        for (jv = 0; jv < nd; jv++) {
-            start[nvars][jv] = 0;
-            dim = var->get_dim(jv);
-            if (!dim->is_unlimited()) {
-                if (!strncmp(dim->name(),"sample",6)) {
-                    nsamples[nvars] = dim->size();
-                    samplei[nvars] = jv;
-                    if (nsamples[nvars] > maxnsamples) maxnsamples = nsamples[nvars];
+        if (var) {
+            for (jv = 0; jv < nd; jv++) {
+                start[nvars][jv] = 0;
+                dim = var->get_dim(jv);
+                if (!dim->is_unlimited()) {
+                    if (!strncmp(dim->name(),"sample",6)) {
+                        nsamples[nvars] = dim->size();
+                        samplei[nvars] = jv;
+                        if (nsamples[nvars] > maxnsamples) maxnsamples = nsamples[nvars];
+                    }
+                    else if (!strcmp(dim->name(),"station")) {
+                        int nstns =  dim->size();
+                        for (unsigned int ii = 0; ii < stations.size(); ii++) {
+                            if (stations[ii] == 0) {
+                                cerr << "Variable " << var->name() << " has a station dimension of " << nstns << ". Must specify a station number instead of " << stations[ii] << endl;
+                                exit(1);
+                            }
+                            else {
+                                if (stations[ii] > nstns) {
+                                    cerr << "Variable " << var->name() << " has a station dimension of " << nstns << ", which is less than requested station #" << stations[ii] << endl;
+                                    exit(1);
+                                }
+                            }
+                        }
+                        nstations[nvars] = nstns;
+                        stationi[nvars] = jv;
+                    }
+                    else od *= dim->size();
                 }
-                else if (!strcmp(dim->name(),"station")) {
-                    nstations[nvars] = dim->size();
-                    stationi[nvars] = jv;
-                }
-                else od *= dim->size();
             }
         }
         otherdims.push_back(od);
@@ -342,73 +356,78 @@ int main(int argc, char **argv)
                 break;
             }
             for (iv = 0; iv < (signed) vars.size(); iv++) {
-                var = vars[iv];
-                start[iv][0] = n;
-                count[iv][0] = 1;
-                doread = 1;
+                NcVar *var = vars[iv];
+                if (var) {
+                    start[iv][0] = n;
+                    count[iv][0] = 1;
+                    doread = 1;
 
-                if (l >= nsamples[iv]) doread = 0;
-                if (doread && (k = samplei[iv]) >= 0) {
-                    start[iv][k] = l;
-                    count[iv][k] = 1;
-                }
+                    if (l >= nsamples[iv]) doread = 0;
+                    if (doread && (k = samplei[iv]) >= 0) {
+                        start[iv][k] = l;
+                        count[iv][k] = 1;
+                    }
 
-                // loop over requested stations
-                for (j = 0; j < (signed) stations.size(); j++) {
+                    // loop over requested stations
+                    for (j = 0; j < (signed) stations.size(); j++) {
 
-                    // if the length of the station dimension for this variable is
-                    // greater than the current requested station, then read this variable
+                        // if the length of the station dimension for this
+                        // variable is greater than the current requested station,
+                        // then read this variable
+                        // station 0 is station # of variables without a station dimension
+                        if (nstations[iv] >= stations[j] && !(stations[j] == 0 && nstations[iv] > 0)) {
+                            if ((k = stationi[iv]) >= 0) {
+                                start[iv][k] = stations[j]-1;
+                                count[iv][k] = 1;
+                            }
+                            if (!var->set_cur(start[iv])) {
+                                cerr << "Error in set_cur of " << var->name() << " rec: " <<
+                                    n << " station: " << stations[j] << endl;
+                                continue;
+                            }
 
-                    // station 0 is station # of variables without a station dimension
-
-                    if (nstations[iv] >= stations[j] && !(stations[j] == 0 && nstations[iv] > 0)) {
-                        if ((k = stationi[iv]) >= 0) {
-                            start[iv][k] = stations[j]-1;
-                            count[iv][k] = 1;
-                        }
-                        if (!var->set_cur(start[iv])) {
-                            cerr << "Error in set_cur of " << var->name() << " rec: " <<
-                                n << " station: " << stations[j] << endl;
-                            continue;
-                        }
-
-                        NcBool getres;
-                        switch(var->type()) {
-                        case ncDouble:
-                            getres = var->get(dval,count[iv]);
-                            break;
-                        case ncFloat:
-                            getres = var->get(fval,count[iv]);
-                            break;
-                        case ncLong:
-                            getres = var->get(lval,count[iv]);
-                            break;
-                        default:
-                            cerr << "Error in get of " << var->name() << " type not supported" << endl;
-                            exit(1);
-
-                        }
-                        if (!getres) {
-                            cerr << "Error in get of " << var->name() << " rec: " <<
-                                n << " station: " << stations[j] << endl;
-                            continue;
-                        }
-                        for (k = 0; k < otherdims[iv]; k++)
+                            NcBool getres;
                             switch(var->type()) {
                             case ncDouble:
-                                cout << dval[k] << ' ';
+                                getres = var->get(dval,count[iv]);
                                 break;
                             case ncFloat:
-                                cout << fval[k] << ' ';
+                                getres = var->get(fval,count[iv]);
                                 break;
                             case ncLong:
-                                cout << lval[k] << ' ';
+                                getres = var->get(lval,count[iv]);
                                 break;
                             default:
-                                cout << '?' << ' ';
-                                break;
+                                cerr << "Error in get of " << var->name() << " type not supported" << endl;
+                                exit(1);
+
                             }
+                            if (!getres) {
+                                cerr << "Error in get of " << var->name() << " rec: " <<
+                                    n << " station: " << stations[j] << endl;
+                                continue;
+                            }
+                            for (k = 0; k < otherdims[iv]; k++)
+                                switch(var->type()) {
+                                case ncDouble:
+                                    cout << dval[k] << ' ';
+                                    break;
+                                case ncFloat:
+                                    cout << fval[k] << ' ';
+                                    break;
+                                case ncLong:
+                                    cout << lval[k] << ' ';
+                                    break;
+                                default:
+                                    cout << '?' << ' ';
+                                    break;
+                                }
+                        }
                     }
+                }
+                else {
+                    for (k = 0; k < otherdims[iv]; k++)
+                        cout << 1.e37 << ' ';
                 }
             }
             cout << endl;
