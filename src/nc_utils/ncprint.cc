@@ -161,6 +161,21 @@ int main(int argc, char **argv)
     for (; optind < argc; optind++) varnames.push_back(argv[optind]);
 
     if (stations.size() == 0) stations.push_back(0);
+    
+    int minstation = 9999;
+    int maxstation = 0;
+    for (unsigned int ii = 0; ii < stations.size(); ii++) {
+        minstation = std::min(minstation,stations[ii]);
+        maxstation = std::max(maxstation,stations[ii]);
+    }
+    if (minstation == 0 && maxstation > 0) {
+        cerr << "Cannot mix station 0 with non-zero stations" << endl;
+        return 1;
+    }
+    if (minstation == 0 && stations.size() > 0) {
+        stations.clear();
+        stations.push_back(0);
+    }
 
     if (useTZ) {
         strcpy(TZenv,"TZ=");
@@ -174,7 +189,7 @@ int main(int argc, char **argv)
     NcFile ncf(fname);
     if (!ncf.is_valid()) {
         cerr << fname << ": NetCDF open failed" << endl;
-        exit(1);
+        return 1;
     }
 
     NcAtt *att;
@@ -197,7 +212,7 @@ int main(int argc, char **argv)
         if (!(tvar = ncf.get_var("time"))) tvar = ncf.get_var("time_offset"); 
         if (!tvar) {
             cerr << "Time variable not found" << endl;
-            exit(1);
+            return 1;
         }
     }
 
@@ -298,12 +313,12 @@ int main(int argc, char **argv)
                         for (unsigned int ii = 0; ii < stations.size(); ii++) {
                             if (stations[ii] == 0) {
                                 cerr << "Variable " << var->name() << " has a station dimension of " << nstns << ". Must specify a station number instead of " << stations[ii] << endl;
-                                exit(1);
+                                return 1;
                             }
                             else {
                                 if (stations[ii] > nstns) {
                                     cerr << "Variable " << var->name() << " has a station dimension of " << nstns << ", which is less than requested station #" << stations[ii] << endl;
-                                    exit(1);
+                                    return 1;
                                 }
                             }
                         }
@@ -314,9 +329,19 @@ int main(int argc, char **argv)
                 }
             }
         }
+
+        if (var && nstations[nvars] == 0 && stations[0] > 0) {
+            if (stations.size() > 1) {
+                cerr << "Variable " << var->name() << " does not have a station dimension" << endl;
+                return 1;
+            }
+            else
+                cerr << "Warning: " << var->name() << " does not have a station dimension, but will be output anyway" << endl;
+        }
+
         otherdims.push_back(od);
         if (od > maxotherdims) maxotherdims = od;
-        // cerr << var->name() << ' ' << od << ' ' << nstations[nvars] << ' ' << nsamples[nvars] << endl;
+
         nvars++;
     }
 
@@ -326,7 +351,6 @@ int main(int argc, char **argv)
     }
 
     long nrecs = ncf.rec_dim()->size();
-    int doread;
 
     double *dval = new double[maxotherdims];
     float *fval = new float[maxotherdims];
@@ -342,6 +366,7 @@ int main(int argc, char **argv)
 
     for (n = 0; n < nrecs; n++) {
         ut0 = bt + readTime(tvar,n).toUsecs();
+
         for (l = 0; l < maxnsamples; l++ ) {
             ut = ut0 - dt / 2 + (dt / maxnsamples / 2) + l * (dt / maxnsamples);
             switch(printopt) {
@@ -358,70 +383,68 @@ int main(int argc, char **argv)
             for (iv = 0; iv < (signed) vars.size(); iv++) {
                 NcVar *var = vars[iv];
                 if (var) {
+
+                    // time dimenstion
                     start[iv][0] = n;
                     count[iv][0] = 1;
-                    doread = 1;
 
-                    if (l >= nsamples[iv]) doread = 0;
+                    // sample dimenstion
+                    bool doread = true;
+                    if (l >= nsamples[iv]) doread = false;
                     if (doread && (k = samplei[iv]) >= 0) {
                         start[iv][k] = l;
                         count[iv][k] = 1;
                     }
 
+                    // station dimension
                     // loop over requested stations
                     for (j = 0; j < (signed) stations.size(); j++) {
+                        if ((k = stationi[iv]) >= 0) {
+                            start[iv][k] = stations[j]-1;
+                            count[iv][k] = 1;
+                        }
+                        if (!var->set_cur(start[iv])) {
+                            cerr << "Error in set_cur of " << var->name() << " rec: " <<
+                                n << " station: " << stations[j] << endl;
+                            continue;
+                        }
 
-                        // if the length of the station dimension for this
-                        // variable is greater than the current requested station,
-                        // then read this variable
-                        // station 0 is station # of variables without a station dimension
-                        if (nstations[iv] >= stations[j] && !(stations[j] == 0 && nstations[iv] > 0)) {
-                            if ((k = stationi[iv]) >= 0) {
-                                start[iv][k] = stations[j]-1;
-                                count[iv][k] = 1;
-                            }
-                            if (!var->set_cur(start[iv])) {
-                                cerr << "Error in set_cur of " << var->name() << " rec: " <<
-                                    n << " station: " << stations[j] << endl;
-                                continue;
-                            }
+                        NcBool getres;
+                        switch(var->type()) {
+                        case ncDouble:
+                            getres = var->get(dval,count[iv]);
+                            break;
+                        case ncFloat:
+                            getres = var->get(fval,count[iv]);
+                            break;
+                        case ncLong:
+                            getres = var->get(lval,count[iv]);
+                            break;
+                        default:
+                            cerr << "Error in get of " << var->name() << " type not supported" << endl;
+                            return 1;
 
-                            NcBool getres;
+                        }
+                        if (!getres) {
+                            cerr << "Error in get of " << var->name() << " rec: " <<
+                                n << " station: " << stations[j] << endl;
+                            return 1;
+                        }
+                        for (k = 0; k < otherdims[iv]; k++) {
                             switch(var->type()) {
                             case ncDouble:
-                                getres = var->get(dval,count[iv]);
+                                cout << dval[k] << ' ';
                                 break;
                             case ncFloat:
-                                getres = var->get(fval,count[iv]);
+                                cout << fval[k] << ' ';
                                 break;
                             case ncLong:
-                                getres = var->get(lval,count[iv]);
+                                cout << lval[k] << ' ';
                                 break;
                             default:
-                                cerr << "Error in get of " << var->name() << " type not supported" << endl;
-                                exit(1);
-
+                                cout << '?' << ' ';
+                                break;
                             }
-                            if (!getres) {
-                                cerr << "Error in get of " << var->name() << " rec: " <<
-                                    n << " station: " << stations[j] << endl;
-                                continue;
-                            }
-                            for (k = 0; k < otherdims[iv]; k++)
-                                switch(var->type()) {
-                                case ncDouble:
-                                    cout << dval[k] << ' ';
-                                    break;
-                                case ncFloat:
-                                    cout << fval[k] << ' ';
-                                    break;
-                                case ncLong:
-                                    cout << lval[k] << ' ';
-                                    break;
-                                default:
-                                    cout << '?' << ' ';
-                                    break;
-                                }
                         }
                     }
                 }
@@ -433,5 +456,6 @@ int main(int argc, char **argv)
             cout << endl;
         }
     }
+    return 0;
 }
 
