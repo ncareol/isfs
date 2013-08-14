@@ -153,7 +153,7 @@ rm -rf $RPM_BUILD_ROOT
 %changelog
 * Mon Apr  2 2012 Gordon Maclean <maclean@ucar.edu> 1.0-12
 - Create counts variable in existing variable group if necessary.
-* Tue Jan  2 2012 Gordon Maclean <maclean@ucar.edu> 1.0-11
+* Mon Jan  2 2012 Gordon Maclean <maclean@ucar.edu> 1.0-11
 - Fix -Weffc++ warnings. Don't set process timezone to GMT.
 - Always update units attributes on connection.
 * Tue Oct 18 2011 Gordon Maclean <maclean@ucar.edu> 1.0-10
@@ -171,7 +171,7 @@ rm -rf $RPM_BUILD_ROOT
 - Reduced SYNC_CHECK_INTERVAL from 60 to 5 seconds.
 - Cleaned up nc_server.check, which now runs /etc/init.d/nc_server
 - instead of nc_server directly.
-* Mon Aug 21 2011 Gordon Maclean <maclean@ucar.edu> 1.0-5
+* Sun Aug 21 2011 Gordon Maclean <maclean@ucar.edu> 1.0-5
 - Fix usage of getpwnam_r, getgrnam_r, getgrid_r.
 * Wed Aug 10 2011 Gordon Maclean <maclean@ucar.edu> 1.0-4
 - Keep incrementing connecionId to avoid the possibility of a paused process
