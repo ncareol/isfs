@@ -1,68 +1,12 @@
 #
-# $Log: krypton1133,v $
-# Revision 1.18  2007/02/23 05:13:29  maclean
-# CHATS kryptons
-#
-# Revision 1.17  2004/10/14 19:58:10  oncley
-# add HVAMS 30cm sep
-#
-# Revision 1.16  2004/06/11 18:09:45  maclean
-# added CME04 cals
-#
-# Revision 1.15  2004/01/10 06:14:38  maclean
-# added 22cm separation for DASH04
-#
-# Revision 1.14  2003/12/31 17:04:55  aster
-# pre-DASH04 cals
-#
-# Revision 1.13  2003/08/29 04:44:19  maclean
-# added HVAMS krypton cals
-#
-# Revision 1.12  2003/07/26 18:24:31  maclean
-# added SonicSeparation
-#
-# Revision 1.11  2003/02/09 06:20:47  maclean
-# *** empty log message ***
-#
-# Revision 1.10  2003/01/13 19:34:37  maclean
-# changed julian day to MMM ddd
-#
-# Revision 1.9  2002/08/07 17:28:19  maclean
-# added pre-NIWOT cal
-#
-# Revision 1.8  2002/06/06 11:37:52  maclean
-# IHOP cal
-#
-# Revision 1.7  2002/03/01 17:10:07  maclean
-# *** empty log message ***
-#
-# Revision 1.6  2000/10/12 21:05:56  maclean
-# added pre-ebex00 cal
-#
-# Revision 1.5  1999/10/28 22:34:57  maclean
-# CASES entry
-#
-# Revision 1.4  1998/08/06 17:58:31  maclean
-# Changed OASIS from FULL to WET VAPOR RANGE
-#
-# Revision 1.3  1998/06/11  20:35:26  maclean
-# Added entry for OASIS98
-#
-# Revision 1.2  1996/06/06  20:46:04  maclean
-# Added pre-FLATLAND96 cals
-#
-# Revision 1.1  1995/11/07  21:10:47  maclean
-# Initial revision
-#
-#
 # Calibrations for Campbell Scientific Krypton Hygrometer serial number 1133
 # This file only contains "clean" calibrations, since only the offset changes.
 #
 # A value of 0.0 for SonicSeparation likely means that it isn't available -
 # someone needs to re-visit the project info and make a determination.
 #
-# Used by java CalFile class
-# dateFormat = "yyyy MMM dd HH:mm:ss"
+# Used by CalFile parser
+# dateFormat = "%Y %b %d %H:%M:%S"
 # timeZone = "GMT"
 #			Kw	Vo (mv)	X(cm)	Bias	SonicSeparation(cm)
 #9/91: CSI (8/26/91)

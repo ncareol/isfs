@@ -1,74 +1,9 @@
 #
-# $Log: krypton1101,v $
-# Revision 1.20  2007/02/23 05:13:29  maclean
-# CHATS kryptons
-#
-# Revision 1.19  2006/11/28 00:43:32  maclean
-# 2006 calibrations for TREX,CuPIDO, MLO_CN2, METCRAX
-#
-# Revision 1.18  2004/06/11 18:09:45  maclean
-# added CME04 cals
-#
-# Revision 1.17  2003/12/31 17:04:55  aster
-# pre-DASH04 cals
-#
-# Revision 1.16  2003/08/29 04:44:19  maclean
-# added HVAMS krypton cals
-#
-# Revision 1.15  2003/07/26 18:24:31  maclean
-# added SonicSeparation
-#
-# Revision 1.14  2003/02/09 06:20:47  maclean
-# *** empty log message ***
-#
-# Revision 1.13  2003/01/13 19:34:36  maclean
-# changed julian day to MMM ddd
-#
-# Revision 1.12  2002/11/11 18:42:30  semmer
-## cal files for FLOSS-II entered
-#
-# Revision 1.11  2002/08/07 17:28:19  maclean
-# added pre-NIWOT cal
-#
-# Revision 1.10  2002/06/06 11:37:52  maclean
-# IHOP cal
-#
-# Revision 1.9  2002/02/28 22:23:21  maclean
-# FLOSS
-#
-# Revision 1.8  2000/10/12 21:05:55  maclean
-# added pre-ebex00 cal
-#
-# Revision 1.7  1999/10/28 22:41:13  maclean
-# CASES99
-#
-# Revision 1.6  1998/08/06 17:58:30  maclean
-# Changed OASIS from FULL to WET VAPOR RANGE
-#
-# Revision 1.5  1998/06/11  20:35:25  maclean
-# Added entry for OASIS98
-#
-# Revision 1.4  1996/12/20  17:42:27  maclean
-# Since the biases during SJVAQS91 were all set to 0., I could
-# remove more than a thousand duplicate entries.
-#
-# Revision 1.3  1996/12/17  17:14:09  maclean
-# Set biases for SJVAQS91 to 0.  Because it appears that they
-# were computed with a different set of cal factors that
-# were used in the field.
-#
-# Revision 1.2  1995/11/07  21:29:45  maclean
-# Sign of bias flipped. +bias means CSI is reading too high.
-#
-# Revision 1.1  1995/11/07  21:11:50  maclean
-# Initial revision
-#
-#
 # Calibrations for Campbell Scientific Krypton Hygrometer serial number 1101
 # This file only contains "clean" calibrations, since only the offset changes.
 #
-# Used by java CalFile class
-# dateFormat = "yyyy MMM dd HH:mm:ss"
+# Used by CalFile parser
+# dateFormat = "%Y %b %d %H:%M:%S"
 # timeZone = "GMT"
 #
 # A value of 0.0 for SonicSeparation likely means that it isn't available -
@@ -155,5 +90,7 @@
 2007 Feb 20 00:00:00    -.147    4786.0  1.3     0.0     0.0
 # PCAPS
 2010 Sep 10 00:00:00     -.134   634     2.6     0.0     0.0   
+# SOAS
+2013 may 1   00:00:00   -0.145  8150.9  1.080   0.0 22.0
 # METCRAXII
 2013 Sep 20 00:00:00     -.179   3209.2     1.3     0.0     0.0   
