@@ -1,0 +1,10 @@
+#
+# Used by CalFile parser
+# dateFormat = "%Y %b %d %H:%M:%S"
+# timeZone = "US/Mountain"
+#
+# DateTime
+#
+# CentNet tests at Marshall. It was flipped (changing sign on v and w), but that conversion is not
+# in this matrix.
+2012 jan  1 00:00:00 -1.3338  0.6679  0.6661  0.0005  1.1549 -1.1560  0.3851  0.3852  0.3842
