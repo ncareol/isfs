@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- JNLP File for Cockpit -->
+
+<jnlp 
+    codebase="http://www.eol.ucar.edu/software/webstart/cockpit/javaws"
+    href="cockpit.jnlp"
+    version="1.0">
+    <information>
+        <title> Cockpit </title>
+        <vendor> National Center for Atmospheric Research (NCAR)</vendor>
+        <description>
+            A thumbnail display program to show realtime sensor data and status. The
+            program connects to a data server remotely or locally, gets data for each
+            measurement through network socket, and displays the current data on a
+            plot, and colors the current data to diffirent color as a histroy trace, so
+            that the plot show the history and current measurement data.
+        </description>
+        <homepage href="http://www.eol.ucar.edu/software/webstart/cockpit/index.html"/>
+        <description kind="short">Sensor measurement display program</description>
+        <icon href="image/nodata.png" />
+        <offline-allowed/>
+    </information>
+    <!--
+        Since nativelibs are part of the package, then must specify all-permissions
+    -->
+    <security>
+	<all-permissions/>
+    </security>
+    <resources>     
+        <jar href="cockpit.jar"  main="true"    download="eager" />
+        <package name="edu.ucar.nidas.apps.cockpit.ui.*" part="cockpit" recursive="true"/>
+        <jar href="lib/qtjambi-4.5.0_01.jar"/>
+        <jar href="lib/serializer.jar"/>
+    </resources>
+
+    <resources os='Windows' arch='x86'>
+        <jar href="lib/win/qtjambi-win32-msvc2005-4.5.0_01.jar"/>
+        <j2se version="1.5+" />
+    </resources>
+
+    <resources os='Windows' arch='x86_64'>
+        <jar href="lib/win/qtjambi-win32-msvc2005-4.5.0_01.jar"/>
+        <j2se version="1.5+" />
+    </resources>
+
+    <resources os='Linux' arch='i386'>
+    	<jar href="lib/linux/qtjambi-linux32-gcc-4.5.0_01.jar"/>
+        <j2se version="1.5+" />
+    </resources>
+
+    <!-- os should match java.lang.System.getProperty("os.name"), and arch should
+    match property "os.arch".  On 64 bit RedHat EL5 and Fedora systems,
+    os.arch is "amd64" (even on intel processors) -->
+    <resources os='Linux' arch='amd64'>
+        <jar href="lib/linux/qtjambi-linux64-gcc-4.5.0_01.jar"/>
+        <j2se version="1.5+" />
+    </resources>
+
+    <resources os='Mac' >
+        <jar href="lib/mac/qtjambi-macosx-gcc-4.5.0_01.jar"/>
+        <!-- Only arguments regarded as safe by the receiving system will be passed
+             to the java-vm. Right now it appears that -XstartOnFirstThread isn't regarded as safe -->
+        <j2se version="1.6" java-vm-args="-d32 -XstartOnFirstThread"/>
+    </resources>
+
+    <application-desc main-class="edu.ucar.nidas.apps.cockpit.ui.CockPit">
+    </application-desc>
+</jnlp>
+

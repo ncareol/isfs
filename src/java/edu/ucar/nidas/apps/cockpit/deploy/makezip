@@ -1,0 +1,52 @@
+#! /bin/sh
+
+doinstall=false
+installpath=/net/www/docs/software/webstart/cockpit
+
+if [ $# -gt 0 -a "$1" == "-i" ]; then
+    doinstall=true
+    shift
+    if [ $# -gt 0 ]; then
+        installpath=$1
+        shift
+    fi
+fi
+
+rm -rf classes
+./makejar || exit 1
+
+echo "Signing cockpit.jar"
+jarsigner -keystore javaws/cockpit.keystore cockpit.jar cockpit || exit 1
+
+[ -d javazip ] || mkdir javazip
+rm -rf javazip/*
+
+[ -d javazip ] || mkdir javaws
+rm -rf javaws/*.zip
+
+
+### zip linux, win, and mac deployment files
+echo "building javazip/cockpit-lnx.zip"
+zip javazip/cockpit-lnx.zip cockpit.jar lib/qtjambi-4.5.0_01.jar lib/serializer.jar lib/linux/qtjambi-linux32-gcc-4.5.0_01.jar lib/linux/qtjambi-linux64-gcc-4.5.0_01.jar image/nodata.png  
+
+echo "building javazip/cockpit-win.zip"
+zip javazip/cockpit-win.zip cockpit.jar lib/qtjambi-4.5.0_01.jar lib/serializer.jar lib/win/qtjambi-win32-msvc2005-4.5.0_01.jar image/nodata.png
+
+echo "building javazip/cockpit-mac.zip"
+zip javazip/cockpit-mac.zip cockpit.jar bin/mac_cockpit.sh lib/qtjambi-4.5.0_01.jar lib/serializer.jar lib/mac/qtjambi-macosx-gcc-4.5.0_01.jar image/nodata.png
+
+echo "building javaws/cockpit.zip"
+cp javaws/cockpit.jnlp .
+zip cockpit.zip cockpit.jar cockpit.jnlp lib/qtjambi-4.5.0_01.jar lib/serializer.jar lib/linux/qtjambi-linux32-gcc-4.5.0_01.jar lib/linux/qtjambi-linux64-gcc-4.5.0_01.jar lib/win/qtjambi-win32-msvc2005-4.5.0_01.jar lib/mac/qtjambi-macosx-gcc-4.5.0_01.jar image/nodata.png
+mv cockpit.zip javaws/.
+rm cockpit.jnlp 
+
+if $doinstall; then
+    echo "installing zip files to $installpath/javazip"
+    [ -d $installpath/javazip ] || mkdir -p $installpath/javazip || exit 1
+    rsync -a javazip/*.zip $installpath/javazip
+
+    echo "installing Web Start files to $installpath/javaws"
+    [ -d $installpath/javaws ] || mkdir -p $installpath/javaws || exit 1
+    unzip -o javaws/cockpit.zip -d $installpath/javaws
+fi

@@ -1,0 +1,65 @@
+
+Documentation of files and scripts in this directory
+
+make_keystore
+    This script only needs to be run if you want to update the
+    keys in javaws/cockpit.keystore.  
+
+    The cockpit keys are created with a validity of 730 days.
+    If javaws/cockpit.keystore is checked into subversion after
+    it is created, then generally this script does not need
+    to be run, unless you want to extend the validity period,
+    or otherwise alter the keys.
+
+    When this script is run, you will be prompted for a keystore
+    password, and a password for the cockpit keys. We generally
+    use the same password for both.
+
+    You will also need to know this password when signing a jar file
+    or to list or delete keys.
+
+    To list the keys in the keystore:
+        keytool -keystore javaws/cockpit.keystore -list -v
+
+    To delete a key from the keystore:
+        keytool -keystore javaws/cockpit.keystore -delete -alias cockpit
+
+sign_jars
+    Sign the jar files from external sources that are used by cockpit.
+
+    You will need to know the keystore and cockpit key password
+    to sign the jar file.
+
+    Once the jar files are signed with the current key, check them
+    into subversion so that we don't have to sign them on every install.
+
+makejar
+    Create the cockpit.jar containing the locally developed classes.
+    This jar file includes a manifest, which specifies the classpath
+    that is used when it is run. The manifest classpath contains the
+    native library jar files that are needed for all platforms.
+
+makezip [ -i [ installpath ] ]
+    Create .zip files for Linux (32 and 64 bit), Mac and Windows,
+    containing cockpit.jar and other jars needed to run cockpit
+    for the various platforms.
+
+    Also create a zip file containing everything needed for a
+    Java Web Start installation.
+
+    Specify a -i option to install the zip and web start files. The default
+    installation path is /net/www/docs/software/webstart/cockpit, or
+    it can be specified with the installpath option.
+    
+    zip files are installed to installpath/javazip. The Java Web Start
+    files are installed  to installpath/javaws.
+
+cockpit.sh
+    execute cockpit directly from the classes directory
+
+    To execute cockpit from the jar file, do:
+        java -jar cockpit.jar
+
+
+
+

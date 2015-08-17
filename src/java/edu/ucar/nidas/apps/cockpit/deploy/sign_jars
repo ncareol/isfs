@@ -1,0 +1,9 @@
+#! /bin/sh
+
+# sign the extra 
+for jar in lib/*.jar lib/linux/*.jar lib/win/*.jar lib/mac/*.jar; do
+    echo "signing $jar"
+    jarsigner -keystore javaws/cockpit.keystore $jar cockpit || exit 1
+done
+
+echo "now check in the jar files to subversion"

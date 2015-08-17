@@ -1,0 +1,27 @@
+#!/bin/sh
+
+# set the CLASSPATH to the jar files found in lib/linux
+
+cp=(lib/*.jar lib/linux/*.jar)
+OLDIFS=$IFS
+IFS=:
+# This syntax for expanding an array expands to a single word
+# with each member separated by the first character in IFS
+export CLASSPATH="${cp[*]}"
+IFS=$OLDIFS
+echo "CLASSPATH=$CLASSPATH"
+
+[ -d classes ] || mkdir classes
+
+javac -d classes -target 5 -source 5  -Xlint:unchecked \
+    ../../../core/*.java \
+    ../../../model/*.java \
+    ../../../util/*.java  \
+    ../../../ui/*.java \
+    ../ui/*.java \
+    ../core/*.java \
+    ../model/*.java\
+    ../model/config/*.java || exit 1
+
+jar cvfm cockpit.jar manifest.txt image/nodata.png -C classes . || exit 1
+
