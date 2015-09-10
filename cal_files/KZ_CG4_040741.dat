@@ -1,0 +1,9 @@
+#
+# dateFormat = "%Y %b %d %H:%M"
+# timeZone = "UTC"
+#
+# Linear calibration factors for Kipp and Zonen CG4 pyrgeometer
+#  
+# Date                 intercept slope
+# EOL BB calibration of April 1, 2013
+2011 mar  1 00:00     0.0   1.043
