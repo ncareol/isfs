@@ -5,5 +5,6 @@
 # Linear calibration factors for Kipp and Zonen CG4 pyrgeometer
 #  
 # Date                 intercept slope
+2010 jan  1 00:00   0.0     1.0
 # calibration as of April 1, 2013
 2011 mar  1 00:00     0.0   1.014
