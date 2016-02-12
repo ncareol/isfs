@@ -3,7 +3,13 @@
 # dateFormat = "%Y %b %d %H:%M:%S"
 # timeZone = "US/Mountain"
 #
-# DateTime
+# CSAT3 array geometry matrix for ABC->UVW transformations, by row.
+# The standard values are:  -1.333 0.667 0.667 0.0 1.155 -1.155 0.385 0.385 0.385
 #
+# DateTime
+1990 jan 01 00:00:00	-1.333	0.667	0.667	0.000	1.155	-1.155	0.385	0.385	0.385
+#
+# SN1123
+2005 sep 23 10:38:00	-1.334	0.666	0.667	-0.019	1.160	-1.145	0.383	0.386	0.386
 # CentNet tests at Marshall. Matrix values from Campbell
-2012 jan  1 00:00:00  -1.3328  0.6664  0.6662 -0.0173  1.1592 -1.1460  0.3843  0.3855  0.3854
+#2012 jan 01 00:00:00	-1.3328	0.6664	0.6662	-0.0173	1.1592	-1.1460	0.3843	0.3855	0.3854
