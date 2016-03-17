@@ -1,4 +1,5 @@
 import os
+import eol_scons
 import platform
 
 env = Environment(tools=['default','nidas'])
