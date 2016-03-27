@@ -1,0 +1,31 @@
+library(isfs)
+
+local({
+    isfs <- Sys.getenv("ISFS",unset=NA)
+    if (is.na(isfs)) isfs <- Sys.getenv("ISFF")
+
+    projdata <- file.path(isfs,"projects",
+            Sys.getenv("PROJECT"),"ISFS","R",".RData")
+
+    if (!file.exists(projdata)) {
+        projdata <- file.path(isfs,"projects",
+                Sys.getenv("PROJECT"),"ISFF","R",".RData")
+        if (!file.exists(projdata)) {
+            projdata <- file.path(isfs,"projects",
+                    Sys.getenv("PROJECT"),"R",".RData")
+        }
+    }
+
+    if (file.exists(projdata)) {
+        cat("attaching",projdata,"\n")
+        attach(projdata)
+        if (existsFunction("project_init")) {
+            cat("doing: project_init()\n")
+            project_init()
+        }
+        else if (existsFunction("project.init")) {
+            cat("doing: project.init()\n")
+            project.init()
+        }
+    }
+})
