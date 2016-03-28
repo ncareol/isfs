@@ -79,11 +79,9 @@ isfs_env() {
     local binpath=$bin
     local scripts=$ISFS/scripts
     local scriptpath=$scripts
-    if $nidas; then
-        local projectpath=$ISFS/projects/$PROJECT/ISFS/scripts
-    else
-        local projectpath=$ISFS/projects/$PROJECT/scripts
-    fi
+    local projectpath=$ISFS/projects/$PROJECT/ISFS/scripts
+    [ -d $projectpath ] || projectpath=$ISFS/projects/$PROJECT/ISFF/scripts
+    [ -d $projectpath ] || projectpath=$ISFS/projects/$PROJECT/scripts
 
     local -a pathdirs
     local oldifs=$IFS
