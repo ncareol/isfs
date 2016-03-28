@@ -38,7 +38,7 @@ else
     set dataset
 endif
 
-eval `$ISFS/scripts/echo_csh_env.sh $PROJECT dataset`
+eval `$ISFS/scripts/echo_csh_env.sh $PROJECT $dataset`
 
 # For BASH scripts
 if (! $?BASH_ENV) then
