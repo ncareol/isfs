@@ -4,7 +4,7 @@
 # Set other environment variables here.
 #
 if (! $?ISFS) then
-    if ($ISFF) then     # old env var
+    if ($?ISFF) then     # old env var
         setenv ISFS $ISFF
     else if (-d /net/isf/isff) then
         setenv ISFS /net/isf/isff
