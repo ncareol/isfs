@@ -1,9 +1,10 @@
 #
 # .cshrc script for ISFS users.  This script should be sourced from the user's
 # own .cshrc file.
+#
 
 if (! $?ISFS) then
-    if ($ISFF) then     # old env var
+    if ($?ISFF) then     # old env var
         setenv ISFS $ISFF
     else if (-d /net/isf/isff) then
         setenv ISFS /net/isf/isff
