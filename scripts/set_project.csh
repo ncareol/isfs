@@ -4,7 +4,7 @@
 # not exec'd, since it defines environment variables.
 #
 
-eval `/bin/bash -c "source $ISFF/scripts/isff_functions.sh; set_project -c $*"`
+eval `/bin/bash -c "source $ISFS/scripts/isfs_functions.sh; set_project -c $*"`
 
-source $ISFF/scripts/set_cdpath.csh
+source $ISFS/scripts/set_cdpath.csh
 
