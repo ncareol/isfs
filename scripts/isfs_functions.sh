@@ -122,6 +122,8 @@ isfs_env() {
 
     [ -f $ISFS/projects/$PROJECT/ISFS/scripts/isfs_env.sh ] &&
         source $ISFS/projects/$PROJECT/ISFS/scripts/isfs_env.sh
+    [ -f $ISFS/projects/$PROJECT/ISFS/scripts/isff_env.sh ] &&
+        source $ISFS/projects/$PROJECT/ISFS/scripts/isff_env.sh
     :
 }
 

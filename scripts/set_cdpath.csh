@@ -1,11 +1,13 @@
-#!/bin/echo You_must_source
+#!/usr/bin/echo You_must_source
 #
 # script which sets cdpath for ISFF users.
 #
 
 if ( $?PROJECT ) then
-    if (-d $ISFF/projects/$PROJECT/ISFF) then
-        set newpath = $ISFF/projects/$PROJECT/ISFF
+    if (-d $ISFS/projects/$PROJECT/ISFS) then
+        set newpath = $ISFS/projects/$PROJECT/ISFS
+    else if (-d $ISFS/projects/$PROJECT/ISFF) then
+        set newpath = $ISFS/projects/$PROJECT/ISFF
     else
         set newpath = $ISFF/projects/$PROJECT
     endif

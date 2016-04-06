@@ -1,4 +1,4 @@
-#!/bin/true
+#!/usr/bin/echo You_must_source
 #
 # set_project.csh script.  This script should be source'd, and
 # not exec'd, since it defines environment variables.
