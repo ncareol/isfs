@@ -6,6 +6,9 @@ if [ $# -lt 1 ]; then
 fi
 debrepo=$1
 
+sdir=${0%/*}
+sdir=$(readlink -f $sdir)
+
 key='<eol-prog@eol.ucar.edu>'
 
 tmpdir=$(mktemp -d /tmp/${0##*/}_XXXXXX)
@@ -13,9 +16,12 @@ trap "{ rm -rf $tmpdir; }" EXIT
 
 cd $ISFS/projects
 
-for script in $(find . -name .git -prune -o -name build_dsm_pkg.sh -print); do
-    echo $script
-    $script -c $tmpdir
+# look for ISFS directories
+for debdir in $(find . -name .git -prune -o -type d -name DEBIAN -print); do
+    echo $debdir
+    # Remove /DEBIAN from path, pass to script
+    proj=${debdir%/*}
+    $sdir/build_dsm_pkg.sh $proj $tmpdir
 done
 
 if [ -e $HOME/.gpg-agent-info ]; then
