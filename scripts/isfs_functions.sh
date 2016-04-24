@@ -57,17 +57,6 @@ isfs_env() {
     envset PROJECT $PROJECT
     [ $dataset ] && envset DATASET $dataset
 
-    local dxml=$ISFS/projects/$PROJECT/ISFS/config/datasets.xml
-    if [ -n "$dataset" -a -f $dxml ]; then
-        if type -p datasets > /dev/null; then
-            if $cshell; then
-                datasets -c $dataset $dxml
-            else
-                eval $(datasets -b $dataset $dxml)
-            fi
-        fi
-    fi
-
     # Build $path
     echo $PATH | grep -q /opt/nc_server/bin || PATH=$PATH:/opt/nc_server/bin
 
@@ -124,6 +113,19 @@ isfs_env() {
         source $ISFS/projects/$PROJECT/ISFS/scripts/isfs_env.sh
     [ -f $ISFS/projects/$PROJECT/ISFS/scripts/isff_env.sh ] &&
         source $ISFS/projects/$PROJECT/ISFS/scripts/isff_env.sh
+
+    # Finally, environment variables for dataset
+    # These values will over-ride any from project isfs_env.sh
+    local dxml=$ISFS/projects/$PROJECT/ISFS/config/datasets.xml
+    if [ -n "$dataset" -a -f $dxml ]; then
+        if type -p datasets > /dev/null; then
+            if $cshell; then
+                datasets -c $dataset $dxml
+            else
+                eval $(datasets -b $dataset $dxml)
+            fi
+        fi
+    fi
     :
 }
 
