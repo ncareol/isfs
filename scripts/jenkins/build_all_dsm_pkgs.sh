@@ -34,11 +34,11 @@ for debdir in $(find . -name .git -prune -o -type d -name DEBIAN -print); do
 	echo "No updates in $projdir since last build"
 	continue
     fi
+    cd -
 
     $sdir/build_dsm_pkg.sh $projdir $tmpdir && echo $this_hash > $hashfile
     hashfiles+=($hashfile)
 
-    cd -
 done
 
 if [ -e $HOME/.gpg-agent-info ]; then
