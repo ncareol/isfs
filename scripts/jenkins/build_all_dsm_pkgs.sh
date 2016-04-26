@@ -24,17 +24,17 @@ for debdir in $(find . -name .git -prune -o -type d -name DEBIAN -print); do
     # Remove /DEBIAN from path, pass to script
     projdir=${debdir%/*}
 
-    cd $projdir
-
-    # build if git hash has changed
     hashfile=$projdir/.last_hash
     [ -f $hashfile ] && last_hash=$(cat $hashfile)
+
+    cd $projdir
+    # build if git hash has changed
     this_hash=$(git log -1 --format=%H .)
+    cd -
     if [ "$this_hash" == "$last_hash" ]; then
 	echo "No updates in $projdir since last build"
 	continue
     fi
-    cd -
 
     $sdir/build_dsm_pkg.sh $projdir $tmpdir && echo $this_hash > $hashfile
     hashfiles+=($hashfile)
