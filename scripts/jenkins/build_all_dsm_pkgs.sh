@@ -16,12 +16,29 @@ trap "{ rm -rf $tmpdir; }" EXIT
 
 cd $ISFS/projects
 
+hashfiles=()
+
 # look for ISFS directories
 for debdir in $(find . -name .git -prune -o -type d -name DEBIAN -print); do
     echo $debdir
     # Remove /DEBIAN from path, pass to script
-    proj=${debdir%/*}
-    $sdir/build_dsm_pkg.sh $proj $tmpdir
+    projdir=${debdir%/*}
+
+    cd $projdir
+
+    # build if git hash has changed
+    hashfile=$projdir/.last_hash
+    [ -f $hashfile ] && last_hash=$(cat $hashfile)
+    this_hash=$(git log -1 --format=%H .)
+    if [ "$this_hash" == "$last_hash" ]; then
+	echo "No updates in $projdir since last build"
+	continue
+    fi
+
+    $sdir/build_dsm_pkg.sh $projdir $tmpdir && echo $this_hash > $hashfile
+    hashfiles+=($hashfile)
+
+    cd -
 done
 
 if [ -e $HOME/.gpg-agent-info ]; then
@@ -39,8 +56,9 @@ for deb in $tmpdir/*.deb; do
     pkg=${deb##*/}
     pkg=${pkg%_*}
     pkg=${pkg%_*}
+    # deletes all hash files if the reprepro fails :-(
     flock $debrepo sh -c "
 	reprepro -V -b $debrepo remove jessie $pkg;
 	reprepro -V -b $debrepo deleteunreferenced;
-	reprepro -V -b $debrepo includedeb jessie $deb"
+	reprepro -V -b $debrepo includedeb jessie $deb" || rm -f ${hashfiles[*]}
 done
