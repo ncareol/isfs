@@ -48,6 +48,8 @@ else
     echo "Warning: $HOME/.gpg-agent-info not found"
 fi
 
+shopt -s nullglob
+
 for deb in $tmpdir/*.deb; do
 
     dpkg-sig -k "$key" --gpg-options "--batch --no-tty" --sign builder $deb
