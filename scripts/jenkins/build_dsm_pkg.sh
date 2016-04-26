@@ -7,7 +7,6 @@
 # Build system must be able to execute the nidas proj_configs and ck_xml commands
 source $ISFS/scripts/isfs_functions.sh
 
-
 # directories to put in the package
 pkgcontents=(config scripts cal_files)
 
@@ -37,18 +36,6 @@ done
 if ! [ $dest ]; then
     usage $0
 fi
-
-check_md5() {
-    local file=$1
-    local sumfile=.${file}_md5sum
-    md5sum --quiet --check $sumfile 2>/dev/null
-    return $?
-}
-save_md5() {
-    local file=$1
-    local sumfile=.${file}_md5sum
-    md5sum $file > $sumfile
-}
 
 # avoid old dpkg commands in /opt/arcom/bin
 PATH=/usr/bin:$PATH
@@ -121,7 +108,7 @@ if [ -f $cf ]; then
     # check xml files. Could exclude ones that don't parse
     for xml in ${xmls[*]}; do
         xml=$(eval echo $xml)
-        ck_xml $xml
+        ck_xml $xml > /dev/null
     done
 else
     echo "Warning: $cf not found"
@@ -146,12 +133,6 @@ chmod -R g-ws $pkgdir/DEBIAN
 
 tar cf $tmptar --mtime="2010-01-01 00:00" -C $pkgdir .
 
-# md5sum file is saved on $projdir
-if check_md5 - < $tmptar > /dev/null; then
-    echo "No changes since last build"
-    exit 0
-fi
-
 fakeroot dpkg-deb -b $pkgdir
 
 # dpkg-name: info: moved 'eol-daq.deb' to '/tmp/build_dpkg.sh_4RI6L9/eol-daq_1.0-1_all.deb'
@@ -160,5 +141,5 @@ newname=$(dpkg-name ${pkgdir%/*}/${dpkg}.deb | sed -r -e "s/.* to '([^']+)'.*/\1
 echo "moving $newname to $dest"
 mv $newname $dest
 
-save_md5 - < $tmptar
+
 
