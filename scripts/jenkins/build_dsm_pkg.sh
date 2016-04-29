@@ -8,7 +8,7 @@
 source $ISFS/scripts/isfs_functions.sh
 
 # directories to put in the package
-pkgcontents=(config scripts cal_files)
+pkgcontents=(config cal_files dsm/scripts)
 
 usage() {
     echo "Usage: ${1##*/} projdir dest"
@@ -54,13 +54,13 @@ export PROJECT=${pdir##*/}
 
 isfs_env $PROJECT
 
-if ! [ -f DEBIAN/control ]; then
+if ! [ -f dsm/DEBIAN/control ]; then
     echo "$PWD/DEBIAN/control not found"
     exit 1
 fi
 
 # Get package name
-dpkg=$(grep "^Package:" DEBIAN/control | awk '{print $2}')
+dpkg=$(grep "^Package:" dsm/DEBIAN/control | awk '{print $2}')
 
 if gitdesc=$(git describe --match "v[0-9]*"); then
     # example output of git describe: v2.0-14-gabcdef123
@@ -80,13 +80,10 @@ tmp_isfs=$pkgdir/home/daq/isfs
 tmp_proj=$tmp_isfs/projects/$PROJECT/ISFS
 mkdir -p $tmp_proj
 
-rsync -aC --exclude=.gitignore DEBIAN $pkgdir
-rsync -aC --exclude=.gitignore --ignore-missing-args ${pkgcontents[*]} $tmp_proj
-
-# Just send scripts/dsm, not any of the other scripts
-for f in $tmp_proj/scripts/*; do
-    [ -d $f ] && [ ${f##*/} == dsm ] || rm -f $f
-done
+# DEBIAN
+rsync -aC --exclude=.gitignore dsm/DEBIAN $pkgdir
+rsync -aC --exclude=.gitignore --ignore-missing-args dsm/root/* $pkgdir
+rsync -aC --exclude=.gitignore --ignore-missing-args ${pkgcontents[*]} dsm/scripts $tmp_proj
 
 echo $PROJECT > $tmp_isfs/current_project
 
@@ -140,6 +137,4 @@ newname=$(dpkg-name ${pkgdir%/*}/${dpkg}.deb | sed -r -e "s/.* to '([^']+)'.*/\1
 
 echo "moving $newname to $dest"
 mv $newname $dest
-
-
 
