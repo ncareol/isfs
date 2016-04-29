@@ -129,6 +129,11 @@ isfs_env() {
     :
 }
 
+# backward compatibility
+isff_env() {
+    isfs_env "$@"
+}
+
 set_project() {
 
     local iarg=0
