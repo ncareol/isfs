@@ -1,10 +1,24 @@
 #!/bin/bash -e
 
-if [ $# -lt 1 ]; then
-    echo "${0##*/} debian_repository"
+install_repo=false
+while [ $# -gt 0 ]; do
+    case $1 in
+    -i)
+        install_repo=true
+        ;;
+    *)
+        dest=$1
+        ;;
+    esac
+    shift
+done
+
+if ! [ $dest ]; then
+    echo "${0##*/} [-i] dest"
     exit 1
 fi
-debrepo=$1
+
+dest=$(readlink -f $dest)
 
 sdir=${0%/*}
 sdir=$(readlink -f $sdir)
@@ -18,14 +32,22 @@ cd $ISFS/projects
 
 hashfiles=()
 
-# look for ISFS directories
+# look for dsm/DEBIAN directories
 for debdir in $(find . -name .git -prune -o -type d -name DEBIAN -print); do
     echo $debdir
-    # Remove /DEBIAN from path, pass to script
-    projdir=${debdir%/*}
 
-    hashfile=$projdir/.last_hash
+    # Remove /DEBIAN from path
+    dsmdir=${debdir%/*}
+
+    # trailing portion should be dsm
+    dir=${dsmdir##*/}
+    [ $dir != dsm ] && continue
+
+    hashfile=$dsmdir/.last_hash
     [ -f $hashfile ] && last_hash=$(cat $hashfile)
+
+    # remove /dsm. $projdir is passed to script
+    projdir=${dsmdir%/*}
 
     cd $projdir
     # build if git hash has changed
@@ -41,26 +63,32 @@ for debdir in $(find . -name .git -prune -o -type d -name DEBIAN -print); do
 
 done
 
-if [ -e $HOME/.gpg-agent-info ]; then
-    export GPG_AGENT_INFO
-    . $HOME/.gpg-agent-info
+if $install_repo; then
+
+    if [ -e $HOME/.gpg-agent-info ]; then
+        export GPG_AGENT_INFO
+        . $HOME/.gpg-agent-info
+    else
+        echo "Warning: $HOME/.gpg-agent-info not found"
+    fi
+
+    shopt -s nullglob
+
+    for deb in $tmpdir/*.deb; do
+
+        dpkg-sig -k "$key" --gpg-options "--batch --no-tty" --sign builder $deb
+
+        # remove _debver_all.deb from names of packages passed to reprepro
+        pkg=${deb##*/}
+        pkg=${pkg%_*}
+        pkg=${pkg%_*}
+        # deletes all hash files if the reprepro fails :-(
+        flock $dest sh -c "
+            reprepro -V -b $dest remove jessie $pkg;
+            reprepro -V -b $dest deleteunreferenced;
+            reprepro -V -b $dest includedeb jessie $deb" || rm -f ${hashfiles[*]}
+    done
 else
-    echo "Warning: $HOME/.gpg-agent-info not found"
+    [ -d $dest ] || mkdir -p $dest
+    rsync $tmpdir/*.deb $dest
 fi
-
-shopt -s nullglob
-
-for deb in $tmpdir/*.deb; do
-
-    dpkg-sig -k "$key" --gpg-options "--batch --no-tty" --sign builder $deb
-
-    # remove _debver_all.deb from names of packages passed to reprepro
-    pkg=${deb##*/}
-    pkg=${pkg%_*}
-    pkg=${pkg%_*}
-    # deletes all hash files if the reprepro fails :-(
-    flock $debrepo sh -c "
-	reprepro -V -b $debrepo remove jessie $pkg;
-	reprepro -V -b $debrepo deleteunreferenced;
-	reprepro -V -b $debrepo includedeb jessie $deb" || rm -f ${hashfiles[*]}
-done
