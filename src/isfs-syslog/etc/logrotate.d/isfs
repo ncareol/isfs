@@ -1,0 +1,14 @@
+/var/log/isfs/isfs.log {
+   rotate 9
+   weekly
+   notifempty
+   compress
+   delaycompress
+   dateext
+   dateyesterday
+   create 0644
+   sharedscripts
+   postrotate
+       invoke-rc.d rsyslog rotate > /dev/null
+   endscript
+}
