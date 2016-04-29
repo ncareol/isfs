@@ -9,6 +9,6 @@
    create 0644
    sharedscripts
    postrotate
-       invoke-rc.d rsyslog rotate > /dev/null
+       /bin/kill -HUP `cat /var/run/syslogd.pid 2> /dev/null` 2> /dev/null || true
    endscript
 }
