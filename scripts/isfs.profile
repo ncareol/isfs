@@ -4,6 +4,8 @@
 # own .profile file.  ISFS, PROJECT may have already been set.
 # Set other environment variables here.
 #
+#
+umask 002
 
 [ $ISFF ] || export ISFF=$ISFS
 [ $ISFS ] || export ISFS=$ISFF
@@ -22,6 +24,4 @@ fi
 declare -F isfs_env > /dev/null || source $ISFS/scripts/isfs_functions.sh
 
 isfs_env $PROJECT $DATASET
-
-umask 002
 

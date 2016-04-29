@@ -1,8 +1,11 @@
+
 #
 # .login script for ISFS users.  This script should be sourced from the user's
 # own .login file.  ISFS, PROJECT have already been set in .cshrc
 # Set other environment variables here.
-#
+
+umask 002
+
 if (! $?ISFS) then
     if ($?ISFF) then     # old env var
         setenv ISFS $ISFF
@@ -56,5 +59,4 @@ unset dataset
 #     setenv MANPATH /usr/share/man:$ISFS/doc/man
 # endif
 
-umask 002
 
