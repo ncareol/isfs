@@ -82,7 +82,7 @@ mkdir -p $tmp_proj
 
 # DEBIAN
 rsync -aC --exclude=.gitignore dsm/DEBIAN $pkgdir
-rsync -aC --exclude=.gitignore --ignore-missing-args dsm/root/* $pkgdir
+rsync -aC --exclude=.gitignore --ignore-missing-args dsm/root/etc $pkgdir
 rsync -aC --exclude=.gitignore --ignore-missing-args ${pkgcontents[*]} dsm/scripts $tmp_proj
 
 echo $PROJECT > $tmp_isfs/current_project
