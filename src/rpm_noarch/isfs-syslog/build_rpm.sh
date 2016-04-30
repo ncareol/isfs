@@ -1,6 +1,7 @@
 #!/bin/sh
 
 script=$(basename $0)
+pkg=isfs-syslog
 
 hashcheck=false
 while [ $# -gt 0 ]; do
@@ -22,8 +23,6 @@ srcdir=$(readlink -f ${0%/*})
 hashfile=$srcdir/.last_hash
 
 set -o pipefail
-
-pkg=isfs-syslog
 
 if $hashcheck; then
     [ -f $hashfile ] && last_hash=$(cat $hashfile)
@@ -85,7 +84,7 @@ git log --max-count=100 --date-order --format="%H%n* %cd %aN%n- %s%n" --date=loc
     awk --re-interval -f $awkcom | cat ${pkg}.spec - > $tmpspec
 
 cd ..
-tar czf $sourcedir/${pkg}-${version}.tar.gz --exclude .git isfs-syslog || exit $?
+tar czf $sourcedir/${pkg}-${version}.tar.gz --exclude .git $pkg || exit $?
 cd -
 
 rpmbuild -v -ba \
