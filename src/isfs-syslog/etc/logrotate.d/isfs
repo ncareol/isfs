@@ -1,4 +1,4 @@
-/var/log/isfs/isfs.log {
+/var/log/isfs/isfs.log /var/log/isfs/isfs_debug.log {
    rotate 9
    weekly
    notifempty
