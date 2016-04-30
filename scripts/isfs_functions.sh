@@ -109,10 +109,23 @@ isfs_env() {
 
     envset PATH $newpath
 
-    [ -f $ISFS/projects/$PROJECT/ISFS/scripts/isfs_env.sh ] &&
-        source $ISFS/projects/$PROJECT/ISFS/scripts/isfs_env.sh
-    [ -f $ISFS/projects/$PROJECT/ISFS/scripts/isff_env.sh ] &&
-        source $ISFS/projects/$PROJECT/ISFS/scripts/isff_env.sh
+    # old style isff_env.sh files, with envset commands
+    if [ -f $ISFF/projects/$PROJECT/ISFS/scripts/isff_env.sh ]; then
+        source $ISFF/projects/$PROJECT/ISFS/scripts/isff_env.sh
+    elif [ -f $ISFS/projects/$PROJECT/ISFS/scripts/isfs_env.sh ]; then
+        # new style isfs_env.sh files with sh syntax "X=Y" without export
+        tmpsh=$(mktemp)
+        if $cshell; then
+            # if cshell, convert to envset format
+            sed -r -e 's/^[[:space:]]*(export)?([^=])=(.*)/envset \2 \3/' \
+                $ISFS/projects/$PROJECT/ISFS/scripts/isfs_env.sh > $tmpsh
+        else
+            sed -r -e 's/^[[:space:]]*[^#](.*)/export \1/' \
+                $ISFS/projects/$PROJECT/ISFS/scripts/isfs_env.sh > $tmpsh
+        fi
+        source $tmpsh
+        rm -f $tmpsh
+    fi
 
     # Finally, environment variables for dataset
     # These values will over-ride any from project isfs_env.sh
