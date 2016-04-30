@@ -8,19 +8,15 @@ BuildArch: noarch
 Source: %{name}-%{version}.tar.gz
 Obsoletes: isff-base-system
 
-Requires: eol-repo-fedora
-Requires: sudo minicom emacs
-# Requires: isff-dhcp
-# Requires: isff-named
-# Requires: isff-syslog
-# Requires: isff-aster-user
-Requires: nidas nidas-buildeol nidas-daq nidas-devel
-Requires: armel-images
-# Our R code uses fftw
-Requires: R fftw-devel netcdf nco
-Requires: nc_server nc_server-devel
 Requires: chrony
 Requires: git subversion
+Requires: sudo minicom emacs
+Requires: eol-repo-fedora
+Requires: netcdf nco
+Requires: nidas nidas-buildeol nidas-daq nidas-devel
+Requires: nc_server nc_server-devel
+Requires: isfs-R
+Requires: armel-images
 
 %description
 Package containing system configuration of an ISFS base system.
