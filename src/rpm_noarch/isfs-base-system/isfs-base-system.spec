@@ -56,10 +56,29 @@ sed -i '/^kernel.sysrq/s/^[^=]*=[[:space:]]*0.*$/kernel.sysrq = 1/' /etc/sysctl.
 
 %triggerin -- chrony
 
-# make sure chrony is running at bootup
+# enable chrony
 if ! systemctl is-enabled chronyd.service > /dev/null; then
     echo "enabling chronyd.service"
     systemctl enable chronyd.service
+fi
+
+%triggerin -- nc_server
+
+# enable nc_server
+if ! systemctl is-enabled nc_server.service > /dev/null; then
+    echo "enabling and starting nc_server.service"
+    systemctl enable nc_server.service
+    systemctl start nc_server.service
+fi
+
+%triggerin -- nidas-daq
+
+cf=%{_sysconfdir}/default/nidas-daq
+source $cf
+
+# setup systemd for $DAQ_USER so that their services are run at boot
+if [ $DAQ_USER ]; then
+    loginctl enable-linger $DAQ_USER
 fi
 
 %post

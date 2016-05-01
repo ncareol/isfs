@@ -93,8 +93,6 @@ rpmbuild -v -ba \
     --define "debug_package %{nil}" \
     $tmpspec | tee -a $log  || exit $?
 
-echo $this_hash > $hashfile
-
 $hashcheck && echo $this_hash > $hashfile
 
 echo "RPMS:"
