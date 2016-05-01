@@ -7,8 +7,13 @@
 # Build system must be able to execute the nidas proj_configs and ck_xml commands
 source $ISFS/scripts/isfs_functions.sh
 
-# directories to put in the package
+# directories to put in the package which will end up
+# at $ISFS/projects/$PROJECT/ISFS
 pkgcontents=(config cal_files dsm/scripts)
+
+# directories to put in the package which will end up at /
+# this may be mis-guided...
+pkgroot=dsm/root/{etc,home}
 
 usage() {
     echo "Usage: ${1##*/} projdir dest"
@@ -82,8 +87,8 @@ mkdir -p $tmp_proj
 
 # DEBIAN
 rsync -aC --exclude=.gitignore dsm/DEBIAN $pkgdir
-rsync -aC --exclude=.gitignore --ignore-missing-args dsm/root/etc $pkgdir
-rsync -aC --exclude=.gitignore --ignore-missing-args ${pkgcontents[*]} dsm/scripts $tmp_proj
+rsync -aC --exclude=.gitignore --ignore-missing-args $pkgroot $pkgdir
+rsync -aC --exclude=.gitignore --ignore-missing-args ${pkgcontents[*]} $tmp_proj
 
 echo $PROJECT > $tmp_isfs/current_project
 
@@ -126,7 +131,6 @@ sed -i -e "s/^Package:.*/Package: $dpkg/" $pkgdir/DEBIAN/control
 sed -i -e "s/^Version:.*/Version: $version/" $pkgdir/DEBIAN/control
 
 chmod -R g-ws $pkgdir/DEBIAN
-
 
 tar cf $tmptar --mtime="2010-01-01 00:00" -C $pkgdir .
 
