@@ -10,7 +10,7 @@ umask 002
 [ $ISFF ] || export ISFF=$ISFS
 [ $ISFS ] || export ISFS=$ISFF
 
-if [ X$PROJECT = "X" ]; then
+if [ -z "$PROJECT" ]; then
     if [ -f $HOME/default_project ]; then
         dp=($(<$HOME/default_project))
     else
