@@ -117,10 +117,10 @@ isfs_env() {
         tmpsh=$(mktemp)
         if $cshell; then
             # if cshell, convert to envset format
-            sed -r -e 's/^[[:space:]]*(export)?([^=])=(.*)/envset \2 \3/' \
+            sed -r -e 's/^[[:space:]]*([^#][^=]*)=(.*)/envset \1 \2/' \
                 $ISFS/projects/$PROJECT/ISFS/scripts/isfs_env.sh > $tmpsh
         else
-            sed -r -e 's/^[[:space:]]*[^#](.*)/export \1/' \
+            sed -r -e 's/^[[:space:]]*([^#])/export \1/' \
                 $ISFS/projects/$PROJECT/ISFS/scripts/isfs_env.sh > $tmpsh
         fi
         source $tmpsh
