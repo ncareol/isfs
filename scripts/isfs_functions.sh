@@ -56,6 +56,7 @@ isfs_env() {
 
     envset PROJECT $PROJECT
     [ $dataset ] && envset DATASET $dataset
+    $cshell || set_cdpath
 
     # Build $path
     echo $PATH | grep -q /opt/nc_server/bin || PATH=$PATH:/opt/nc_server/bin
@@ -203,7 +204,6 @@ set_project() {
     fi
 
     isfs_env $arg $project $dataset
-    set_cdpath
 }
 
 # short-hand
@@ -253,4 +253,3 @@ get_datasets() {
         [ -f $dxml ] && datasets -n $dxml
     fi
 }
-   
