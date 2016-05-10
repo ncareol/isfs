@@ -11,9 +11,7 @@ source $ISFS/scripts/isfs_functions.sh
 # at $ISFS/projects/$PROJECT/ISFS
 pkgcontents=(config cal_files dsm/scripts)
 
-# directories to put in the package which will end up at /
-# this may be mis-guided...
-pkgroot=dsm/root/{etc,home}
+# files to put in the $DAQ_USER's home
 
 usage() {
     echo "Usage: ${1##*/} projdir dest"
@@ -87,7 +85,7 @@ mkdir -p $tmp_proj
 
 # DEBIAN
 rsync -aC --exclude=.gitignore dsm/DEBIAN $pkgdir
-rsync -aC --exclude=.gitignore --ignore-missing-args $pkgroot $pkgdir
+rsync -aC --exclude=.gitignore --ignore-missing-args dsm/hosts $pkgdir/tmp/hosts-field
 rsync -aC --exclude=.gitignore --ignore-missing-args ${pkgcontents[*]} $tmp_proj
 
 echo $PROJECT > $tmp_isfs/current_project
