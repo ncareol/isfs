@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 # Build a debian package of the field project meta-data and scripts
-# for DSMs. This may be built by jenkins which may
+# for DSMs. This may be used by jenkins which may
 # not have the full ISFS environment setup.
 
 # Build system must be able to execute the nidas proj_configs and ck_xml commands
@@ -82,6 +82,7 @@ pkgdir=$tmpdir/$dpkg
 tmp_isfs=$pkgdir/home/daq/isfs
 tmp_proj=$tmp_isfs/projects/$PROJECT/ISFS
 mkdir -p $tmp_proj
+mkdir -p $pkgdir/tmp
 
 # DEBIAN
 rsync -aC --exclude=.gitignore dsm/DEBIAN $pkgdir
