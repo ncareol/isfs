@@ -3,5 +3,5 @@
 	url = git@github.com:ncareol/public-field-projects
 	sparsecheckout = true
 [submodule "embedded-armel"]
-	path = embedded-armel
-	url = git@github.com:ncareol/embedded-armel
+	path = embedded-linux
+	url = git@github.com:ncareol/embedded-linux
