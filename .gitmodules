@@ -4,4 +4,7 @@
 	sparsecheckout = true
 [submodule "embedded-linux"]
 	path = embedded-linux
-	url = git@github.com:ncareol/embedded-linux
+	url = ./embedded-linux
+[submodule "embedded-daq"]
+	path = embedded-daq
+	url = ./embedded-daq
