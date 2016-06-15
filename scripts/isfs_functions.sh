@@ -231,7 +231,7 @@ set_cdpath() {
         fi
     done
     [ -n "$projpath" ] && newpath+=${newpath:+:}$projpath
-    export CDPATH=${newpath}
+    export CDPATH=.:${newpath}
     # set +x
 }
 
