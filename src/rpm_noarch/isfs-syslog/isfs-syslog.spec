@@ -1,7 +1,7 @@
 Summary: Additions to syslog config for ISFS logging
 Name: isfs-syslog
 Version: %{gitversion}
-Release: %{releasenum}%{?dist}
+Release: %{releasenum}
 License: GPL
 Group: System Environment/Daemons
 Url: http://www.eol.ucar.edu/
