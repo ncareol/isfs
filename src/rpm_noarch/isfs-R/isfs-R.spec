@@ -1,7 +1,7 @@
 Summary: Setup for ISFS R users
 Name: isfs-R
 Version: %{gitversion}
-Release: %{releasenum}%{?dist}
+Release: %{releasenum}
 License: GPL
 Group: System Environment/Daemons
 Url: http://www.eol.ucar.edu/

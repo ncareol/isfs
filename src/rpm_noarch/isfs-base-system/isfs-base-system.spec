@@ -1,7 +1,7 @@
 Summary: Package containing system configuration of an ISFS base system.
 Name: isfs-base-system
 Version: %{gitversion}
-Release: %{releasenum}%{?dist}
+Release: %{releasenum}
 License: GPL
 Group: System Administration
 BuildArch: noarch
