@@ -58,7 +58,8 @@ for debdir in $(find . -name .git -prune -o -type d -name DEBIAN -print); do
 	continue
     fi
 
-    $sdir/build_dsm_pkg.sh $projdir $tmpdir && echo $this_hash > $hashfile
+    $sdir/build_dsm_pkg.sh $projdir $tmpdir
+    echo $this_hash > $hashfile
     hashfiles+=($hashfile)
 
 done
