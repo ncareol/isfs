@@ -1,20 +1,31 @@
 #!/bin/bash -e
 
 install_repo=false
+projects=()
 while [ $# -gt 0 ]; do
     case $1 in
     -i)
         install_repo=true
+	shift
+	dest="$1"
         ;;
     *)
-        dest=$1
+        projects+=($1)
         ;;
     esac
     shift
 done
 
+usage() {
+    echo "${0##*/} -i dest project ..."
+}
+
 if ! [ $dest ]; then
-    echo "${0##*/} [-i] dest"
+    usage
+    exit 1
+fi
+if [ -z "$projects" ]; then
+    usage
     exit 1
 fi
 
@@ -33,21 +44,19 @@ cd $ISFS/projects
 hashfiles=()
 
 # look for dsm/DEBIAN directories
-for debdir in $(find . -name .git -prune -o -type d -name DEBIAN -print); do
+for projdir in ${projects[*]} ; do
+    projdir="$projdir/ISFS"
+    dsmdir="./$projdir/dsm"
+    debdir="$dsmdir/DEBIAN"
     echo $debdir
 
-    # Remove /DEBIAN from path
-    dsmdir=${debdir%/*}
-
-    # trailing portion should be dsm
-    dir=${dsmdir##*/}
-    [ $dir != dsm ] && continue
+    if [ ! -d "$debdir" ]; then
+	echo "Project $projdir does not have a DEBIAN directory."
+	continue
+    fi
 
     hashfile=$dsmdir/.last_hash
     [ -f $hashfile ] && last_hash=$(cat $hashfile)
-
-    # remove /dsm. $projdir is passed to script
-    projdir=${dsmdir%/*}
 
     cd $projdir
     # build if git hash has changed
