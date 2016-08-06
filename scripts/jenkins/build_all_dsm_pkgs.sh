@@ -6,18 +6,22 @@ while [ $# -gt 0 ]; do
     case $1 in
     -i)
         install_repo=true
-	shift
-	dest="$1"
         ;;
     *)
-        projects+=($1)
+        if [ $dest ]; then
+            projects+=($1)
+        else
+            dest=$1
+        fi
         ;;
     esac
     shift
 done
 
 usage() {
-    echo "${0##*/} -i dest project ..."
+    echo "${0##*/} [-i] dest project ..."
+    echo "-i: install in debian repo specified by dest"
+    echo "dest: destination of package"
 }
 
 if ! [ $dest ]; then
