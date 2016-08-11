@@ -17,6 +17,8 @@ Requires: nidas nidas-buildeol nidas-daq nidas-devel
 Requires: nc_server nc_server-devel
 Requires: isfs-R
 Requires: armel-images
+# GNOME stuff
+Requires: gnome-tweak-tool dconf-editor
 
 %description
 Package containing system configuration of an ISFS base system.
