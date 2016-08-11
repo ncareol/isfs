@@ -88,7 +88,7 @@ mkdir -p $pkgdir/tmp
 rsync -aC --exclude=.gitignore dsm/DEBIAN $pkgdir
 rsync -aC --exclude=.gitignore --ignore-missing-args dsm/hosts-field $pkgdir/tmp/hosts-field
 rsync -aC --exclude=.gitignore --ignore-missing-args dsm/home $pkgdir
-rsync -aC --exclude=.gitignore --ignore-missing-args ${pkgcontents[*]} $tmp_proj
+rsync -aC --exclude=.gitignore --ignore-missing-args --exclude=QC ${pkgcontents[*]} $tmp_proj
 
 echo $PROJECT > $tmp_isfs/current_project
 
