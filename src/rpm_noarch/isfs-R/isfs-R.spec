@@ -42,7 +42,7 @@ echo "Log file is $rlog"
 # install some R packages into site library
 R --vanilla --slave << EOD >& $rlog
 # CRAN and EOL repos
-repos=c("http://cran.us.r-project.org","http://www.eol.ucar.edu/software/R")
+repos=c("http://cran.us.r-project.org","https://www.eol.ucar.edu/software/R")
 pkgs=c("eolts", "isfs", "eolsonde")
 cat("Installing:",paste(pkgs,sep=","),"\n")
 install.packages(pkgs,lib=.Library.site[1],repos=repos)
