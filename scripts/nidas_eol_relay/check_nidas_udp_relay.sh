@@ -5,12 +5,13 @@ export PATH=/bin:/usr/bin:/opt/nidas/bin
 
 script=$0
 script=${script##*/}
-logdir=$HOME
+logdir=$HOME/nidas_eol_relay
 
 proc="nidas_udp_relay -h vertex.txt -u 30010"
 
 if ! pgrep -f "$proc" > /dev/null; then
-    echo "`date`: $proc not running" >> $logdir/$script.log
-    $proc >> $logdir/nidas_udp_relay.log 2>&1
+    (cd "$logdir"
+	echo "`date`: ***** $proc not running, starting it..."
+	exec $proc) >> $logdir/nidas_eol_relay.log 2>&1
 fi
 
