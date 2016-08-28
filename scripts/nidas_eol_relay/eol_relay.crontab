@@ -1,0 +1,2 @@
+PATH=/usr/bin:/opt/nidas/bin
+*/10 * * * *    $HOME/check_nidas_udp_relay.sh
