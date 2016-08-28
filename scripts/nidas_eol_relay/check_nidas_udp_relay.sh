@@ -1,10 +1,10 @@
 #!/bin/sh
 
+export PATH=/bin:/usr/bin:/opt/nidas/bin
 # set -x
 
 script=$0
 script=${script##*/}
-
 logdir=$HOME
 
 proc="nidas_udp_relay -h vertex.txt -u 30010"
