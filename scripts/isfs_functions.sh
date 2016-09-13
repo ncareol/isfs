@@ -223,7 +223,7 @@ set_cdpath() {
 
     for dir in ${dirs[*]}; do
         # Substitute current project
-        if [[ $dir == */projects/* ]]; then
+        if [[ $dir == $ISFS/projects/* ]]; then
             newpath+=${newpath:+:}$projpath
             projpath=
         else
