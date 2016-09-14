@@ -8,7 +8,7 @@ Url: http://www.eol.ucar.edu/
 Packager: Gordon Maclean <maclean@ucar.edu>
 Vendor: UCAR
 BuildArch: noarch
-Requires: R fftw-devel netcdf-devel GeographicLib-devel
+Requires: R fftw-devel netcdf-devel GeographicLib-devel udunits2-devel
 # For BUILD_GROUP in /etc/default/nidas-build
 Requires: nidas-build
 
