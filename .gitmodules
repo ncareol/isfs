@@ -1,6 +1,6 @@
 [submodule "projects"]
 	path = projects
-	url = git@github.com:ncareol/public-field-projects
+	url = ./public-field-projects
 	sparsecheckout = true
 [submodule "embedded-linux"]
 	path = embedded-linux
