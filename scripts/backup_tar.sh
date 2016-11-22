@@ -214,11 +214,11 @@ for key in ${!backup[*]}; do
         # echo "ninc=$ninc"
 	tarball=${dest}/${key}_${l0date}_$ninc.tar$suffix
 	tarinc=${dest}/${key}_${l0date}_$ninc.snar-1
-	[ $debug ] || cp ${dest}/${key}_${l0date}.snar-0 $tarinc
+	$debug || cp ${dest}/${key}_${l0date}.snar-0 $tarinc
     else
-	tarinc=${dest}/${key}_$curdate.snar-0
 	tarball=${dest}/${key}_$curdate.tar$suffix
-	[ $debug ] || rm -f $tarinc
+	tarinc=${dest}/${key}_$curdate.snar-0
+	$debug || rm -f $tarinc
     fi
 
     if [ -n "${lvdev[$key]}" ]; then
@@ -230,15 +230,17 @@ for key in ${!backup[*]}; do
         # echo "vg=$vg"
         lvpath=${vgpath}-$newlv
         # echo "lvpath=$lvpath"
-        lvcreate --snapshot -l100%FREE -n $newlv ${lvdev[$key]}
+        lvs $lvpath 2> /dev/null ||
+            lvcreate --snapshot -l100%FREE -n $newlv ${lvdev[$key]}
         trap "{ lvremove --force $lvpath; }" EXIT
         tmpdir=$(mktemp -d /tmp/${key}_XXXXXX)
         trap "{ rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
         mntpath=${tmpdir}${backup[$key]}
         # echo "mntpath=$mntpath"
         [ -d $mntpath ] || mkdir -p $mntpath
+        mount | grep -Fq $lvpath && umount -v $lvpath
         mount -v $lvpath -o ro $mntpath
-        trap "{ umount -v $mntpath; rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
+        trap "{ sleep 1; umount -v $mntpath; rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
 	cddir=$tmpdir
     else
 	cddir=/
@@ -246,9 +248,10 @@ for key in ${!backup[*]}; do
 
     # remove leading slash
     bkdir=${backup[$key]#/}
+    [ -z "$bkdir" ] && bkdir=.
 
     cd $cddir
-    trap "{ cd -; umount -v $mntpath; rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
+    trap "{ cd -; sleep 1; umount -v $mntpath; rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
 
     echo "tar backup starting: $key, $(date)"
     echo "PWD=$PWD"
@@ -273,5 +276,6 @@ for key in ${!backup[*]}; do
 	lvremove --force $lvpath;
     fi
     echo "tar backup finished: $key, $(date)"
+    echo ""
 done
 
