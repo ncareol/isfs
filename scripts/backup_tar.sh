@@ -225,7 +225,7 @@ for key in ${!backup[*]}; do
     if $inc; then
         lasttar=$(get_last_level0 $key $dest)
         if [ -z "$lasttar" ]; then
-            echo "A level 0 backup of $key does not exist. Doing level 0 instead of incremental"
+            echo "A full backup of $key does not exist. Doing full backup instead of incremental"
             inc=false
         fi
     fi
@@ -237,7 +237,7 @@ for key in ${!backup[*]}; do
         ninc=$(get_last_incremental ${key}_${l0date} $dest)
         # echo "ninc=$ninc"
         if [ -n "$ninc" ]; then
-            ninc=$(printf "%02d" $((ninc+1)))
+            printf -v ninc "%02d" $((ninc+1))
         else
             ninc=00
         fi
@@ -275,6 +275,7 @@ for key in ${!backup[*]}; do
             snapshot=true
         fi
     fi
+
     if $snapshot; then
         lvs $snapdev > /dev/null 2>&1 ||
             lvcreate --snapshot --permission r -l100%FREE -n $snaplv $mntdev
