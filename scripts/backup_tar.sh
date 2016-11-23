@@ -90,27 +90,27 @@ suffix=.gz
 config=
 while [ $# -gt 0 ]; do
     case $1 in
-    -i)
-        incremental=true
-        ;;
-    -d)
-        debug=true
-        ;;
-    -j)
-        suffix=.bz2
-        ;;
-    -J)
-        suffix=.xz
-        ;;
-    -n)
-        suffix=
-        ;;
-    -z)
-        suffix=.gz
-        ;;
-    *)
-        config=$1
-        ;;
+        -i)
+            incremental=true
+            ;;
+        -d)
+            debug=true
+            ;;
+        -j)
+            suffix=.bz2
+            ;;
+        -J)
+            suffix=.xz
+            ;;
+        -n)
+            suffix=
+            ;;
+        -z)
+            suffix=.gz
+            ;;
+        *)
+            config=$1
+            ;;
     esac
     shift
 done
@@ -162,10 +162,10 @@ get_last_level0 () {
     local res
     local tarball=$(ls -1 $dest/${name}_20[12][0-9][01][0-9][0-3][0-9].tar* 2>/dev/null | sort | tail -n 1)
     if [ -n "$tarball" ]; then
-    	local tarinc=${tarball/.tar*/.snar-0}
-	if [ -f $tarinc ]; then
-	    res=$tarball
-	fi
+        local tarinc=${tarball/.tar*/.snar-0}
+        if [ -f $tarinc ]; then
+            res=$tarball
+        fi
     fi
     echo $res
 }
@@ -184,14 +184,14 @@ get_last_incremental () {
     local res=
     local tarball=$(ls -1 $dest/${namedate}_[0-9][0-9].tar* 2>/dev/null | sort | tail -n 1)
     if [ -n "$tarball" ]; then
-    	local tarinc=${tarball/.tar*/.snar-1}
-	if [ -f $tarinc ]; then
-	    tarball=${tarball##*/}
-	    tarball=${tarball#$namedate}
-	    tarball=${tarball%.tar*}
-	    tarball=${tarball#_}
-	    res=$tarball
-	fi
+        local tarinc=${tarball/.tar*/.snar-1}
+        if [ -f $tarinc ]; then
+            tarball=${tarball##*/}
+            tarball=${tarball#$namedate}
+            tarball=${tarball%.tar*}
+            tarball=${tarball#_}
+            res=$tarball
+        fi
     fi
     echo $res
 }
@@ -206,31 +206,31 @@ for key in ${!backup[*]}; do
     inc=$incremental
     if $inc; then
         lasttar=$(get_last_level0 $key $dest)
-	if [ -z "$lasttar" ]; then
-	    echo "A level 0 backup of $key does not exist. Doing level 0 instead of incremental"
+        if [ -z "$lasttar" ]; then
+            echo "A level 0 backup of $key does not exist. Doing level 0 instead of incremental"
             inc=false
         fi
     fi
 
     if $inc; then
         # echo "lasttar=$lasttar"
-	l0date=$(get_date_of_backup $lasttar)
+        l0date=$(get_date_of_backup $lasttar)
         # echo "l0date=$l0date"
-	ninc=$(get_last_incremental ${key}_${l0date} $dst)
+        ninc=$(get_last_incremental ${key}_${l0date} $dest)
         # echo "ninc=$ninc"
         if [ -n "$ninc" ]; then
-	    ninc=$(printf "%02d" $((ninc+1)))
-	else
-	    ninc=00
-	fi
+            ninc=$(printf "%02d" $((ninc+1)))
+        else
+            ninc=00
+        fi
         # echo "ninc=$ninc"
-	tarball=${dest}/${key}_${l0date}_$ninc.tar$suffix
-	tarinc=${dest}/${key}_${l0date}_$ninc.snar-1
-	$debug || cp ${dest}/${key}_${l0date}.snar-0 $tarinc
+        tarball=${dest}/${key}_${l0date}_$ninc.tar$suffix
+        tarinc=${dest}/${key}_${l0date}_$ninc.snar-1
+        $debug || cp ${dest}/${key}_${l0date}.snar-0 $tarinc
     else
-	tarball=${dest}/${key}_$curdate.tar$suffix
-	tarinc=${dest}/${key}_$curdate.snar-0
-	$debug || rm -f $tarinc
+        tarball=${dest}/${key}_$curdate.tar$suffix
+        tarinc=${dest}/${key}_$curdate.snar-0
+        $debug || rm -f $tarinc
     fi
 
     if [ -n "${lvdev[$key]}" ]; then
@@ -260,12 +260,12 @@ for key in ${!backup[*]}; do
             # remove ./ in front of path names
             targ="--transform=s,^\./,,"
         fi
-	cddir=$tmpdir
+        cddir=$tmpdir
     else
         # remove leading slash
         bkdir=${backup[$key]#/}
         [ -z "$bkdir" ] && bkdir=/
-	cddir=/
+        cddir=/
     fi
 
     cd $cddir
@@ -276,21 +276,21 @@ for key in ${!backup[*]}; do
     echo "tarball=$tarball"
     echo "tarinc=$tarinc"
     if ! $debug; then
-	time tar --create --one-file-system --auto-compress \
-	    --selinux --no-check-device --sparse $targ \
-	    --listed-incremental=$tarinc \
-	    --file=$tarball \
+        time tar --create --one-file-system --auto-compress \
+            --selinux --no-check-device --sparse $targ \
+            --listed-incremental=$tarinc \
+            --file=$tarball \
             $bkdir
     fi
     cd - > /dev/null
     if [ -n "${lvdev[$key]}" ]; then
         sleep 1
         trap "{ rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
-	umount -v $mntpath
+        umount -v $mntpath
         trap "{ lvremove --force $lvpath; }" EXIT
-	rm -rf $tmpdir
-	trap - EXIT
-	lvremove --force $lvpath;
+        rm -rf $tmpdir
+        trap - EXIT
+        lvremove --force $lvpath;
     fi
     ls -l $tarball
     echo "tar backup finished: $key, $(date)"
