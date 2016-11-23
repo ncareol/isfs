@@ -3,7 +3,7 @@
 # An example configuration file for this script, which uses bash syntax:
 #       # where to put the tarballs and incremental files
 #	dest=/backup/data
-#       # what to backup. Values should be absolute expressions
+#       # what to backup. Values should be absolute paths
 #	backup[boot]=/boot
 #	backup[root]=/
 #	backup[home]=/home
@@ -55,8 +55,8 @@
 # that logical volume to hold any file system changes that happen while
 # the snapshot is mounted.
 #
-# By default a .gz compressed archive is created, but other compression
-# may specified via a runstring argument.
+# By default a .gz compressed archive is created, but other compression,
+# or none, may specified via a runstring argument.
 #
 # TODO:
 #   automate lvm handing: determine logical volume and use lvm tools
@@ -71,10 +71,10 @@
 usage () {
     echo "Usage ${0##*/} [-d] [-i] [ -j | -J | -n | -z ] config"
     echo "-d: print debug messages, don't create backup"
-    echo "-i: incremental backup of last level 0"
+    echo "-i: incremental backup of last full backup"
     echo "-j: create bzip2 compressed archive with .bz2 suffix"
     echo "-J: create xz compressed archive with .xz suffix"
-    echo "-n: no copmression of archive"
+    echo "-n: no compression of archive"
     echo "-z: default, gzip archive with .gz suffix"
     echo "config: name of configuration file"
     exit 1
@@ -199,6 +199,9 @@ get_last_incremental () {
 renice +20 -p $$
 
 for key in ${!backup[*]}; do
+
+    echo "tar backup starting: $key, $(date)"
+
     targ=
     inc=$incremental
     if $inc; then
@@ -240,16 +243,16 @@ for key in ${!backup[*]}; do
         lvpath=${vgpath}-$newlv
         # echo "lvpath=$lvpath"
         lvs $lvpath > /dev/null 2>&1 ||
-            lvcreate --snapshot -l100%FREE -n $newlv ${lvdev[$key]}
-        trap "{ lvremove --force $lvpath; }" EXIT
+            lvcreate -v --snapshot -l100%FREE -n $newlv ${lvdev[$key]}
+        trap "{ lvremove -v --force $lvpath; }" EXIT
         tmpdir=$(mktemp -d /tmp/${key}_XXXXXX)
-        trap "{ rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
+        trap "{ rm -rf $tmpdir; lvremove -v --force $lvpath; }" EXIT
         mntpath=${tmpdir}${backup[$key]}
         # echo "mntpath=$mntpath"
         [ -d $mntpath ] || mkdir -p $mntpath
         mount | grep -Fq $lvpath && umount -v $lvpath
         mount -v $lvpath -o ro $mntpath
-        trap "{ sleep 1; umount -v $mntpath; rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
+        trap "{ sleep 1; umount -v $mntpath; rm -rf $tmpdir; lvremove -v --force $lvpath; }" EXIT
         # remove leading slash
         bkdir=${backup[$key]#/}
         if [ -z "$bkdir" ]; then
@@ -266,9 +269,8 @@ for key in ${!backup[*]}; do
     fi
 
     cd $cddir
-    trap "{ cd -; sleep 1; umount -v $mntpath; rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
+    trap "{ cd -; sleep 1; umount -v $mntpath; rm -rf $tmpdir; lvremove -v --force $lvpath; }" EXIT
 
-    echo "tar backup starting: $key, $(date)"
     echo "PWD=$PWD"
     echo "backup=$bkdir"
     echo "tarball=$tarball"
@@ -283,12 +285,12 @@ for key in ${!backup[*]}; do
     cd - > /dev/null
     if [ -n "${lvdev[$key]}" ]; then
         sleep 1
-        trap "{ rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
+        trap "{ rm -rf $tmpdir; lvremove -v --force $lvpath; }" EXIT
 	umount -v $mntpath
-        trap "{ lvremove --force $lvpath; }" EXIT
+        trap "{ lvremove -v --force $lvpath; }" EXIT
 	rm -rf $tmpdir
 	trap - EXIT
-	lvremove --force $lvpath;
+	lvremove -v --force $lvpath;
     fi
     ls -l $tarball
     echo "tar backup finished: $key, $(date)"
