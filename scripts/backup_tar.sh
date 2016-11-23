@@ -1,15 +1,19 @@
 #!/bin/sh -e
 
-# Given a configuration (in bash syntax), such as:
+# An example configuration file for this script, which uses bash syntax:
+#       # where to put the tarballs and incremental files
 #	dest=/backup/data
+#       # what to backup. Values should be absolute expressions
+#	backup[boot]=/boot
 #	backup[root]=/
 #	backup[home]=/home
 #
 # For a full backup, no -i incremental option, this script loops
-# over the backup array, by the keys (root, home) and does:
+# over the backup array, by the keys (boot, root, home) and does:
 #
 #   cd /
-#   tar --create --file=$dest/${key}_YYYYMMDD.tar.gz
+#   tar --create --one-file-system --sparse --selinux \
+#       --file=$dest/${key}_YYYYMMDD.tar.gz \
 #	--listed-incremental=$dest/${key}_YYYYMMDD.snar-0
 #	bkdir
 #   where bkdir is ${backup[$key]} with the leading slash removed.
@@ -17,7 +21,7 @@
 # With the -i option, a level 1 incremental backup will be created.
 #   1. determine most recent full backup, by lexical sort of 
 #       $dest/${key}_YYYYMMDD.tar.gz, where YYYYMMDD matches any date.
-#       If a full backup is not done, a full backup is done instead.
+#       If a full backup is not found, a full backup is done instead.
 #   2. get YYYYMMDD of that full backup from name
 #   3. get NN of last incremental from lexical sort of tar files
 #       with that date: ${key}_YYYYMMDD_NN.tar.gz
@@ -27,13 +31,15 @@
 #      last full backup.
 #
 #   cd /
-#   tar --create --file=$dest/${key}_YYYYMMDD_NN.tar.gz
+#   tar --create --one-file-system --sparse --selinux \
+#       --file=$dest/${key}_YYYYMMDD_NN.tar.gz \
 #	--listed-incremental=$dest/${key}_YYYYMMDD_NN.snar-1
 #	bkdir
 
 # If a logical volume is specified in the configuration for
-# the backup, such as:
+# one or more backups:
 #	lvdev[root]=/dev/mapper/vg_myhost-lv-root
+#	lvdev[home]=/dev/mapper/vg_myhost-lv-home
 # Then an lvm snapshot is created of that logical volume, using the
 # rest of the free space on the volume group. The snapshot is mounted
 # to a temporary mount point and the tar is done on the mounted
@@ -48,7 +54,10 @@
 # Sufficient free space should exist in the volume group containing
 # that logical volume to hold any file system changes that happen while
 # the snapshot is mounted.
-
+#
+# By default a .gz compressed archive is created, but other compression
+# may specified via a runstring argument.
+#
 # TODO:
 #   automate lvm handing: determine logical volume and use lvm tools
 #	to determine if volume group has a minimum of free space
