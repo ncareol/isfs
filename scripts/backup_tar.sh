@@ -243,16 +243,16 @@ for key in ${!backup[*]}; do
         lvpath=${vgpath}-$newlv
         # echo "lvpath=$lvpath"
         lvs $lvpath > /dev/null 2>&1 ||
-            lvcreate -v --snapshot -l100%FREE -n $newlv ${lvdev[$key]}
-        trap "{ lvremove -v --force $lvpath; }" EXIT
+            lvcreate --snapshot -l100%FREE -n $newlv ${lvdev[$key]}
+        trap "{ lvremove --force $lvpath; }" EXIT
         tmpdir=$(mktemp -d /tmp/${key}_XXXXXX)
-        trap "{ rm -rf $tmpdir; lvremove -v --force $lvpath; }" EXIT
+        trap "{ rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
         mntpath=${tmpdir}${backup[$key]}
         # echo "mntpath=$mntpath"
         [ -d $mntpath ] || mkdir -p $mntpath
         mount | grep -Fq $lvpath && umount -v $lvpath
         mount -v $lvpath -o ro $mntpath
-        trap "{ sleep 1; umount -v $mntpath; rm -rf $tmpdir; lvremove -v --force $lvpath; }" EXIT
+        trap "{ sleep 1; umount -v $mntpath; rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
         # remove leading slash
         bkdir=${backup[$key]#/}
         if [ -z "$bkdir" ]; then
@@ -269,7 +269,7 @@ for key in ${!backup[*]}; do
     fi
 
     cd $cddir
-    trap "{ cd -; sleep 1; umount -v $mntpath; rm -rf $tmpdir; lvremove -v --force $lvpath; }" EXIT
+    trap "{ cd -; sleep 1; umount -v $mntpath; rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
 
     echo "PWD=$PWD"
     echo "backup=$bkdir"
@@ -285,12 +285,12 @@ for key in ${!backup[*]}; do
     cd - > /dev/null
     if [ -n "${lvdev[$key]}" ]; then
         sleep 1
-        trap "{ rm -rf $tmpdir; lvremove -v --force $lvpath; }" EXIT
+        trap "{ rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
 	umount -v $mntpath
-        trap "{ lvremove -v --force $lvpath; }" EXIT
+        trap "{ lvremove --force $lvpath; }" EXIT
 	rm -rf $tmpdir
 	trap - EXIT
-	lvremove -v --force $lvpath;
+	lvremove --force $lvpath;
     fi
     ls -l $tarball
     echo "tar backup finished: $key, $(date)"
