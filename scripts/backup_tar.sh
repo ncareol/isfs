@@ -36,38 +36,39 @@
 #	--listed-incremental=$dest/${key}_YYYYMMDD_NN.snar-1
 #	bkdir
 
-# If a logical volume is specified in the configuration for
-# one or more backups:
-#	lvdev[root]=/dev/mapper/vg_myhost-lv-root
-#	lvdev[home]=/dev/mapper/vg_myhost-lv-home
-# Then an lvm snapshot is created of that logical volume, using the
-# rest of the free space on the volume group. The snapshot is mounted
+# If the mount device for a desired backup is an lvm device,
+# then the amount of free space on the volume group is checked.
+# If it is greater or equal to minfreeM (the value of the -s option)
+# then a read-only lvm snapshot is created of the logical volume, using the
+# rest of the free space on the volume group.  The snapshot is mounted
 # to a temporary mount point and the tar is done on the mounted
-# snapshot:
-#    lvcreate --snapshot -l100%FREE -n lv-root-snapshot \
-#		/dev/mapper/vg_myhost-lv-root
+# snapshot.
+# For example, if root (/) is mounted from /dev/mapper/vg_myhost-lv_root,
+# these steps are performed:
+#
+#    lvcreate --snapshot --permission r -l100%FREE -n lv_root_snapshot \
+#		/dev/mapper/vg_myhost-lv_root
 #    tmpdir=/tmp/root_ABCDEF  # for example
-#    mount /dev/mapper/vg_myhost-lv-root-snapshot -o ro $tmpdir/bkdir
+#    mount /dev/mapper/vg_myhost-lv_root_snapshot -o ro $tmpdir/bkdir
 #    cd $tmpdir
 #    tar ... bkdir
 #
-# Sufficient free space should exist in the volume group containing
-# that logical volume to hold any file system changes that happen while
-# the snapshot is mounted.
+# The value of -s minfreeM should be a guess of the necessary
+# free space that should exist in the volume group to save the original
+# copy of any file system changes that happen while the snapshot is mounted.
 #
 # By default a .gz compressed archive is created, but other compression,
 # or none, may specified via a runstring argument.
 #
 # TODO:
-#   automate lvm handing: determine logical volume and use lvm tools
-#	to determine if volume group has a minimum of free space
 #   age off old backups?
 #	Keep option: -k 3
 #	save last 3 full backups and all their incrementals
 # Other things that should be done for a full backup:
-#   save sfdisk config: sfdisk --dump /dev/sda > /backup/disk/sda.dump
-#   save lvm config: vgcfgbackup -f /backup/disk/vg_myhost.conf vg_myhost
+#   save sfdisk config: sfdisk --dump /dev/sda > $dest/sda.dump
+#   save lvm config: vgcfgbackup -f $dest/vg_myhost.conf vg_myhost
 
+minfreeMdefault=1000
 usage () {
     echo "Usage ${0##*/} [-d] [-i] [ -j | -J | -n | -z ] config"
     echo "-d: print debug messages, don't create backup"
@@ -75,6 +76,7 @@ usage () {
     echo "-j: create bzip2 compressed archive with .bz2 suffix"
     echo "-J: create xz compressed archive with .xz suffix"
     echo "-n: no compression of archive"
+    echo "-s freeM: minimum Mb of free space on lvm volume group to do a snapshot, default=$minfreeMdefault"
     echo "-z: default, gzip archive with .gz suffix"
     echo "config: name of configuration file"
     exit 1
@@ -88,6 +90,7 @@ debug=false
 incremental=false
 suffix=.gz
 config=
+minfreeM=$minfreeMdefault
 while [ $# -gt 0 ]; do
     case $1 in
         -i)
@@ -101,6 +104,11 @@ while [ $# -gt 0 ]; do
             ;;
         -J)
             suffix=.xz
+            ;;
+        -s)
+            shift
+            [ $# -eq 0 ] && usage
+            minfreeM=$1
             ;;
         -n)
             suffix=
@@ -122,7 +130,6 @@ if ! [ -f $config ]; then
 fi
 
 declare -A backup
-declare -A lvdev
 source $config
 
 if [ -z "$dest" ]; then
@@ -233,26 +240,42 @@ for key in ${!backup[*]}; do
         $debug || rm -f $tarinc
     fi
 
-    if [ -n "${lvdev[$key]}" ]; then
-        newlv=lv_${key}_snapshot
-        # echo "newlv=$newlv"
-        vgpath=${lvdev[$key]%-lv*}
-        # echo "vgpath=$vgpath"
-        vg=${vgpath##*/}
+    snapshot=false
+    mntdev=$(findmnt --noheadings --first-only --output SOURCE ${backup[$key]})
+    if [ -n "$mntdev" ] && lvs --no-headings $mntdev > /dev/null 2>&1; then
+        lvs=($(lvs --no-headings $mntdev))
+        lv=${lvs[0]}
+        vg=${lvs[1]}
+        snaplv=${lv}_snapshot
+        snapdev=/dev/mapper/${vg}-$snaplv
+        # echo "lv=$lv"
         # echo "vg=$vg"
-        lvpath=${vgpath}-$newlv
-        # echo "lvpath=$lvpath"
-        lvs $lvpath > /dev/null 2>&1 ||
-            lvcreate --snapshot -l100%FREE -n $newlv ${lvdev[$key]}
-        trap "{ lvremove --force $lvpath; }" EXIT
+        # echo "snaplv=$snaplv"
+        # echo "snapdev=$snapdev"
+        # unmount and remove snapshot if it exists
+        findmnt $snapdev > /dev/null && umount -v $snapdev
+        lvs $snapdev > /dev/null 2>&1 && lvremove --force $snapdev
+        vgfree=$(vgs -o vg_free --no-headings --units=M --nosuffix $vg)
+        echo "Free space on volume group $vg: ${vgfree}M"
+        if [ ${vgfree%.*} -lt $minfreeM ]; then
+            echo "Free space on $vg is less than $minfreeM."
+            echo "lvm snapshot will not be used for backup of $key=${backup[$key]}"
+        else
+            snapshot=true
+        fi
+    fi
+    if $snapshot; then
+        lvs $snapdev > /dev/null 2>&1 ||
+            lvcreate --snapshot --permission r -l100%FREE -n $snaplv $mntdev
+        trap "{ lvremove --force $snapdev; }" EXIT
         tmpdir=$(mktemp -d /tmp/${key}_XXXXXX)
-        trap "{ rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
+        trap "{ rm -rf $tmpdir; lvremove --force $snapdev; }" EXIT
         mntpath=${tmpdir}${backup[$key]}
         # echo "mntpath=$mntpath"
         [ -d $mntpath ] || mkdir -p $mntpath
-        mount | grep -Fq $lvpath && umount -v $lvpath
-        mount -v $lvpath -o ro $mntpath
-        trap "{ sleep 1; umount -v $mntpath; rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
+        findmnt $snapdev > /dev/null && umount -v $snapdev
+        mount -v $snapdev -o ro $mntpath
+        trap "{ sleep 1; umount -v $mntpath; rm -rf $tmpdir; lvremove --force $snapdev; }" EXIT
         # remove leading slash
         bkdir=${backup[$key]#/}
         if [ -z "$bkdir" ]; then
@@ -269,7 +292,7 @@ for key in ${!backup[*]}; do
     fi
 
     cd $cddir
-    trap "{ cd -; sleep 1; umount -v $mntpath; rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
+    trap "{ cd -; sleep 1; umount -v $mntpath; rm -rf $tmpdir; lvremove --force $snapdev; }" EXIT
 
     echo "PWD=$PWD"
     echo "backup=$bkdir"
@@ -283,14 +306,14 @@ for key in ${!backup[*]}; do
             $bkdir
     fi
     cd - > /dev/null
-    if [ -n "${lvdev[$key]}" ]; then
+    if $snapshot; then
         sleep 1
-        trap "{ rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
+        trap "{ rm -rf $tmpdir; lvremove --force $snapdev; }" EXIT
         umount -v $mntpath
-        trap "{ lvremove --force $lvpath; }" EXIT
+        trap "{ lvremove --force $snapdev; }" EXIT
         rm -rf $tmpdir
         trap - EXIT
-        lvremove --force $lvpath;
+        lvremove --force $snapdev;
     fi
     ls -l $tarball
     echo "tar backup finished: $key, $(date)"
