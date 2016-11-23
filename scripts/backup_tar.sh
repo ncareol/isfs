@@ -12,8 +12,7 @@
 #   tar --create --file=$dest/${key}_YYYYMMDD.tar.gz
 #	--listed-incremental=$dest/${key}_YYYYMMDD.snar-0
 #	bkdir
-#   where bkdir is ${backup[$key]} with the leading slash removed,
-#   or '.' when the backup is '/'.
+#   where bkdir is ${backup[$key]} with the leading slash removed.
 #
 # With the -i option, a level 1 incremental backup will be created.
 #   1. determine most recent full backup, by lexical sort of 
@@ -191,6 +190,7 @@ get_last_incremental () {
 renice +20 -p $$
 
 for key in ${!backup[*]}; do
+    targ=
     inc=$incremental
     if $inc; then
         lasttar=$(get_last_level0 $key $dest)
@@ -230,7 +230,7 @@ for key in ${!backup[*]}; do
         # echo "vg=$vg"
         lvpath=${vgpath}-$newlv
         # echo "lvpath=$lvpath"
-        lvs $lvpath 2> /dev/null ||
+        lvs $lvpath > /dev/null 2>&1 ||
             lvcreate --snapshot -l100%FREE -n $newlv ${lvdev[$key]}
         trap "{ lvremove --force $lvpath; }" EXIT
         tmpdir=$(mktemp -d /tmp/${key}_XXXXXX)
@@ -241,14 +241,20 @@ for key in ${!backup[*]}; do
         mount | grep -Fq $lvpath && umount -v $lvpath
         mount -v $lvpath -o ro $mntpath
         trap "{ sleep 1; umount -v $mntpath; rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
+        # remove leading slash
+        bkdir=${backup[$key]#/}
+        if [ -z "$bkdir" ]; then
+            bkdir=.
+            # remove ./ in front of path names
+            targ="--transform=s,^\./,,"
+        fi
 	cddir=$tmpdir
     else
+        # remove leading slash
+        bkdir=${backup[$key]#/}
+        [ -z "$bkdir" ] && bkdir=/
 	cddir=/
     fi
-
-    # remove leading slash
-    bkdir=${backup[$key]#/}
-    [ -z "$bkdir" ] && bkdir=.
 
     cd $cddir
     trap "{ cd -; sleep 1; umount -v $mntpath; rm -rf $tmpdir; lvremove --force $lvpath; }" EXIT
@@ -260,7 +266,7 @@ for key in ${!backup[*]}; do
     echo "tarinc=$tarinc"
     if ! $debug; then
 	time tar --create --one-file-system --auto-compress \
-	    --selinux --no-check-device  --sparse \
+	    --selinux --no-check-device --sparse $targ \
 	    --listed-incremental=$tarinc \
 	    --file=$tarball \
             $bkdir
@@ -275,6 +281,7 @@ for key in ${!backup[*]}; do
 	trap - EXIT
 	lvremove --force $lvpath;
     fi
+    ls -l $tarball
     echo "tar backup finished: $key, $(date)"
     echo ""
 done
