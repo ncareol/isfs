@@ -1,6 +1,8 @@
 #!/bin/sh -e
 
-# An example configuration file for this script, which uses bash syntax:
+# See usage function for options and format of configuration file.
+#
+# Assume a configuration file containing the following:
 #       # where to put the tarballs and incremental files
 #	dest=/backup/data
 #       # what to backup. Keys in this bash associative array should be
@@ -10,7 +12,7 @@
 #	backup[home]=/home
 #
 # For a full backup, no -i incremental option, this script loops
-# over the backup array, by the keys (boot, root, home in the above
+# over the keys of the backup array (boot, root, home in the above
 # example) and does:
 #
 #   cd /
@@ -82,14 +84,15 @@ usage () {
     -z: default, gzip archive with .gz suffix
     config: name of configuration file
 
-configuration file should look like (bash syntax, avoid spaces!):
-        # where to place backup archive files
-        dest=/backup/data
-        # what to backup. Keys in this bash associative array should be
-        # simple strings, without slashes. Values should be absolute paths.
-        backup[boot]=/boot
-        backup[root]=/
-        backup[home]=/home"
+configuration file should look like the following (bash syntax, avoid spaces!):
+    # Where to place backup archive files
+    dest=/backup/data
+    # What to backup. Keys in this bash associative array should be
+    # simple strings, without slashes. Values should be absolute paths.
+    # Tar backups of single file systems at these paths will be done.
+    backup[boot]=/boot
+    backup[root]=/
+    backup[home]=/home"
     exit 1
 }
 
