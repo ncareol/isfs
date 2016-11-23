@@ -3,13 +3,15 @@
 # An example configuration file for this script, which uses bash syntax:
 #       # where to put the tarballs and incremental files
 #	dest=/backup/data
-#       # what to backup. Values should be absolute paths
+#       # what to backup. Keys in this bash associative array should be
+#       # simple strings, without slashes. Values should be absolute paths.
 #	backup[boot]=/boot
 #	backup[root]=/
 #	backup[home]=/home
 #
 # For a full backup, no -i incremental option, this script loops
-# over the backup array, by the keys (boot, root, home) and does:
+# over the backup array, by the keys (boot, root, home in the above
+# example) and does:
 #
 #   cd /
 #   tar --create --one-file-system --sparse --selinux \
@@ -70,15 +72,24 @@
 
 minfreeMdefault=1000
 usage () {
-    echo "Usage ${0##*/} [-d] [-i] [ -j | -J | -n | -z ] config"
-    echo "-d: print debug messages, don't create backup"
-    echo "-i: incremental backup of last full backup"
-    echo "-j: create bzip2 compressed archive with .bz2 suffix"
-    echo "-J: create xz compressed archive with .xz suffix"
-    echo "-n: no compression of archive"
-    echo "-s freeM: minimum Mb of free space on lvm volume group to do a snapshot, default=$minfreeMdefault"
-    echo "-z: default, gzip archive with .gz suffix"
-    echo "config: name of configuration file"
+    echo "Usage ${0##*/} [-d] [-i] [ -j | -J | -n | -z ] [-s freeM] config
+    -d: print debug messages, don't create backup
+    -i: incremental backup of last full backup
+    -j: create bzip2 compressed archive with .bz2 suffix
+    -J: create xz compressed archive with .xz suffix
+    -n: no compression of archive
+    -s freeM: minimum Mb of free space on lvm volume group to do a snapshot, default=$minfreeMdefault
+    -z: default, gzip archive with .gz suffix
+    config: name of configuration file
+
+configuration file should look like (bash syntax, avoid spaces!):
+        # where to place backup archive files
+        dest=/backup/data
+        # what to backup. Keys in this bash associative array should be
+        # simple strings, without slashes. Values should be absolute paths.
+        backup[boot]=/boot
+        backup[root]=/
+        backup[home]=/home"
     exit 1
 }
 
