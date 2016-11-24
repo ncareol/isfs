@@ -151,6 +151,11 @@ if [ -z "$dest" ]; then
     usage
 fi
 
+if [ $(id -u) -ne 0 ]; then
+    echo "ERROR: you must be root or use sudo."
+    exit 1
+fi
+
 # On Nov 20, without --sparse, root tar file was 139G
 #       but root was only 41G out of 50G
 #       Then, with --sparse, tar file was 40G
@@ -239,11 +244,8 @@ for key in ${!backup[*]}; do
         # echo "l0date=$l0date"
         ninc=$(get_last_incremental ${key}_${l0date} $dest)
         # echo "ninc=$ninc"
-        if [ -n "$ninc" ]; then
-            printf -v ninc "%02d" $((ninc+1))
-        else
-            ninc=00
-        fi
+        [ -z "$ninc" ] && ninc=-1
+        printf -v ninc "%02d" $((ninc+1))
         # echo "ninc=$ninc"
         tarball=${dest}/${key}_${l0date}_$ninc.tar$suffix
         tarinc=${dest}/${key}_${l0date}_$ninc.snar-1
