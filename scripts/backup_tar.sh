@@ -64,22 +64,22 @@
 # By default a .gz compressed archive is created, but other compression,
 # or none, may specified via a runstring argument.
 #
-# In addition to the tar backups, this script also saves a sfdisk
+# After doing a full backup, this script also saves a sfdisk
 # dump of the partitions on all physical disk devices containing
 # file systems that were backed up. These configurations are written
-# with "sfdisk --dump /dev/$dev > $dest/$dev.sfdisk", where $dev is the
-# PKNAME reported by lsblk, such as "sda".
+# with "sfdisk --dump /dev/$dev > $dest/${dev}_YYYYMMDD.sfdisk",
+# where $dev is the PKNAME reported by lsblk, such as "sda".
 # This configuration could be restored to an empty disk, with:
-#   sfdisk /dev/sda < $dest/sda.sfdisk
+#   sfdisk /dev/sda < $dest/sda_YYYYMMDD.sfdisk
 #
 # If any backed up file systems reside on a LVM partition, the
-# volume group information is also saved:
-#   vgcfgbackup -f $dest/$vg.conf $vg
+# volume group information is also saved with a full backup:
+#   vgcfgbackup -f $dest/${vg}_YYYYMMDD.conf $vg
 # This LVM configuation could be restored with:
-#   vgcfgrestore -f $dest/$vg.conf $vg
+#   vgcfgrestore -f $dest/${vg}_YYYYMMDD.conf $vg
 #   The vgcfg file seems to contain enough information to know
-#   where to place the volume group. I don't think these commands are
-#   necessary to do before the vgcfgrestore.
+#   where to place the volume group. If not, then these commands
+#   may be necessary before the vgcfgrestore:
 #   pvcreate /dev/sda1
 #   vgcreate $vg /dev/sda1
 #   
@@ -87,7 +87,6 @@
 #   age off old backups?
 #	Keep option: -k 3
 #	save last 3 full backups and all their incrementals
-#   put dates in names of sdfisk and vgcfgbackup files?
 
 minfreeMdefault=1000
 usage () {
@@ -367,14 +366,16 @@ for key in ${!backup[*]}; do
     echo ""
 done
 
-# Save partition information for backed up disks
-for dev in ${!diskdevs[*]}; do
-    echo "sfdisk --dump /dev/$dev > $dest/$dev.sfdisk"
-    sfdisk --dump /dev/$dev > $dest/$dev.sfdisk
-done
+if ! $incremental; then
+    # Save partition information for backed up disks
+    for dev in ${!diskdevs[*]}; do
+        echo "sfdisk --dump /dev/$dev > $dest/${dev}_$curdate.sfdisk"
+        sfdisk --dump /dev/$dev > $dest/${dev}_$curdate.sfdisk
+    done
 
-# Save LVM information for backed up disks
-for vg in ${!volgroups[*]}; do
-    echo "vgcfgbackup -f $dest/$vg.conf $vg"
-    vgcfgbackup -f $dest/$vg.conf $vg
-done
+    # Save LVM information for backed up disks
+    for vg in ${!volgroups[*]}; do
+        echo "vgcfgbackup -f $dest/${vg}_$curdate.conf $vg"
+        vgcfgbackup -f $dest/${vg}_$curdate.conf $vg
+    done
+fi
