@@ -64,13 +64,30 @@
 # By default a .gz compressed archive is created, but other compression,
 # or none, may specified via a runstring argument.
 #
+# In addition to the tar backups, this script also saves a sfdisk
+# dump of the partitions on all physical disk devices containing
+# file systems that were backed up. These configurations are written
+# with "sfdisk --dump /dev/$dev > $dest/$dev.sfdisk", where $dev is the
+# PKNAME reported by lsblk, such as "sda".
+# This configuration could be restored to an empty disk, with:
+#   sfdisk /dev/sda < $dest/sda.sfdisk
+#
+# If any backed up file systems reside on a LVM partition, the
+# volume group information is also saved:
+#   vgcfgbackup -f $dest/$vg.conf $vg
+# This LVM configuation could be restored with:
+#   vgcfgrestore -f $dest/$vg.conf $vg
+#   The vgcfg file seems to contain enough information to know
+#   where to place the volume group. I don't think these commands are
+#   necessary to do before the vgcfgrestore.
+#   pvcreate /dev/sda1
+#   vgcreate $vg /dev/sda1
+#   
 # TODO:
 #   age off old backups?
 #	Keep option: -k 3
 #	save last 3 full backups and all their incrementals
-# Other things that should be done for a full backup:
-#   save sfdisk config: sfdisk --dump /dev/sda > $dest/sda.dump
-#   save lvm config: vgcfgbackup -f $dest/vg_myhost.conf vg_myhost
+#   put dates in names of sdfisk and vgcfgbackup files?
 
 minfreeMdefault=1000
 usage () {
@@ -224,6 +241,12 @@ get_last_incremental () {
 
 renice +20 -p $$
 
+# array of whole-disk device names that contain file systems
+# being backed up, such as "sda"
+declare -A diskdevs
+# volume groups of backed up file systems 
+declare -A volgroups
+
 for key in ${!backup[*]}; do
 
     echo "tar backup starting: $key, $(date)"
@@ -279,6 +302,13 @@ for key in ${!backup[*]}; do
         else
             snapshot=true
         fi
+        partdev=$(pvs -S vg_name=$vg -o pv_name --noheadings)
+        diskdev=$(lsblk --noheadings --output pkname $partdev | head -n 1)
+        diskdevs[$diskdev]=$diskdev
+        volgroups[$vg]=$vg
+    else
+        diskdev=$(lsblk --noheadings --output pkname $mntdev | head -n 1)
+        diskdevs[$diskdev]=$diskdev
     fi
 
     if $snapshot; then
@@ -337,3 +367,14 @@ for key in ${!backup[*]}; do
     echo ""
 done
 
+# Save partition information for backed up disks
+for dev in ${!diskdevs[*]}; do
+    echo "sfdisk --dump /dev/$dev > $dest/$dev.sfdisk"
+    sfdisk --dump /dev/$dev > $dest/$dev.sfdisk
+done
+
+# Save LVM information for backed up disks
+for vg in ${!volgroups[*]}; do
+    echo "vgcfgbackup -f $dest/$vg.conf $vg"
+    vgcfgbackup -f $dest/$vg.conf $vg
+done
