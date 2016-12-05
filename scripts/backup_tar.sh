@@ -11,9 +11,9 @@
 #	backup[root]=/
 #	backup[home]=/home
 #
-# For a full backup, no -i incremental option, this script loops
-# over the keys of the backup array (boot, root, home in the above
-# example) and does:
+# For a full backup, no -i incremental option, and gzip compression enabled,
+# this script loops over the keys of the backup array (boot, root, home
+# in the above example) and does:
 #
 #   cd /
 #   tar --create --one-file-system --sparse --selinux \
@@ -24,11 +24,11 @@
 #
 # With the -i option, a level 1 incremental backup will be created.
 #   1. determine most recent full backup, by lexical sort of 
-#       $dest/${key}_YYYYMMDD.tar.gz, where YYYYMMDD matches any date.
+#       $dest/${key}_YYYYMMDD.tar*, where YYYYMMDD matches any date.
 #       If a full backup is not found, a full backup is done instead.
 #   2. get YYYYMMDD of that full backup from name
 #   3. get NN of last incremental from lexical sort of tar files
-#       with that date: ${key}_YYYYMMDD_NN.tar.gz
+#       with that date: ${key}_YYYYMMDD_NN.tar*
 #   4. increment NN, or set to 00 if no incrementals found
 #   5. Copy ${key}_YYYYMMDD.snar-0 file to ${key}_YYYYMMDD_NN.snar-1,
 #      so that an incremental backup is done of the changes since the
@@ -59,7 +59,7 @@
 #
 # The value of -s minfreeM should be a guess of the necessary
 # free space that should exist in the volume group to save the original
-# copy of any file system changes that happen while the snapshot is mounted.
+# copy of any file system changes that happen during the backup.
 #
 # By default a .gz compressed archive is created, but other compression,
 # or none, may specified via a runstring argument.
@@ -73,7 +73,7 @@
 #   sfdisk /dev/sda < $dest/sda_YYYYMMDD.sfdisk
 #
 # If any backed up file systems reside on a LVM partition, the
-# volume group information is also saved with a full backup:
+# volume group information is also saved as part of a full backup:
 #   vgcfgbackup -f $dest/${vg}_YYYYMMDD.conf $vg
 # This LVM configuation could be restored with:
 #   vgcfgrestore -f $dest/${vg}_YYYYMMDD.conf $vg
@@ -373,7 +373,7 @@ if ! $incremental; then
         sfdisk --dump /dev/$dev > $dest/${dev}_$curdate.sfdisk
     done
 
-    # Save LVM information for backed up disks
+    # Save LVM information for backed up logical volumes
     for vg in ${!volgroups[*]}; do
         echo "vgcfgbackup -f $dest/${vg}_$curdate.conf $vg"
         vgcfgbackup -f $dest/${vg}_$curdate.conf $vg
