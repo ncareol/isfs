@@ -23,8 +23,8 @@ import com.trolltech.qt.gui.QVBoxLayout;
 import com.trolltech.qt.gui.QWidget;
 import com.trolltech.qt.gui.QSizePolicy.Policy;
 
-import edu.ucar.nidas.apps.cockpit.core.CpConnection;
 import edu.ucar.nidas.apps.cockpit.model.MinMaxer;
+import edu.ucar.nidas.model.Dsm;
 import edu.ucar.nidas.model.Sample;
 import edu.ucar.nidas.model.Var;
 import edu.ucar.nidas.util.Util;
@@ -46,16 +46,30 @@ public class GaugePage extends QWidget {
      * and a timer to control update frequency 
      */
 
-    private 
-    QSizePolicy _sizePolicy;
-    QGridLayout _gaugelayout;
-    QScrollArea _scrollArea;
+    /**
+     * Gauges on this page.
+     */
+    List<Gauge> _gauges = new ArrayList<Gauge>();
 
-    //plot 
-    ArrayList<Gauge> _gauges = new ArrayList<Gauge>();
-    ArrayList<Gauge> _gaugesWait = new ArrayList<Gauge>();
-    int _gw=CockPit.gwdef, _gh=CockPit.ghdef, _rectWidth, rectHeight;
-    QColor _currentColor = CockPit.gdefCColor, _historyColor = CockPit.gdefHColor, _bgColor=CockPit.gdefBColor;
+    /**
+     * QSizePolicy of Gauges.
+     */
+    private QSizePolicy _gaugePolicy = null;
+
+    private QSize _gaugeSize = null;
+
+    private QGridLayout _gaugelayout;
+
+    private QScrollArea _scrollArea;
+
+    /**
+     * Number of columns in layout of Gauges.
+     */
+    int _ncols;
+
+    QColor _currentColor = Cockpit.gdefCColor;
+    QColor _historyColor = Cockpit.gdefHColor;
+    QColor _bgColor = Cockpit.gdefBColor;
 
     /**
      * Data reduction period, in milliseconds. Points will
@@ -74,60 +88,139 @@ public class GaugePage extends QWidget {
      */
     int _gaugeNoDataTmout = 600; 
 
-    /**
-     * a subset of samples from cockpit, they are the samples in this widget
-     */
-    List<Sample>  	_samples = new ArrayList<Sample>(); //samples in this widget
-
-    HashMap<String, Gauge> _nameToGauge = new HashMap<String,Gauge>(0);
+    HashMap<String, Gauge> _gaugesByName = new HashMap<String,Gauge>();
 
     String _name;
 
-    boolean _primary =true;
+    CentTabWidget _centTabWidget = null;
 
-    CentTabWidget _parent= null;
-
-    QTimer _tm = new QTimer();
-    ///////////////////////////////////////////////////////////////////////
     /**
      *  constructor.
      */	
-    public  GaugePage( CentTabWidget  p, List<Sample> samps, String name) {
-        if (p==null || samps==null || samps.isEmpty() || name==null || name.length()<=0) {
-            Util.prtErr("GaugePage doesn't get enough infor to create an instance. \nCheck new GaugePage details");
-        }
+    public GaugePage(CentTabWidget p, String name)
+    {
         super.setParent(p);
-        _parent=p;
-        _name= name;
-        _samples = samps;
-        createUIs();
+        _centTabWidget = p;
+        _name = name;
 
-        _tm.timeout.connect(this, "VaryingTimeout()");
-        _tm.start(60000); //1 min
+        /*
+        // policy for this GaugePage
+        QSizePolicy sizePolicy = new QSizePolicy(
+            Policy.Expanding,Policy.Expanding);
+        // sizePolicy.setHorizontalStretch((byte)0);
+        // sizePolicy.setVerticalStretch((byte)0);
+        // sizePolicy.setHeightForWidth(true);
+        setSizePolicy(sizePolicy);
+        */
+
+        /*
+         * minimumSizeHint() returns an invalid size if there is no
+         * layout for this widget, and returns the layouts minimum
+         * size otherwise.  If minimumSize() is set, minimumSizeHint()
+         * is ignored.
+         * CentTabWidget (QTabWidget) has a layout manager,
+         * QStackedLayout.
+         *  resize(new QSize(900, 600).expandedTo(minimumSizeHint()));
+         */
+        resize(new QSize(900, 600));
+
+        _gaugelayout = new QGridLayout();
+        QWidget plotwidget = new QWidget();
+        plotwidget.resize(new QSize(800, 600));//.expandedTo(minimumSizeHint()));
+        plotwidget.setLayout(_gaugelayout);
+
+        _scrollArea = new QScrollArea(this);
+        _scrollArea.resize(800,600);
+        _scrollArea.setWidget(plotwidget);
+        _scrollArea.setWidgetResizable( true);
+        _scrollArea.adjustSize();
+        _scrollArea.setHorizontalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAlwaysOff);
+
+	// create layout for this
+        QVBoxLayout verticalLayout = new QVBoxLayout(this);
+        verticalLayout.addWidget(_scrollArea);
+        setLayout(verticalLayout);
+
+        _gaugeSize = new QSize(Cockpit.gwdef, Cockpit.ghdef);
+        _gaugePolicy = new QSizePolicy(
+            Policy.Expanding,Policy.Expanding);
+        _gaugePolicy.setHorizontalStretch((byte)0);
+        _gaugePolicy.setVerticalStretch((byte)0);
+        _gaugePolicy.setHeightForWidth(true);
+        _ncols = calcGaugeColumns();
+        System.out.printf("ncols=%d\n",_ncols);
     }
 
-    public  GaugePage() {  }
+    /**
+     * Create a Gauge.
+     * @param Var -- the variable.
+     */
+    public Gauge addGauge(Var var)
+    {
+        synchronized(this) {
+            int ng = _gauges.size();
+            Gauge g = new Gauge(this, _gaugeSize, _gaugeWidthMsec, var);
 
-    public void setPrimary( boolean prim){
-        _primary=prim;
+            g.setSizePolicy(_gaugePolicy);
+            _gauges.add(g);
+            String pname = g.getName();
+            _gaugesByName.put(pname, g);
+
+            int row = ng / _ncols;
+            int col = ng % _ncols;
+            /*
+            System.out.printf("adding Gauge=%s, row=%d,col=%d\n",
+                    g.getName(),row,col);
+            */
+            _gaugelayout.addWidget(g,row,col);
+            return g;
+        }
+    } 
+
+    public QSize getGaugeSize()
+    {
+        return _gaugeSize;
     }
 
-    public boolean getPrimary() {
-        return _primary;
-    }  
 
-    public void destroyWidget(boolean b) {
-        super.destroy(b);
+    public int getNumColumns()
+    {
+        return _ncols;
     }
 
-
-
-    public Policy getPolicy() {
-        return _sizePolicy.verticalPolicy(); //vertical and horizontal policy is the same
+    public List<Gauge> getGauges()
+    {
+        return _gauges;
     }
 
-    public HashMap<String, Gauge> getNameToGauge() {
-        return _nameToGauge;
+    public String getName() {
+        return _name;
+    }
+
+    public QColor getCColor() {
+        return _currentColor;
+    }
+
+    public QColor getHColor() {
+        return _historyColor;
+    }
+
+    public QColor getBGColor() {
+        return _bgColor;
+    }
+    public void setBGColor(QColor bgdc) {
+        _bgColor = bgdc;
+    }
+
+    void status(String msg, int tm)
+    {
+        _centTabWidget.status(msg, tm);
+    }
+
+    public Gauge getGauge(String name) 
+    {
+        return _gaugesByName.get(name);
     }
 
     /**
@@ -137,9 +230,9 @@ public class GaugePage extends QWidget {
     public void setGaugeTimeMSec(int msec) {
         if (msec != _gaugeWidthMsec)
         {
-            _gaugeWidthMsec= msec;
-            for (int i=0; i<_gauges.size(); i++) {
-                _gauges.get(i).setNewTimeMSec(msec);
+            _gaugeWidthMsec = msec;
+            for (Gauge gauge : _gauges) {
+                gauge.setNewTimeMSec(msec);
             }
         }
     }
@@ -166,9 +259,9 @@ public class GaugePage extends QWidget {
     public void setGaugeNoDataTimeout(int sec) {
         if (sec != _gaugeNoDataTmout)
         {
-            _gaugeNoDataTmout= sec;
-            for (int i=0; i<_gauges.size(); i++) {
-                _gauges.get(i).setNoDataTmout(sec);
+            _gaugeNoDataTmout = sec;
+            for (Gauge gauge : _gauges) {
+                gauge.setNoDataTmout(sec);
             }
         }
     }
@@ -177,261 +270,170 @@ public class GaugePage extends QWidget {
      * get the time-width-in-milli-seconds
      * @return
      */
-    public int getGaugeNoDataTmout() {
+    public int getGaugeNoDataTmout()
+    {
         return _gaugeNoDataTmout;
     }
 
-
-    public ArrayList<Gauge> getPlots() {
-        return _gauges;
-    }
-
-    public String getName() {
-        return _name;
-    }
-
-    public QColor getCColor() {
-        return _currentColor;
-    }
-
-    public QColor getHColor() {
-        return _historyColor;
-    }
-
-    public QColor getBGColor() {
-        return _bgColor;
-    }
-    public void setBGColor(QColor bgdc) {
-        _bgColor = bgdc;
-    }
-
-    
-    protected void createUIs() {
-        resize(new QSize(900, 600).expandedTo(minimumSizeHint()));
-        getSizePol(Policy.Preferred); //set _sizePolicy=
-        setSizePolicy(_sizePolicy);	 //set page's policy
-
-        _gaugelayout = new QGridLayout();
-        QWidget plotwidget = new QWidget();		//verticalLayout = new QVBoxLayout(this);
-        plotwidget.resize(new QSize(800, 600));//.expandedTo(minimumSizeHint()));
-        plotwidget.setLayout(_gaugelayout);
-
-        _scrollArea = new QScrollArea(this);
-        _scrollArea.resize(800,600);
-        _scrollArea.setWidget(plotwidget);
-        _scrollArea.setWidgetResizable( true);
-        _scrollArea.adjustSize();
-        _scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff);
-        // create layout for this
-        QVBoxLayout verticalLayout = new QVBoxLayout(this);
-        verticalLayout.addWidget(_scrollArea);
-        setLayout(verticalLayout);
-    }
-
-    public void setSamples(List<Sample> ps) {
-        _samples=ps;
-    }
-
-    public List<Sample> getSamples(){
-        return _samples;
-    }
-
-
-    public void addSample(Sample ps) {
-        _samples.remove(ps); //to avoid multiple
-        _samples.add(ps);
-    }
-
-    public void removeSample(Sample ps) {
-        _samples.remove(ps);
-    }
-
-    public void removeSamples(List<Sample> ps) {
-        for (int i=0; i<ps.size(); i++) {
-            _samples.remove(ps.get(i));
+    /**
+     * Freeze the layout of the Gauges.
+     */
+    public void freezeLayout(int ncols, QSize gaugeSize)
+    {
+        _gaugePolicy.setHorizontalPolicy(Policy.Fixed);
+        _gaugePolicy.setVerticalPolicy(Policy.Fixed);
+        setSizePolicyOfGauges();
+        _gaugeSize = gaugeSize;
+        setSizeOfGauges();
+        if (ncols != _ncols) {
+            _ncols = ncols;
+            redoLayout();
         }
+        _ncols = ncols;
+        update(); 
     }
 
-    public List<Var> getVars() {
-        if (_gauges == null || _gauges.size()==0) {
-            return null;
+    public void unfreezeLayout()
+    {
+        _gaugePolicy.setHorizontalPolicy(Policy.Expanding);
+        _gaugePolicy.setVerticalPolicy(Policy.Expanding);
+        setSizePolicyOfGauges();
+        int ncols = calcGaugeColumns();
+        if (ncols != _ncols) {
+            _ncols = ncols;
+            redoLayout();
         }
-        int len = _gauges.size();
-        List<Var> vars = new ArrayList<Var>();
-        for(int i=0; i<len; i++) {
-            Var var= _gauges.get(i).getVar();
-            if (!vars.contains(var)) vars.add(var);
-        }
-        return vars;
+        _ncols = ncols;
+        update(); 
+        fetchGaugeSize();
     }
 
-    public void toggleFixedGaugeSize(Policy policy)
+    public void setSizePolicyOfGauges()
     {
         synchronized (_gauges){
-            if (_gauges.size()<=0) return;
-            getSizePol(policy); //reset _sizePolicy
-            setSizePolicy(_sizePolicy);  //set page's policy
-            _gw= _gauges.get(0).width();
-            _gh=_gauges.get(0).height();
-            if (policy==Policy.Preferred) { _gh=CockPit.ghdef;_gw=CockPit.gwdef;} //policy=preferred reset plotmin=gh gw
-            for (int i=0; i<_gauges.size();i++) {
-                _gauges.get(i).setSizePolicy(_sizePolicy);// .setFixedSize(_gw,_gh);
-                _gauges.get(i).setMinimumSize(_gw,_gh);                   
+            for (Gauge gauge : _gauges) {
+                gauge.setSizePolicy(_gaugePolicy);
             }
-            if (policy == Policy.Preferred) resize(width(), height());
         }
     }
 
-    private void getSizePol(Policy sp){
-        _sizePolicy = new QSizePolicy(sp, sp);
-        _sizePolicy.setHorizontalStretch((byte)0);
-        _sizePolicy.setVerticalStretch((byte)0);
-        _sizePolicy.setHeightForWidth(true);
-    }
-    /**
-     * Create a Gauge.
-     * @param Var -- the variable.
-     */
-    public Gauge createGauge(Var var) {
-        synchronized (this){
-            int ng = _gauges.size();
-            int cols=width()/_gw ;
-            if (width()%_gw!=0 ) cols--;
-            int row = ng / cols;
-            int col = ng % cols;  //index
-            Gauge g = new Gauge( this, _gw, _gh, _gaugeWidthMsec, var);
-
-            if (_sizePolicy !=null)  g.setSizePolicy(_sizePolicy);// .setFixedSize(_gw,_gh);
-            _gauges.add(g);
-            String pname = var.getName();
-            _nameToGauge.put(pname, g);
-            _gaugelayout.addWidget(g,row,col);
-            return g;
-        }
-    } 
-
-    protected void reArrangeGauges()
+    public void setSizeOfGauges()
     {
-        if (_gauges == null || _gauges.size() <1) return;
-        for (int i = 0; i < _gauges.size(); i++) {
-            _gaugelayout.removeWidget(_gauges.get(i));
+        synchronized (_gauges){
+            for (Gauge gauge : _gauges) {
+                gauge.resize(_gaugeSize);
+            }
+        }
+    }
+
+    public int calcGaugeColumns()
+    {
+        // TODO: account for margins
+        int cols = 1;
+        if (_gaugePolicy.horizontalPolicy() == Policy.Expanding) {
+            if (!_gauges.isEmpty()) {
+                int mW = Cockpit.gwdef;
+                int mH = Cockpit.ghdef;
+                double perarea = (double)(width() * height()) / _gauges.size();
+                perarea = Math.max(perarea, (double)(mW * mH));
+
+                double newW = Math.sqrt(perarea * 3 / 2);
+                // _gw = (int)newW;
+                // _gh = (int)(newW * 2 / 3);
+                cols = Math.max((int)((double)width() / newW), 1);
+            }
+            else {
+                cols = Math.max((int)((double)width() / _gaugeSize.width()), 1);
+            }
+        }
+        else {
+            cols = Math.max((int)((double)width() / _gaugeSize.width()), 1);
+        }
+        return cols;
+    }
+
+    private void fetchGaugeSize()
+    {
+        if (!_gauges.isEmpty()) {
+            Gauge g = _gauges.get(0);
+            _gaugeSize = g.size();
+        }
+    }
+
+    protected void redoLayout()
+    {
+        if (_gauges == null || _gauges.size() < 1) return;
+        for (Gauge gauge : _gauges) {
+            _gaugelayout.removeWidget(gauge);
         }
 
-        int cols = getColNum();
-        if (cols<=0) return;
         for (int i = 0; i < _gauges.size(); i++) {
-            int row = i / cols;
-            int col = i % cols;  //index
-            _gaugelayout.addWidget(_gauges.get(i),row, col);
+            int row = i / _ncols;
+            int col = i % _ncols;
+            Gauge g = _gauges.get(i);
+            _gaugelayout.addWidget(g,row, col);
         }
         update(); 
     } 
 
-    public void focusInEvent( QFocusEvent arg){
+    public void focusInEvent( QFocusEvent arg)
+    {
         if (!isActiveWindow()) return;
-        //_parent.setMinimumSize(_pageSize);
+        //_centTabWidget .setMinimumSize(_pageSize);
     }
 
-
-    public void resetGaugeOrder(ArrayList<Gauge> newgs){
-        if (_gauges.size()<=1) return;
-        synchronized (this) {
-            for (int i = 0; i < _gauges.size(); i++) {
-                _gaugelayout.removeWidget(_gauges.get(i));
-            }
-
-            _gauges.clear();
-            _gauges = new ArrayList<Gauge>();
-            _gauges.addAll(newgs);
-            int cols = getColNum();
-            if (cols<=0) return;
-            for (int i = 0; i < _gauges.size(); i++) {
-                int row = i / cols;
-                int col = i % cols;  //index
-                Gauge g = _gauges.get(i);
-                if (g == null) continue;
-                _gaugelayout.addWidget(g,row, col++);
-            }
-        }
-    }
-
-    public void resizeEvent(QResizeEvent ent) {
-
+    public void resizeEvent(QResizeEvent ent)
+    {
         if (!isActiveWindow()) return;
 
         if (ent.isAccepted()){
             synchronized(this){
-                reArrangeGauges();
-                if( _sizePolicy.horizontalPolicy()== Policy.Preferred && !_tm.isActive()) _tm.start(60000); //1 min
+                redoLayout();
             }
         }
-
         update();
     }
 
-    public void deleteIt(Gauge g) {
+    public void destroyWidget(boolean destroyWindow)
+    {
+        super.destroy(destroyWindow);
+    }
+
+    public void remove(Gauge g)
+    {
         synchronized (this) {
+            // Is this necessary?
             //remove all plots
-            for (int i = 0; i < _gauges.size(); i++) {
-                _gaugelayout.removeWidget(_gauges.get(i));
+            for (Gauge gauge : _gauges) {
+                _gaugelayout.removeWidget(gauge);
             }
             //remove one from gauge list
             _gauges.remove(g); 
-            _gaugesWait.add(g);
-            g.hide();        
+            // g.hide();        
+            g.destroyWidget(true);
             update();
             //set fixed policy
+            /*
             if (getPolicy()==Policy.Preferred) { //set it to fixed
                 setAllPolicy(Policy.Fixed);
             }
-            //reArrangeGauges;
-            int cols = getColNum();
-            if (cols<=0) return;
+            */
+            //redoLayout;
+            _ncols = calcGaugeColumns();
             for (int i = 0; i < _gauges.size(); i++) {
-                int row = i / cols;
-                int col = i % cols;  //index
-                _gaugelayout.addWidget(_gauges.get(i),row, col++);
+                int row = i / _ncols;
+                int col = i % _ncols;  //index
+                _gaugelayout.addWidget(_gauges.get(i),row, col);
             }
             update();
         }
     }
 
-    public void setAllPolicy(Policy policy) {
-        toggleFixedGaugeSize(policy); //set gauges's policy
-        getSizePol(policy);          //set _sizePolicy=
-        setSizePolicy(_sizePolicy);  //set page's policy
-        if (_parent!=null)  _parent.syncCurrentSizePolicy(policy); //set menu
-    }
-
-    int getColNum() {
-        int cols = (int)( width() / _gw - 0.5);
-        if (cols <= 4) {
-            int gwAdd = _gw + 4; //width of a plot + 4 pixels
-            if ((width() - (cols * gwAdd)) > gwAdd) cols++;
-        }
-        if (getPolicy()==Policy.Preferred) cols=calColNum();
-        return cols;
-    }
-
-    int calColNum(){
-        if (_gauges==null || _gauges.size()<1) return -1;
-        int mW = CockPit.gwdef; //margin=3 pix
-        int mH = CockPit.ghdef; //margin=3 pix
-        int size = width()*height();
-        float persize = size/_gauges.size();
-        if (persize <= mW*mH) return (int)(width()/mW);
-
-        double newW = Math.sqrt(persize*3/2);
-        _gw = (int)Math.round(newW);
-        _gh = (int)Math.round(newW*2/3);
-        return (int)(width()/newW); //cols
-    }
-
-
-    public void cleanupHistory() {
-        for (int i=0; i<_gauges.size(); i++){
-            _gauges.get(i).initPixmaps();
-            _gauges.get(i).changeCColor(_currentColor);
+    public void cleanupHistory()
+    {
+        for (Gauge gauge : _gauges) {
+            gauge.initPixmaps();
+            gauge.changeCColor(_currentColor);
         }
     }
 
@@ -440,90 +442,80 @@ public class GaugePage extends QWidget {
      * Otherwise, it will check to see yf is in the range.  
      * @param flag
      */
-    public void gautoScalePlots(boolean flag) {
-        for (int i=0; i<_gauges.size(); i++){
-            _gauges.get(i).autoScalePlot(flag);
+    public void gautoScalePlots(boolean flag)
+    {
+        for (Gauge gauge : _gauges) {
+            gauge.autoScalePlot(flag);
         }
     }
 
-    public void colorCurrent(QColor c) {
+    public void colorCurrent(QColor c)
+    {
         _currentColor = c;// new QColor(c.getRed(), c.getGreen(), c.getBlue());
-        for (int i=0; i<_gauges.size(); i++) {
-            _gauges.get(i).changeCColor(_currentColor);
+        for (Gauge gauge : _gauges) {
+            gauge.changeCColor(_currentColor);
         }
     }
 
 
-    public void colorHistory(QColor c) {
+    public void colorHistory(QColor c)
+    {
         _historyColor = c;//new QColor(c.getRed(), c.getGreen(), c.getBlue());
-        for (int i=0; i<_gauges.size(); i++) {
-            _gauges.get(i).changeHColor(_historyColor);
+        for (Gauge gauge : _gauges) {
+            gauge.changeHColor(_historyColor);
         }
     }
 
 
     public void colorBackGround(QColor c) {
-        _bgColor =c;
-        for (int i=0; i<this._gauges.size(); i++) {
-            _gauges.get(i).changeBGColor(_bgColor);
+        _bgColor = c;
+        for (Gauge gauge : _gauges) {
+            gauge.changeBGColor(_bgColor);
         }
     }
 
-    public void createDataClients()
+    public void createGauges(Dsm dsm)
     {
-        if (_samples==null || _samples.size()<1){
-            Util.prtErr("Pwidget-createDataClient  _samples ==null");
-            return;
-        }
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
-        synchronized (_samples){
-            Util.prtDbg("createDataClient-begin");
-            for (int i = 0; i < _samples.size(); i++) {
-                Sample samp = _samples.get(i);
-                ArrayList<Var> vars = samp.getVars();
-                for (int j = 0; j < vars.size(); j++) {
-                    Var var = vars.get(j);
-                    createOneDataClient(samp, var);
-                }
+
+        ArrayList<Sample> samples = dsm.getSamples();
+        for (Sample samp : samples) {
+            ArrayList<Var> vars = samp.getVars();
+            for (Var var : vars) {
+                addGauge(var);
             }
+        }
+
+        setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
+    }
+
+    public void createGauges(List<Var> vars) 
+    {
+        setCursor(new QCursor(Qt.CursorShape.WaitCursor));
+        for (Var var : vars) {
+            addGauge(var);
         }
         setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
     }
 
-    private void createOneDataClient(Sample samp, Var var){
-        if ( var.getLength()!=1) return;   //for nearly all the cases, the variable only has one data, except 1d-probe. Ignore it for now
-        MinMaxer mm  = new MinMaxer(_reductionPeriod);
-        Gauge g=null;
-        if (!var.getDynamic() && var.getDisplay())
-            g = createGauge(var); 
-        GaugeDataClient gdc = new GaugeDataClient(this, var, g);
-        CentTabWidget._varToGdc.put(var, gdc);
-        mm.addClient(gdc);
-        if (CpConnection._dataTh==null) {Util.prtErr("dataTh==null"); return;}
-        CpConnection._dataTh.addClient(samp,var,0,mm);         
-    }
-
-    /**
-     * @param sampId -sampleId from data and sampleId from xml
-     */
-
+    /*
     public void removeGaugeFromWidget(Gauge g) {
-        //set var-display=false
-        if (g.getVar().getDisplay() ) return;
+        // if (g.getVar().getDisplay() ) return;
         _gaugelayout.removeEventFilter(g);
     }
 
     public void addGaugeToWidget(Gauge g) {
-        g.getVar().setDisplay(true);
+        // g.getVar().setDisplay(true);
         _gaugelayout.addWidget(g);
     }
+    */
 
     public void mouseReleaseEvent(QMouseEvent pEvent)
     {
         if (pEvent.button() == MouseButton.RightButton)
         {
             QMenu pMenu = new QMenu("");
-            QMenu option= pMenu.addMenu("RenamePage");
+            QMenu option = pMenu.addMenu("RenamePage");
             option.addAction("&RenamePage", this, "renamePage()");
         }
     }
@@ -537,10 +529,6 @@ public class GaugePage extends QWidget {
         } 
     }
 
-    void VaryingTimeout() {
-        _tm.stop();
-        if (_sizePolicy.horizontalPolicy() == Policy.Preferred) setAllPolicy(Policy.Fixed);
-    }
-}//eof class
+}
 
 

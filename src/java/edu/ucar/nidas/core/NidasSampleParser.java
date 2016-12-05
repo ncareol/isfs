@@ -1,5 +1,7 @@
 package edu.ucar.nidas.core;
 
+import edu.ucar.nidas.model.FloatSample;
+
 // import java.io.*;
 import java.nio.ByteBuffer;
 
@@ -36,8 +38,8 @@ public class NidasSampleParser  {
 		 *  4 bytes of id
 		 */
 		long tt = data.getLong() / 1000;    // convert microseconds to milliseconds
-		int dataBytes= data.getInt();
-		int id= data.getInt() & (int)0x3FFFFFF;
+		int dataBytes = data.getInt();
+		int id = data.getInt() & 0x3FFFFFF;
 	
 		if (( length - data.position()) < dataBytes) return null;
 
@@ -45,7 +47,7 @@ public class NidasSampleParser  {
 
 		_fdata = new float[dlen];
 
-		for (int i=0; i< dlen; i++)
+		for (int i = 0; i < dlen; i++)
 			_fdata[i] = data.getFloat();
 
 		return new FloatSample(tt,id,_fdata);
@@ -63,7 +65,7 @@ public class NidasSampleParser  {
         long tt = data.getLong() / 1000;    // convert microseconds to milliseconds
         int dataBytes = data.getInt();
         int rawid = data.getInt();
-        int id= rawid & (int)0x3FFFFFF;
+        int id = rawid & 0x3FFFFFF;
         int sampleType = rawid >> 26;
 
         if (( length - data.position()) < dataBytes) return null;
@@ -81,7 +83,7 @@ public class NidasSampleParser  {
         int dlen = dataBytes / rawSize;  //number of floats or doubles
         _fdata = new float[dlen];
 
-        for (int i=0; i< dlen; i++){
+        for (int i = 0; i < dlen; i++){
             if (sampleType == 7) {
                 _fdata[i] = (float)data.getDouble();
             } else {

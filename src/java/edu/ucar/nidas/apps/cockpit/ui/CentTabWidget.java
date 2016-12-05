@@ -2,13 +2,14 @@ package edu.ucar.nidas.apps.cockpit.ui;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.HashSet;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.Map.Entry;
 
-import org.w3c.dom.Document;
-
+import com.trolltech.qt.core.QSize;
+import com.trolltech.qt.core.QRect;
 import com.trolltech.qt.core.QPoint;
 import com.trolltech.qt.core.QTimer;
 import com.trolltech.qt.core.Qt;
@@ -25,14 +26,15 @@ import com.trolltech.qt.gui.QStackedLayout;
 import com.trolltech.qt.gui.QTabWidget;
 import com.trolltech.qt.gui.QSizePolicy.Policy;
 
-import edu.ucar.nidas.apps.cockpit.model.DataDescriptor;
-import edu.ucar.nidas.apps.cockpit.model.config.CockpitConfig;
-import edu.ucar.nidas.apps.cockpit.model.config.UserConfig;
-import edu.ucar.nidas.apps.cockpit.model.config.TabPageConfig;
-import edu.ucar.nidas.apps.cockpit.model.config.PlotConfig;
+import edu.ucar.nidas.apps.cockpit.model.CockpitConfig;
+// import edu.ucar.nidas.apps.cockpit.model.UserConfig;
+import edu.ucar.nidas.apps.cockpit.model.GaugePageConfig;
+import edu.ucar.nidas.apps.cockpit.model.GaugeConfig;
+import edu.ucar.nidas.model.Site;
 import edu.ucar.nidas.model.Dsm;
 import edu.ucar.nidas.model.Sample;
 import edu.ucar.nidas.model.Var;
+import edu.ucar.nidas.model.DataSource;
 import edu.ucar.nidas.util.Util;
 /**
  * This class is the center tab-widget which controls all the tab-gauge-pages
@@ -45,202 +47,230 @@ import edu.ucar.nidas.util.Util;
 public class CentTabWidget extends QTabWidget {
 
     /**
-     * copy of a parent
+     * Reference to Cockpit.
      */
-    CockPit _parent=null;
-    /**
-     * user-config-keeper 
-     */
-
-
-    //data and clients
-    /**
-     * All the samples from the data-descriptor
-     */
-    List<Sample>    _samples = new ArrayList<Sample>(); //for all samples
-    /**
-     * All the dsms from the data-feed
-     */
-    List<Dsm> _dsms = new ArrayList<Dsm>();
+    private Cockpit _cockpit = null;
 
     /**
-     * All the plot-pages in the Cockpit
+     * GaugePages by name
      */
-    List<GaugePage> _gaugePages = new ArrayList<GaugePage>(0);
-    /**
-     * A list of var-to-gaugedataclient 
-     *      one gaugedataclient-to-multiplots
-     */
-    public static HashMap<Var, GaugeDataClient> _varToGdc = new HashMap<Var,GaugeDataClient>();
+    private HashMap<String, GaugePage> _gaugePageByName =
+        new HashMap<String,GaugePage>();
 
-    static HashMap<String, GaugePage> _nameToGaugepage = new HashMap<String,GaugePage>();
+    private boolean _layoutFrozen;
 
     /**
-     * index of the previous tab-page in centWidget
+     * Layout manager.
      */
-    int _pidx =-1;
+    // private QStackedLayout _stacked= new QStackedLayout();
 
-    QStackedLayout _stacked= new QStackedLayout();; //stackedlayout for none-tab-widget
-
-    UIUtil _uU = new UIUtil();
-
-    private QTimer _tm; //used at beginning to cycle pages (one time only)
-    private QTimer _ucftm; //used at beginning to check user config (one time only)
-    
-    String _name;
+    /**
+     * Name of widget, typically set to the project.
+     * Saved in configuration. Not sure whether is it used otherwise.
+     */
+    private String _name;
 
     /**
      * auto-cycle tab-pages, default is 10 seconds
      */
-    QTimer _cycleTm;
-    int _cycleInt = 10;
+    private QTimer _cycleTm;
 
-    /**
-     * user-configuration
-     */
-    UserConfig _saveconfig = new UserConfig();;
-    UserConfig _openconfig = new UserConfig();
+    private int _cycleInt = 10;
+
+    private QRect _pageGeometry = new QRect(350, 250, 1000, 700);
 
     /***********************************************/
-    public CentTabWidget(CockPit p) {
-        _parent=p;
+    public CentTabWidget(Cockpit p) {
+        _cockpit = p;
         connectSlotsByName();
-        setLayout(_stacked);
-        currentChanged.connect(this,   "pageChanged()");  
+        // setLayout(_stacked);
+        currentChanged.connect(this, "pageChanged()");  
         _cycleTm = new QTimer();
         _cycleTm.timeout.connect(this, "cycleTimeout()");
     }
 
-    public void createPrimaryGauges() {
+    /**
+     * Create a GaugePage for every dsm.
+     */
+    public void addGaugePages(ArrayList<Site> sites)
+    {
+        setCursor(new QCursor(Qt.CursorShape.WaitCursor));
 
-        if (_dsms==null || _dsms.size()<1) return;
-        // create gauge-pages
-        GaugePage gp=null;
-        for (int i=0; i<_dsms.size(); i++) {
-            Dsm dsm= _dsms.get(i);
-            if (dsm==null ) continue;
-            if ( dsm.getSamples()==null ||dsm.getSamples().isEmpty()) {
-                Util.prtErr("dsm "+dsm.getName() + " contains empty samples. \nSkip creating plots ");
-                continue;
-            }
-            Util.prtDbg("create-"+dsm.getName()+"-page");
-            gp = new GaugePage(this, dsm.getSamples(), dsm.getName());
-            String color = "gdefBColor";
-            if ((i%4)!=0)  color += (i%4+1); //skip 0
-            
-            gp.setBGColor(CockPit._orderToColor.get(color));
-            if (gp==null) {
-                Util.prtDbg("Errors occured in creating "+dsm.getName()+" page");
-                continue;
-            }
-            gp.setGeometry(PageGeometry.x,  PageGeometry.y, PageGeometry.w, PageGeometry.h); 
-            _gaugePages.add(gp);
-            _nameToGaugepage.put(dsm.getName(), gp);
-            setCursor(new QCursor(Qt.CursorShape.WaitCursor));
-            gp.createDataClients();
-            setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
-        }
-        //add g-pages to layout # add g-pages later to avoid empty dsm
-        if (_gaugePages == null || _gaugePages.isEmpty()) return;
-        GaugePage gpp=_gaugePages.get(0);
-        if (_gaugePages.size()==1) {
-            _stacked.addWidget(gpp);
-        } else {
-            for (int j=0; j< _gaugePages.size(); j++) {
-                gpp=_gaugePages.get(j); 
-                addTab(gpp, gpp.getName());
+        for (Site site : sites) {
+
+            ArrayList<Dsm> dsms = site.getDsms();
+
+            for (Dsm dsm : dsms) {
+                GaugePage gp = new GaugePage(this, dsm.getName());
+                int n = _gaugePageByName.size();
+                String color = "gdefBColor";
+                if ((n%4)!=0)  color += (n%4+1); //skip 0
+                
+                gp.setBGColor(Cockpit.orderToColor.get(color));
+                gp.setGeometry(_pageGeometry);
+                gp.createGauges(dsm);
+                _gaugePageByName.put(dsm.getName(), gp);
+                addTab(gp, gp.getName());
             }
         }
-        setCurrentWidget(_gaugePages.get(0));
-        _tm = new QTimer();
-        _tm.timeout.connect(this, "timeout()");
-        _tm.start(1000);
-        if (_parent.getUserConfig()!=null){
-            _ucftm = new QTimer();
-            _ucftm.timeout.connect(this, "ucfTimeout()");
-            _ucftm.start(100); 
+
+        /*
+        for (GaugePage gpp : _gaugePageByName.values()) {
+            setCurrentWidget(gpp);
         }
+        */
+        setCurrentIndex(0);
+        update();
+
+        setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
     }
 
-    public GaugePage getCurrentGaugePage() {
-        if (_gaugePages.size()<=0) return null;
-        if (_gaugePages.size()==1) return (GaugePage)_gaugePages.get(0); //because the first page is in _stacked layout, not th _centWidget
+    /**
+     * Create a GaugePage for a list of Var.
+     */
+    public void addGaugePage(List<Var> vars, String name)
+    {
+        setCursor(new QCursor(Qt.CursorShape.WaitCursor));
+
+        GaugePage gp = new GaugePage(this, name);
+
+        int n = _gaugePageByName.size();
+        String color = "gdefBColor";
+        if ((n%4)!=0)  color += (n%4+1); //skip 0
+                
+        gp.setBGColor(Cockpit.orderToColor.get(color));
+        gp.setGeometry(_pageGeometry);
+        gp.createGauges(vars);
+        _gaugePageByName.put(name, gp);
+
+        addTab(gp, gp.getName());
+        setCurrentWidget(gp);
+        update();
+        setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
+    }
+
+    public void remove(GaugePage gp)
+    {
+        _gaugePageByName.remove(gp.getName());
+
+        int cidx = currentIndex();
+        int idx = indexOf(gp);
+        if (idx >= 0) removeTab(idx);
+        if (idx <= cidx) cidx = cidx - 1;
+        setCurrentIndex(cidx);
+
+        gp.destroyWidget(true);
+    }
+
+    public void closeCurrentTab()
+    {
+        GaugePage gp = (GaugePage)currentWidget();
+        remove(gp);
+    }
+
+    public GaugePage getCurrentGaugePage()
+    {
         return (GaugePage)currentWidget();
     }
 
-    public List<Sample> getSamps() {
-        return _samples;
+
+    public GaugePage getGaugePage(String name) 
+    {
+        return _gaugePageByName.get(name);
+    }
+
+    public Gauge getGauge(String dsmname, String varname) 
+    {
+        GaugePage gp = getGaugePage(dsmname);
+        if (gp != null)
+            return gp.getGauge(varname);
+        return null;
+    }
+
+    public Set<Gauge> getGauges(String name)
+    {
+        Set<Gauge> gauges = new HashSet<Gauge>();
+        synchronized(_gaugePageByName) {
+            for (GaugePage gp : _gaugePageByName.values()) {
+                Gauge g = gp.getGauge(name);
+                if (g != null) gauges.add(g);
+            }
+        }
+        return gauges;
+    }
+
+    void status(String msg, int tm)
+    {
+        _cockpit.status(msg, tm);
     }
 
     public void setName(String name) { _name = name; }
 
-    public String getName() {return _name; }
+    public String getName() { return _name; }
     
-    public CockPit getParent() {
-        return _parent;
+    public Cockpit getParent() {
+        return _cockpit;
     }
 
-    public List<GaugePage> getGaugePages(){
-        return _gaugePages;
+    public Collection<GaugePage> getGaugePages()
+    {
+        return _gaugePageByName.values();
     }
 
-    public HashMap<String, GaugePage> getNameToGaugePage() {
-        return _nameToGaugepage;
-    }
-
-    public  void closeTab()  {
-        if (_gaugePages.size()<=1) return;
-        int idx= currentIndex();
-        GaugePage gp=(GaugePage)currentWidget();
-        if (gp==null) return;
-        if (gp.getPrimary()) {
-            _parent.statusBar().showMessage("Cannot delete a primary page, Cockpit preserved it", 10000); //10 sec
-            return;
-        }
-        _gaugePages.remove(gp);
-        _nameToGaugepage.remove(gp._name);
-        removeTab(idx);
-        gp.destroyWidget(true);
-        setCurrentIndex(idx-1);
-        setCurrentWidget(_gaugePages.get(idx-1));
-        checkFirstPageTab(false);
-    }
 
     /**
-     * Change the plot-page policy to resize 
+     * 
      */
-    public void toggleFixedGaugeSize(Policy policy)
+    /*
+    public void freezeUnfreezePageLayout()
     {
-        if (policy == Policy.Preferred) if (Util.confirmMsgBox("ToVarying will loss all the history data! ", "Toggle Resize")== Util.RetAbort) return;
-        getCurrentGaugePage().toggleFixedGaugeSize(policy);
+        getCurrentGaugePage().freezeUnfreezeLayout();
+    }
+    */
+
+    public boolean isLayoutFrozen()
+    {
+        return _layoutFrozen;
     }
 
     /**
      * Change all pages' policy to resize 
      */
-    public void gtoggleFixedGaugeSize(Policy policy)
+    public void freezeUnfreezeAllLayout()
     {
-        if (policy == Policy.Preferred) if (Util.confirmMsgBox("ToVarying will loss all the history data! ", "Toggle Resize")== Util.RetAbort) return;
-        for (int i =0; i<_gaugePages.size(); i++) {
-            _gaugePages.get(i).toggleFixedGaugeSize(policy);
+        GaugePage gp = getCurrentGaugePage();
+        if (gp == null) return;
+        QSize sz = gp.getGaugeSize();
+        int nc = gp.getNumColumns();
+        if (sz.isValid()) {
+            for (GaugePage gpp : _gaugePageByName.values()) {
+                if (_layoutFrozen)
+                    gpp.unfreezeLayout();
+                else
+                    gpp.freezeLayout(nc, sz);
+            }
+            _layoutFrozen = !_layoutFrozen;
         }
-        _tm.start(15000);
     }
+
 
     /**
      * Clean up history for all plots in the current page
      */
-    public void cleanupHistory() {
-        if (Util.confirmMsgBox("Processing \"cleanupHistory\" will loss all the history data! ", "Clean History")== Util.RetAbort) return;
+    public void cleanupHistory()
+    {
+        if (Util.confirmMsgBox("All plot history will be lost", "Clean History")== Util.RetAbort ) return;
         getCurrentGaugePage().cleanupHistory();
     }
     /**
      * Clean up history for all plots in all pages
      */
-    public void gcleanupHistory() {
-        if (Util.confirmMsgBox("Processing \"cleanupHistory\" will loss all the history data! ", "Clean History")== Util.RetAbort) return;
-        for (int i =0; i<_gaugePages.size(); i++) 
-            _gaugePages.get(i).cleanupHistory();
+    public void gcleanupHistory()
+    {
+        if (Util.confirmMsgBox("All plot history will be lost", "Clean History")== Util.RetAbort ) return;
+        for (GaugePage gp : _gaugePageByName.values()) {
+            gp.cleanupHistory();
+        }
     }
 
     /**
@@ -254,10 +284,10 @@ public class CentTabWidget extends QTabWidget {
      * Scale each plot in all page based on its max-min in the span 
      */
     public void ggautoScalePlots() {
-        GaugePage gp = (GaugePage)currentWidget();
-        for (int i =0; i<_gaugePages.size(); i++){ 
-            _gaugePages.get(i).gautoScalePlots(true);
+        for (GaugePage gp : _gaugePageByName.values()) {
+            gp.gautoScalePlots(true);
         }
+        GaugePage gp = (GaugePage)currentWidget();
         setCurrentWidget(gp);
     }
 
@@ -275,15 +305,14 @@ public class CentTabWidget extends QTabWidget {
     public void gcolorCurrent() {
         QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getCColor());
         if (c.value()==0) return;
-        for (int i =0; i<_gaugePages.size(); i++) 
-            _gaugePages.get(i).colorCurrent(c);
+        for (GaugePage gp : _gaugePageByName.values()) gp.colorCurrent(c);
     }
 
     /**
      * Color the history image of each plot in the active page with new color  
      */
     public void colorHistory() {
-        if (Util.confirmMsgBox("Processing \"colorHistory\" will loss all the history data! ", "Color History")== Util.RetAbort ) return;
+        if (Util.confirmMsgBox("All plot history will be lost", "Color History")== Util.RetAbort ) return;
         QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getHColor());
         if (c.value()==0) return;
         getCurrentGaugePage().colorHistory(c);
@@ -293,18 +322,19 @@ public class CentTabWidget extends QTabWidget {
      * Color the history image of each plot in the active page with new color  
      */
     public void gcolorHistory() {
-        if (Util.confirmMsgBox("Processing \"colorHistory\" will loss all the history data! ", "Color History")== Util.RetAbort ) return;
+        if (Util.confirmMsgBox("All plot history will be lost", "Color History")== Util.RetAbort ) return;
         QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getHColor());
         if (c.value()==0) return;
-        for (int i =0; i<_gaugePages.size(); i++) 
-            _gaugePages.get(i).colorHistory(c);
+        for (GaugePage gp : _gaugePageByName.values()) {
+            gp.colorHistory(c);
+        }
     }
 
     /**
      * Color the back-ground of each plot in the active page with new color  
      */
     public void colorBackGround() {
-        if (Util.confirmMsgBox("Processing \"colorBackGround\" will loss all the history data! ", "Color Background")== Util.RetAbort) return;
+        if (Util.confirmMsgBox("All plot history will be lost", "Color Background")== Util.RetAbort) return;
         QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getBGColor());
         if (c.value()==0) return;
         getCurrentGaugePage().colorBackGround(c); 
@@ -314,28 +344,28 @@ public class CentTabWidget extends QTabWidget {
      * Color the back-ground of each plot in all pages with new color  
      */
     public void gcolorBackGround() {
-        if (Util.confirmMsgBox("Processing \"colorBackGround\" will loss all the history data! ", "Color Background")== Util.RetAbort) return;
+        if (Util.confirmMsgBox("All plot history will be lost", "Color Background")== Util.RetAbort) return;
         QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getBGColor());
         if (c.value()==0) return;
-        for (int i =0; i<_gaugePages.size(); i++) 
-            _gaugePages.get(i).colorBackGround(c); 
+        for (GaugePage gp : _gaugePageByName.values()) {
+            gp.colorBackGround(c); 
+        }
     }
-
 
     /**
      * change the gauge-time-span-x_axis for every gauge page and its plots 
      * set the time-range in milli-second in x_axis
      */
     public void changePlotTimeMSec () {
-        if (Util.confirmMsgBox("Changing-plot-time-range will loss all the history data! ", "Change time span")== Util.RetAbort) return;
+        if (Util.confirmMsgBox("All plot history will be lost", "Change time span")== Util.RetAbort) return;
 
         int oldtm= getCurrentGaugePage().getGaugeTimeMSec();
         NewTimeMSec tmDlg = new NewTimeMSec(null, oldtm);
         int newtm = tmDlg.getNewTimeMSec();
         if (newtm <= 0 || oldtm == newtm) return;
 
-        for (int i=0; i<_gaugePages.size(); i++) {
-            _gaugePages.get(i).setGaugeTimeMSec(newtm);
+        for (GaugePage gp : _gaugePageByName.values()) {
+            gp.setGaugeTimeMSec(newtm);
         }
     }
 
@@ -344,7 +374,7 @@ public class CentTabWidget extends QTabWidget {
      * set the time-range in milli-second in x_axis
      */
     public void changeSinglePlotTimeMSec () {
-        if (Util.confirmMsgBox("Changing-plot-time-range will loss all the history data! ", "Change time span")== Util.RetAbort) return;
+        if (Util.confirmMsgBox("All plot history will be lost", "Change time span")== Util.RetAbort) return;
 
         int oldtm= getCurrentGaugePage().getGaugeTimeMSec();
         NewTimeMSec tmDlg = new NewTimeMSec(this, oldtm);
@@ -360,8 +390,8 @@ public class CentTabWidget extends QTabWidget {
         int newtm = tmDlg.getNewTimeSec();
         if (newtm <= 0 || oldtm == newtm) return;
 
-        for (int i=0; i<_gaugePages.size(); i++) {
-            _gaugePages.get(i).setGaugeNoDataTimeout(newtm);
+        for (GaugePage gp : _gaugePageByName.values()) {
+            gp.setGaugeNoDataTimeout(newtm);
         }
     }
 
@@ -374,236 +404,20 @@ public class CentTabWidget extends QTabWidget {
         getCurrentGaugePage().setGaugeNoDataTimeout(newtm);
     }
 
-    public void pageChanged () {
+    public void pageChanged()
+    {
         int index = currentIndex();
-        if (index==_pidx) {
-            Util.prtDbg("curidx=previdx == "+_pidx);
-            return;
-        }
-
-        //set prev-page to be fixed-size 
-        if (_pidx!=-1){
-            if (_gaugePages.size()>= (_pidx+1)){
-                GaugePage prevG = _gaugePages.get(_pidx);
-                if (prevG.getPolicy()==Policy.Preferred) prevG.toggleFixedGaugeSize(Policy.Fixed);
-            }
-        }
-        //sync current-page-policy with gfixedSize
-        if (getCurrentGaugePage()!=null)  syncCurrentSizePolicy(getCurrentGaugePage().getPolicy());    
-        //sign new id
-        _pidx = index;   
-    }
-
-    /**
-     * sync current page size policy with the menu
-     * @param policy
-     */
-    public void syncCurrentSizePolicy(Policy policy) {
-
-        boolean flag =false;
-        if (policy==Policy.Fixed) flag=true;
-        _parent.syncSizePolicy(flag);
-    }
-
-    private void checkFirstPageTab(boolean addTab) {
-        //set first page
-        if (_gaugePages.size()!=1) return;
-        GaugePage p= _gaugePages.get(0);
-
-        if (addTab ) {
-            _stacked.removeWidget(p);
-            addTab(p, p._name);
-            return; 
-        } 
-        removeTab(0);
-        _stacked.addWidget(p);
-    }
-
-    public GaugePage addNewPage(List<Var> vars, String pname) {
-        if (vars.isEmpty()) return null;
-
-        if (_nameToGaugepage.get(pname)!=null) pname += "+";
-        PostGaugePage pgp = new PostGaugePage(this, vars, pname);
-        //pgp.setPrimary(false); //should be in constructor
-        pgp.addPlots();
-        //pgp.setPrimary(false);        
-        checkFirstPageTab(true);
-        _gaugePages.add(pgp);
-        _nameToGaugepage.put(pname, pgp);
-        addTab(pgp, pgp._name);
-        setCurrentWidget(pgp);
-        setCurrentIndex(_gaugePages.size()-1);
-        syncCurrentSizePolicy(pgp.getPolicy());
-        update();      
-        return pgp;
-    }
-
-    public void addVariablePage() {
-        GaugePage gp = getCurrentGaugePage();
-        if (gp==null) return;
-        if (gp.getPolicy()==Policy.Preferred) gp.setAllPolicy(Policy.Fixed);
-        ArrayList<Var> vars = _uU.getSortedVars(gp._gauges);
-        if (vars.isEmpty()) return;
-        String pname = gp._name+"Var";
-        if (_nameToGaugepage.get(pname)!=null) pname += "+";
-
-        PostGaugePage pgp = new PostGaugePage(this, vars, pname);
-        pgp.addPlots();
-        checkFirstPageTab(true);
-        _gaugePages.add(pgp);
-        _nameToGaugepage.put(pname, pgp);
-        addTab(pgp, pgp._name);
-        setCurrentWidget(pgp);
-        setCurrentIndex(_gaugePages.size()-1);
-        syncCurrentSizePolicy(pgp.getPolicy());
-        update();        
-    }
-
-    public void sortVariable() {
-        GaugePage gp = getCurrentGaugePage();
-        if (gp==null) return;
-        ArrayList<Gauge> gs=gp.getPlots();
-        if (gs.size()<=1) return;
-        if (gp.getPolicy()==Policy.Preferred) gp.toggleFixedGaugeSize(Policy.Fixed);
-        ArrayList<Gauge> newgs=_uU.getSortedGauges(gs);
-        gp.resetGaugeOrder(newgs);
-        update();
-    }
-
-    public void gsortVariable() {
-        for (int i=0; i< _gaugePages.size(); i++) {
-            GaugePage gp = _gaugePages.get(i);
-            if (gp==null) continue;
-            ArrayList<Gauge> gs=gp.getPlots();
-            if (gs.size()<=1) return;
-            if (gp.getPolicy()==Policy.Preferred) gp.toggleFixedGaugeSize(Policy.Fixed);
-            ArrayList<Gauge> newgs=_uU.getSortedGauges(gs);
-            gp.resetGaugeOrder(newgs);
-            update();
-        }
-    }
-
-    public void  sortHeight() {
-        GaugePage gp = getCurrentGaugePage();
-        if (gp==null) return;
-        ArrayList<Gauge> gs=gp.getPlots();
-        if (gs.size()<=1) return;
-        if (gp.getPolicy()==Policy.Preferred) gp.toggleFixedGaugeSize(Policy.Fixed);
-        ArrayList<Gauge> newgs=_uU.getSortedGaugesByHeight(gs);
-        if (newgs != null || newgs.size()>1) gp.resetGaugeOrder(newgs);
-        update();
-    }
-
-    public void  gsortHeight() {
-        for (int i=0; i< _gaugePages.size(); i++) {
-            GaugePage gp = _gaugePages.get(i);
-            if (gp==null) continue;
-            ArrayList<Gauge> gs=gp.getPlots();
-            if (gs.size()<=1) return;
-            if (gp.getPolicy()==Policy.Preferred) gp.toggleFixedGaugeSize(Policy.Fixed);
-            ArrayList<Gauge> newgs=_uU.getSortedGaugesByHeight(gs);
-            //gp.resetGaugeOrder(newgs);
-            if (newgs != null || newgs.size()>1) gp.resetGaugeOrder(newgs);
-            update();
-        }
-    }
-
-    public void addHeightPage(){
-        GaugePage gp = getCurrentGaugePage();
-        if (gp==null) return;
-        if (gp.getPolicy()==Policy.Preferred) gp.setAllPolicy(Policy.Fixed);
-        ArrayList<Var> vars = _uU.getSortedVarsByHeight(gp._gauges);
-        if (vars.isEmpty()) return;
-
-        String pname = gp._name+"Ht";
-        if (_nameToGaugepage.get(pname)!=null) pname += "+";
-
-        PostGaugePage pgp = new PostGaugePage(this, vars, pname);
-        pgp.addPlots();
-        // pgp.setPrimary(false);   //should be in constructor     
-        checkFirstPageTab(true);
-        _gaugePages.add(pgp);
-        _nameToGaugepage.put(pname, pgp);
-        setCurrentWidget(pgp);
-        setCurrentIndex(_gaugePages.size()-1);
-        syncCurrentSizePolicy(pgp.getPolicy());
-        update();        
+        // if (getCurrentGaugePage()!=null)  syncCurrentSizePolicy(getCurrentGaugePage().getPolicy());    
     }
 
 
-    /**
-     * This method gets a xml document, and parses it to get data-descriptors
-     *  
-     * @param doc
-     */
-    public void setSampsFromDataDescriptor(Document doc) {
-        if (_dsms !=null && !_dsms.isEmpty()) { //this is the case of reconnection
-            checkSamps(doc); 
-            return;
-        }
-        synchronized (this){
-            _dsms=getDsms(doc);
-            if (_dsms==null || _dsms.isEmpty()) return;
-
-            setCursor(new QCursor(Qt.CursorShape.WaitCursor));
-            //parse the xml and walk through the elements
-            ArrayList<Var> allVars = new ArrayList<Var>();
-            for (int i = 0; i < _dsms.size(); i++) {
-                Dsm dsm = _dsms.get(i);
-                List<Sample> samples = dsm.getSamples();
-                if (samples==null || samples.isEmpty()) continue;
-                for (int j = 0; j < samples.size(); j++) {
-                    Sample samp = samples.get(j);
-                    List<Var> vars = samp.getVars();
-                    if (vars==null || vars.isEmpty()) continue;
-                    allVars.addAll(vars);
-                }
-                _samples.addAll(samples);
-            }
-            setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
-        }       
-    }
-
-    private void checkSamps(Document doc) {
-        synchronized (this){
-            List<Sample>  tmpsamps = new ArrayList<Sample>(); //for all samples
-            List<Dsm>   tmpdsms = getDsms(doc);
-            if (tmpdsms==null || tmpdsms.isEmpty()) return;
-
-            //parse the xml and walk through the elements
-            setCursor(new QCursor(Qt.CursorShape.WaitCursor));
-            ArrayList<Var> allVars = new ArrayList<Var>();
-            for (int i = 0; i < tmpdsms.size(); i++) {
-                Dsm dsm = tmpdsms.get(i);
-                List<Sample> samples = dsm.getSamples();
-                if (samples==null || samples.isEmpty()) continue;
-                for (int j = 0; j < samples.size(); j++) {
-                    Sample samp = samples.get(j);
-                    List<Var> vars = samp.getVars();
-                    if (vars==null || vars.isEmpty()) continue;
-                    allVars.addAll(vars);
-                }
-                tmpsamps.addAll(samples);
-            }
-            setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
-        }
-
-    }
-
-    private List<Dsm> getDsms(Document doc) {
-        DataDescriptor cpxml = new DataDescriptor(doc);  
-        cpxml.walkSites();
-        return cpxml.getAllDsms();
-    }
-
-    static class PageGeometry {
-        static public int x= 350, y=250, w=1000, h=700;
-    }
-
-    public boolean isAnyPlot() {
+    /*
+    public boolean isAnyPlot()
+    {
         if ( _gaugePages==null || _gaugePages.get(0)==null || _gaugePages.get(0)._gauges.size()<1) return false;
         else return true;
     }
+    */
 
     public void mouseReleaseEvent(QMouseEvent pEvent)
     {
@@ -615,29 +429,6 @@ public class CentTabWidget extends QTabWidget {
             int xmouse = pEvent.globalX();
             int ymouse = pEvent.globalY();
             option.popup(new QPoint(xmouse, ymouse) );    
-        }
-    }
-
-    public  void saveUserConfig() {
-        synchronized (this){
-            _saveconfig.createCockpitConfig(this);
-            _saveconfig.writeUserConfig();
-        }
-    }
-
-    public void openUserConfig() {
-        synchronized (this){
-            _openconfig.readUserConfig(true);
-            applyUserConfig(_openconfig.getCockpitConfig()); //or the method with fname
-        }
-    }
-
-
-    public void openUserConfig(String ucf) {
-        _openconfig.setConfigName(ucf);
-        synchronized (this){
-            _openconfig.readUserConfig(false);
-            applyUserConfig(_openconfig.getCockpitConfig()); //or the method with fname
         }
     }
 
@@ -663,7 +454,7 @@ public class CentTabWidget extends QTabWidget {
      */
     private void autoCycleTabs(){
         synchronized(this) {
-            QAction at = _parent._gsetup.actions().get(2);
+            QAction at = _cockpit.gsetup.actions().get(2);
             String tx = at.text();
             if (tx.equals("AutoCycleTabs")) {
                 at.setText("StopCycleTabs");
@@ -672,11 +463,11 @@ public class CentTabWidget extends QTabWidget {
                 _cycleInt = tmDlg.getNewTimeSec();
                 if (_cycleInt <= 0 ) return;
                 _cycleTm.start(_cycleInt*1000); 
-                _parent._cpConn.getStatusBarClient().receive("Auto_cycle_tabs every "+ _cycleInt+ " seconds", -1);
+                status("Auto_cycle_tabs every "+ _cycleInt+ " seconds", -1);
             } else {
                 at.setText("AutoCycleTabs");
                 _cycleTm.stop();
-                _parent._cpConn.getStatusBarClient().receive("Stop_cycle_tabs", 10000);
+                status("Stop_cycle_tabs", 10000);
             }
         }
     }
@@ -693,136 +484,91 @@ public class CentTabWidget extends QTabWidget {
     /**
      * timer to set current page, and auto-scale. Only one time when the program starts. 
      */
+    /*
     private void timeout() {
         _tm.stop();
         GaugePage gp=(GaugePage)currentWidget();
-        for (int i=0; i<_gaugePages.size(); i++ ) {
+        for (int i = 0; i<_gaugePages.size(); i++ ) {
             GaugePage p = _gaugePages.get(i);
             setCurrentWidget(p);
         }
         setCurrentWidget(gp);
        
     }
+    */
 
     /**
-     * timer to set user config, and set current, only onetime when the porgram starts 
+     * timer to set user config, and set current, only onetime when the program starts 
      */
+    /*
     private void ucfTimeout() {
         _ucftm.stop();
-        if (_parent.getUserConfig()!=null) {
-            openUserConfig(_parent.getUserConfig());
+        if (_cockpit.getUserConfig()!=null) {
+            openUserConfig(_cockpit.getUserConfig());
         }    
         GaugePage gp=(GaugePage)currentWidget();
-        for (int i=0; i<_gaugePages.size(); i++ ) {
+        for (int i = 0; i < _gaugePages.size(); i++ ) {
             GaugePage p = _gaugePages.get(i);
             setCurrentWidget(p);
         }
         setCurrentWidget(gp);
     }
+    */
    
     private void cycleTimeout(){
 
-        if (_cycleInt<=0) {
+        if (_cycleInt <= 0) {
             _cycleTm.stop();
         } else {
             if (count() > 0) setCurrentIndex((currentIndex() + 1) % count());
         }
     }
 
-    private void applyUserConfig(CockpitConfig cconf) {
-        if (cconf==null ) {
-           // Util.prtErr("Error: Userconfig-apply get cconf is null.");
-            return;
-        }
+    public void apply(CockpitConfig conf)
+    {
         synchronized (this){
-            setWindowTitle(cconf.getName());
-            // System.out.println("cconf-apply "+cconf.getTabPageConfig().size()+ "   "+cconf.getTabPageConfig().get(0).getName());
-            List<TabPageConfig> tps = cconf.getTabPageConfig();
-            for (int i=0; i<tps.size(); i++){
-                TabPageConfig tp = tps.get(i);
-                GaugePage gp = _nameToGaugepage.get(tp.getName());
-                if (gp == null ){
-                    List<Var> vars = abstractVars(tp);
-                    if (vars!=null && vars.size()>0) {
-                        gp = addNewPageFromConfig(tp, vars, tp.getName());
+            setWindowTitle(conf.getName());
+            // System.out.println("conf-apply "+conf.getGaugePageConfig().size()+ "   "+conf.getGaugePageConfig().get(0).getName());
+            List<GaugePageConfig> tps = conf.getGaugePageConfig();
+            for (int i = 0; i<tps.size(); i++){
+                GaugePageConfig tp = tps.get(i);
+                String pname = tp.getName();
+                GaugePage gp = getGaugePage(tp.getName());
+
+                if (gp == null) {
+                    gp = new GaugePage(this, pname);
+                    _gaugePageByName.put(pname, gp);
+                }
+
+                List<GaugeConfig> gcs = tp.getGaugeConfigs();
+                for (GaugeConfig gc : gcs) {
+                    String vname = gc.getName();
+                    Var var = _cockpit.getVar(vname);
+                    if (var != null) {
+                        Gauge g = gp.addGauge(var);
+                        if ((g.getYMax() != gc.getMax()) || (g.getYMin() != gc.getMin())) {
+                            g.changeYMaxMin(gc.getMax(),gc.getMin());
+                        }
+                        if (!g.getCColor().equals(new QColor(gc.getCColor()))) {
+                            g._noDataPaint = false; g.setCColor(new QColor(gc.getCColor()));
+                        }
+                        if (!g.getHColor().equals(new QColor(gc.getHColor()))) {
+                            g._noDataPaint = false; g.setHColor(new QColor(gc.getHColor()));
+                        }
+                        if (!g.getBGColor().equals(new QColor(gc.getBGColor()))) {
+                            g._noDataPaint = false; g.setBGColor(new QColor(gc.getBGColor()));
+                        }
+                        if (gc.getNoDataTm() != g.getNoDataTmout()) g.setNoDataTmout(gc.getNoDataTm());
+                        if (gc.getplotTmRange() != g.getGaugeTimeMSec()) g.setNewTimeMSec(gc.getplotTmRange());
+                        DataSource ds = _cockpit.getDataSource(var);
+                        ds.addClient(g);
                     }
-                } 
-                if (gp==null) return;
-                //else {    
+                }
+
                 gp.setWindowTitle(tp.getName());
                 gp.resize(tp.getSize()[0], tp.getSize()[1]);
-                gp.setPrimary(tp.getPrm());
-
-                List<PlotConfig> pcs = tp.getUIVars();
-                for (int j=0; j<pcs.size(); j++) {
-                    PlotConfig plotc = pcs.get(j);
-                    Gauge g = gp.getNameToGauge().get(plotc.getName());
-                    if (g!=null){
-                        /* if (j==0) {
-                                System.out.println(j+"plotc-apply= "+plotc.getName() + " g-name= "+g.getName() );
-                                System.out.println( plotc.getCColor()+ " "+plotc.getHColor()+ " "+plotc.getBGColor() );
-                            }*/
-                        if (!g._label.equals(plotc.getName()) || (g.getYMax()!=plotc.getMax()) || (g.getYMin()!=plotc.getMin())){
-                            g._label = plotc.getName();
-                            g.changeYMaxMin(plotc.getMax(),plotc.getMin());
-                        }
-                        if (!g.getCColor().equals(new QColor(plotc.getCColor()))){ g._noDataPaint=false; g.setCColor(new QColor(plotc.getCColor()));}
-                        if (!g.getHColor().equals(new QColor(plotc.getHColor()))) {g._noDataPaint=false; g.setHColor(new QColor(plotc.getHColor()));}
-                        if (!g.getBGColor().equals(new QColor(plotc.getBGColor()))) {g._noDataPaint=false; g.setBGColor(new QColor(plotc.getBGColor()));}
-                        if (plotc.getNoDataTm()!= g.getNoDataTmout())   g.setNoDataTmout(plotc.getNoDataTm());
-                        if (plotc.getplotTmRange()!= g.getGaugeTimeMSec()) g.setNewTimeMSec(plotc.getplotTmRange());
-                    } else { //TODO add new gauge or not
-                        //createOneDataClient(gp.gets, plotc.getVar());
-                    }
-                }
-                //}
             }
         }
     }
 
-    private GaugePage addNewPageFromConfig(TabPageConfig tp, List<Var> vars, String name) {
-        if (vars==null) {
-            Util.prtErr("addNewPageFromConfig vars is null");
-            return null;
-        }
-        List<Var> lvar = new ArrayList<Var>();
-        for (int i=0; i< vars.size(); i++) {
-            String vname = vars.get(i).getName();
-            Iterator <Var> it = _varToGdc.keySet().iterator();
-
-            while (it.hasNext()) {
-                Var v = it.next();
-                if (v.getName().equals(vname)) {
-                    lvar.add(v);
-                   // System.out.println(" lvar ="+v.getName());
-                    break;
-                }
-            }
-        }
-        if (lvar.size()<1){
-            Util.prtErr("addNewPageFromConfig Lvar-gauge is null");
-            return null;
-        }
-
-        GaugePage gp = addNewPage(lvar, name);
-        if (gp==null){
-            Util.prtErr("addNewPage is null");
-            return null;
-        }
-
-        return gp;
-    }
-
-
-    private List<Var> abstractVars(TabPageConfig tp) {
-        List<PlotConfig> plotcs = tp.getUIVars();
-        if (plotcs==null || plotcs.size()<=0) return null;
-        List<Var> vars = new ArrayList<Var>(0);
-        for (int i=0; i< plotcs.size(); i++){
-            String name = plotcs.get(i).getName();
-            vars.add(plotcs.get(i).getVar());
-        }
-
-        return vars;
-    }
 } //eof-cent-tab-widget class

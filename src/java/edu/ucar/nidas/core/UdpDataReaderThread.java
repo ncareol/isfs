@@ -1,21 +1,26 @@
 package edu.ucar.nidas.core;
 
+import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Set;
+import java.util.Iterator;
+import java.util.HashSet;
 import java.util.HashMap;
 
-import edu.ucar.nidas.apps.cockpit.core.ReconnectionClient;
-import edu.ucar.nidas.apps.cockpit.model.DataClient;
+import edu.ucar.nidas.model.NotifyClient;
+import edu.ucar.nidas.model.StatusDisplay;
+import edu.ucar.nidas.model.DataClient;
+import edu.ucar.nidas.model.FloatSample;
 import edu.ucar.nidas.model.Sample;
 import edu.ucar.nidas.model.Var;
-import edu.ucar.nidas.ui.StatusBarClient;
 import edu.ucar.nidas.util.Util;
 
 /**
- * This class is the data-feeder center. 
+ * Data thread.
  * It receives data from the prepared data-socket, 
  * parses the nidas data into FloatSample, 
  * fetches the FSample data to the min-max client,
@@ -29,139 +34,113 @@ import edu.ucar.nidas.util.Util;
 public class UdpDataReaderThread extends Thread
 {
 
-    //network
-    UdpFeed _udpf;
-    ReconnectionClient     _rc;
+    NotifyClient _notify;
     
     //UI
-    StatusBarClient        _sbc;
+    StatusDisplay _status;
   
     //data 
-    public static int _buffLen=16384;
+    public static int _buffLen = 16384;
     private DatagramPacket _packet;    	//get data from server
     private ByteBuffer _bf;				//get data from server
-    private DatagramSocket         _dsocket;
-
+    private DatagramSocket _dsocket;
 
     //data_parsser
     NidasSampleParser _nsp = new NidasSampleParser();
 
     /**
-     *  mapping from a sample id to a list of Vars
+     *  mapping from a sample id to a Sample
      */
-    HashMap<Integer,ArrayList<Var> > _idToVars = new HashMap<Integer,ArrayList<Var> >();
+    HashMap<Integer,Sample> _idToSample = new HashMap<Integer, Sample>();
 
     /**
-     * For each Var, a two dimensional ArrayList of clients.
-     * The first index of the ArrayList is for each value in the Variable, since
-     * there can be more than one.  The second index points to the list of clients
-     * for that value.
+     * For each Var, a Set of clients.
+     * There is typically one client per variable.
      */
-    HashMap<Var,ArrayList<ArrayList<DataClient> > > _varToClients =
-        new HashMap<Var,ArrayList<ArrayList<DataClient> > >();
+    HashMap<Var, HashSet<DataClient> > _varToClients =
+        new HashMap<Var, HashSet<DataClient> >();
 
-    // loopState
-    boolean _abort = false;
-    //boolean _stopped=false;
-
-    synchronized public void abort() {_abort=true;}
-    //public boolean getStatus() {  return  _stopped; }
-
-    public void setRC(ReconnectionClient rc) {_rc=rc;}
-    
-    public HashMap<Integer,ArrayList<Var> >  getIdToVars () {
-        return _idToVars;
+    public UdpDataReaderThread(DatagramSocket sock,
+            StatusDisplay status, NotifyClient notify)
+    {
+        _dsocket = sock;
+        _status = status;
+        _notify = notify;
+        buildDataBuf();
     }
 
-    public void setIdToVars(HashMap<Integer,ArrayList<Var> >  id2Vars) {
-        _idToVars=id2Vars;
+    @Override
+    public void interrupt()
+    {
+        _status = null;
+        _notify = null;
+        super.interrupt();
+        _dsocket.close();
     }
 
-    public HashMap<Var,ArrayList<ArrayList<DataClient> > > getVarToClients( ) {
-        return _varToClients;   
-    }
-
-    public void setVarToClients(HashMap<Var,ArrayList<ArrayList<DataClient> > >  var2Clnt) {
-        _varToClients=var2Clnt;
-    }
-
-    /**
-     * set data feed 
-     */
-    public void setUdpFeed(UdpFeed udpf) {
-        _udpf=udpf;
-    }
-
-    public void setStatusBar(StatusBarClient sbc) {
-        _sbc=sbc;
-    }
     /**
      * create a new buffer with Little-Indian byte order 
      */
     private void buildDataBuf() {
         byte[] buffer = new byte[_buffLen];
         _packet = new DatagramPacket(buffer, buffer.length);
-        _bf= ByteBuffer.wrap(buffer, 0, buffer.length);
+        _bf = ByteBuffer.wrap(buffer, 0, buffer.length);
         _bf.order(ByteOrder.LITTLE_ENDIAN);
     }
 
     /**
-     * Add a MinMax client to the the data-thread
+     * Add a DataClient to the the data-thread
      *  
      * @param samp The Sample containing the Var
      * @param var The Var containing the data for the client.
      * @param index The index into the Var's data which the client is to receive.
      */
-    public void addClient(Sample samp, Var var, int index, DataClient client)
+    public void addClient(Sample samp, Var var, DataClient client)
     {
         synchronized (_varToClients){
-            ArrayList<Var> vars = _idToVars.get(samp.getId());
-            if (vars == null) {
-                vars = samp.getVars();
-                _idToVars.put(samp.getId(),vars);
+            HashSet<DataClient> varClients =
+                _varToClients.get(var);
+            if (varClients == null) {
+                varClients = new HashSet<DataClient>();
+                _varToClients.put(var, varClients);
             }
-
-            ArrayList<ArrayList<DataClient> > varClients = _varToClients.get(var);
-            ArrayList<DataClient> clients;
-            if (varClients == null || index >= varClients.size()) {
-                if (varClients == null) 
-                    varClients = new ArrayList<ArrayList<DataClient> >();
-                _varToClients.put(var,varClients);
-
-                for (int i = varClients.size(); i < index; i++) varClients.add(new ArrayList<DataClient>());
-                clients = new ArrayList<DataClient>();
-                varClients.add(clients);
-            } else clients = varClients.get(index);
-            clients.remove(client);
-            clients.add(client);
-
+            varClients.add(client);
+            _idToSample.put(samp.getId(), samp);
         }
     }
 
-
-    /***********************************************************************************
+    /*****************************************************************
      * listen to at the port from the data-socket, 
      * read the data packets from the data server,
      * parse the nidas data into FloatSample
      * fetch the data to MinMax client
      *  
      */
-    public void run( ) {
+    public void run( )
+    {
         Util.prtDbg("dataTh-run()");
-        buildDataBuf();
         
         // Now loop forever, waiting to receive packets and printing them.
-        int retry=0;
-        _dsocket = _udpf.getUdpSocket();
+        int retry = 0;
         
-        while(!_abort) {
+        while(!isInterrupted()) {
             // Wait to receive a datagram
             try {
                 _dsocket.setSoTimeout(10000);
                 _dsocket.receive(_packet);
-            } catch (Exception e) { //other exceptions
-               reconnect();
-               return;
+            }
+            catch (IOException e) {
+                _dsocket.close();
+                if (_notify != null) {
+                    if (_status != null)
+                        _status.show(e.getMessage() + ". Reconnecting...", -1);
+                    _notify.notify();
+                }
+                else {
+                    if (_status != null)
+                        _status.show(e.getMessage(), -1);
+                }
+                return;
             }
                        
             _bf.limit(_packet.getLength());
@@ -169,49 +148,29 @@ public class UdpDataReaderThread extends Thread
             for ( ;; ) {
                 FloatSample samp = _nsp.parseSample(_bf,_packet.getLength());
                 if (samp == null) break;
-                int sampId=samp.getId();
+                int sampId = samp.getId();
+                // System.out.printf("sampId=%d\n",sampId);
 
                 synchronized(_varToClients){
-                    if (_idToVars==null || _idToVars.size()<=0) {
-                        continue;
-                    }
-                    ArrayList<Var> vars = _idToVars.get(samp.getId());
+                    Sample sample = _idToSample.get(sampId);
+                    if (sample == null) continue;
 
-                    if (vars==null || vars.size()<=0) {
-                        continue;
-                    }
+                    for (Var var : sample.getVars()) {
 
-                    for (int i = 0; i < vars.size(); i++) {
-                        Var var = vars.get(i);
-                        int offset = var.getOffset();
-                        ArrayList<ArrayList<DataClient> > varClients = _varToClients.get(var);
-                        for (int j = 0; j < var.getLength(); j++) {
-                            if (varClients != null && j < varClients.size()) {
-                                ArrayList<DataClient> clients = varClients.get(j);
-                                for (int k = 0; k < clients.size(); k++) {
-                                    DataClient client = clients.get(k);
-                                    if (client==null ) continue;
-                                    client.receive(samp,offset+j);
-                                }
-                            } 
+                        int offset = sample.getOffset(var);
+                        Set<DataClient> varClients = _varToClients.get(var);
+                        if (varClients == null) continue;
+                        Iterator<DataClient> itr = varClients.iterator();
+                        while (itr.hasNext()) {
+                            DataClient client = itr.next();
+                            client.receive(samp,offset);
                         }   
                     }
                 }
             } //forloop
             _bf.rewind();
         }
-        _udpf.closeSocket();
-        Util.prtDbg("dataTh-run()--endof-data-loop");
+        _dsocket.close();
+        // Util.prtDbg("dataTh-run()--endof-data-loop");
     }
-    
-    private void reconnect() {
-        if (_rc==null ) {
-            if ( _sbc!=null) _sbc.receive("_reconneciton-client is null ", 10);
-            return;
-        }
-        if (_sbc!=null) _sbc.receive("No data from the data feed. Reconnecting...", -1);
-        _rc.setReconnect();
-        _udpf.closeSocket();
-    }
-
-}//class
+}

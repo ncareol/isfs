@@ -2,6 +2,7 @@ package edu.ucar.nidas.apps.cockpit.ui;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Collections;
 
 import com.trolltech.qt.core.Qt;
 import com.trolltech.qt.gui.QAbstractItemView;
@@ -22,7 +23,7 @@ import com.trolltech.qt.gui.QVBoxLayout;
 import edu.ucar.nidas.model.Var;
 
 
-public class VarLookup extends QDialog{
+public class VarLookup extends QDialog {
 
     /**
      * The dialog that provides users with UI interface to 
@@ -45,35 +46,36 @@ public class VarLookup extends QDialog{
      */
     private List<Var> _selvars = new ArrayList<Var>(); 
 
-    //variables for class use only
-    //private List<QTableWidgetItem> _nameItems = new ArrayList<QTableWidgetItem>();
-    //private List<QTableWidgetItem> _statusItems = new ArrayList<QTableWidgetItem>();
-    private List<Integer>         _selectedIdxs = new ArrayList<Integer>();
+    private List<Integer> _selectedIdxs = new ArrayList<Integer>();
     private QTableWidget _tbl;
-    private QTextEdit    _tedit;
-    private QBrush _pgreen=new QBrush( QColor.green);
-    private QBrush _pblack=new QBrush( QColor.black);
-    private String yesstr= "Y";
-    private String nostr="N";
-    private CockPit _cpit;
-    private UIUtil                 _uU          = new UIUtil();
+    private QTextEdit _tedit;
+    private QBrush _pgreen = new QBrush(new QColor(Qt.GlobalColor.green));
+    private QBrush _pblack = new QBrush(new QColor(Qt.GlobalColor.black));
+    private String yesstr = "Y";
+    private String nostr = "N";
+    private Cockpit _cpit = null;
 
-
-    public VarLookup(QFrame owner, CockPit p, List<Var> vars) {
+    public VarLookup(Cockpit cpit)
+    {
+        _cpit = cpit;
         setModal(true);
-        _vars = _uU.getSortedVars(vars);
-        _cpit = p;
+
+        _vars.addAll(cpit.getVars());
+        Collections.sort(_vars, Var.NAME_ORDER);
+
         //create the UI-components
         createComp();
         if (_tbl == null) close();
         populateTbl();
-        _tbl.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows);
-        _tbl.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection);
+        _tbl.setSelectionBehavior(
+                QAbstractItemView.SelectionBehavior.SelectRows);
+        _tbl.setSelectionMode(
+                QAbstractItemView.SelectionMode.MultiSelection);
         _tbl.setMinimumSize(390, 350);
         _tbl.setColumnWidth(0, 250);
         _tbl.setColumnWidth(1, 70);
         List<String> title = new ArrayList<String>();
-        title.add(" Varaibles");
+        title.add(" Variables");
         title.add(" Status");        
         _tbl.setHorizontalHeaderLabels(title);
     }
@@ -96,9 +98,9 @@ public class VarLookup extends QDialog{
         QFrame frm = new QFrame();
         QHBoxLayout hl = new QHBoxLayout();
         hl.setMargin(0);
-        _tedit= new QTextEdit();
+        _tedit = new QTextEdit();
         _tedit.setMaximumSize(120, 30);
-        QPalette pl=new QPalette( QColor.green);
+        QPalette pl = new QPalette(Qt.GlobalColor.green);
         _tedit.setPalette(pl);
         _tedit.setLineWrapColumnOrWidth(200);
         _tedit.textChanged.connect(this, "searchBegin()");
@@ -117,10 +119,10 @@ public class VarLookup extends QDialog{
         // add all/deselectall
         frm = new QFrame();
         hl = new QHBoxLayout();
-        pb= new QPushButton("SelectAll");
+        pb = new QPushButton("SelectAll");
         pb.clicked.connect(this, "selectAll()");
         hl.addWidget(pb);
-        pb= new QPushButton("DeselectAll");
+        pb = new QPushButton("DeselectAll");
         pb.clicked.connect(this, "deselectAll()");
         hl.addWidget(pb);
         frm.setLayout(hl);
@@ -138,10 +140,10 @@ public class VarLookup extends QDialog{
         //add ok /cancel
         frm = new QFrame();
         hl = new QHBoxLayout();
-        pb= new QPushButton("    Ok    ");
+        pb = new QPushButton("    Ok    ");
         pb.clicked.connect(this, "pressOk()");
         hl.addWidget(pb);
-        pb= new QPushButton("Cancel");
+        pb = new QPushButton("Cancel");
         pb.clicked.connect(this, "pressCancel()");
         hl.addWidget(pb);
         frm.setLayout(hl);
@@ -161,14 +163,16 @@ public class VarLookup extends QDialog{
 
     }
 
-    private void populateTbl(){
+    private void populateTbl()
+    {
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
         _tbl.clear();
+        _selectedIdxs.clear();
         int len = _vars.size();
         _tbl.setRowCount(len);
-        for (int i=0; i<len; i++) {
+        for (int i = 0; i < len; i++) {
             Var var = _vars.get(i);
-            String name= var.getName();
+            String name = var.getName();
             QTableWidgetItem ti = new QTableWidgetItem(nostr);
             ti.setTextAlignment(0x0004|0x0008);
             _tbl.setItem(i,0,new QTableWidgetItem(name));
@@ -178,20 +182,21 @@ public class VarLookup extends QDialog{
         setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
     }
 
-    private void populateStatusTbl() {
+    private void populateStatusTbl()
+    {
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
-        int len = _tbl.rowCount(); _selectedIdxs.clear();
-        for (int i=1; i<=len; i++) {
+        int len = _tbl.rowCount();
+        // Should this be done? _selectedIdxs.clear();
+        for (int i = 1; i <= len; i++) {
             _tbl.setRowHidden(i,false);
             _selectedIdxs.add(new Integer(i));
         }
         setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
     }
 
-
     private void pressCancel() {
         _tbl.clear();
-        _selvars=null;
+        _selvars = null;
         close();
     }
 
@@ -199,13 +204,13 @@ public class VarLookup extends QDialog{
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
         _selvars.clear();
         int len = _tbl.rowCount();
-        for (int i=0; i<len; i++) {
+        for (int i = 0; i < len; i++) {
             if (_tbl.item(i,1).text().equals(yesstr))  {
                 _selvars.add(_vars.get(i));
             }
         }
         if (_selvars.size()> 0){
-            _cpit._centWidget.addNewPage(_selvars, _selvars.get(0).getName());
+            _cpit.getCentWidget().addGaugePage(_selvars, _selvars.get(0).getName());
         }
         close();
         setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
@@ -214,9 +219,9 @@ public class VarLookup extends QDialog{
     private void selectAll() {
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
         int len = _tbl.rowCount();
-        for (int i=0; i<len; i++) {
-            QTableWidgetItem item= _tbl.item(i,1);
-            if (item==null) return;
+        for (int i = 0; i < len; i++) {
+            QTableWidgetItem item = _tbl.item(i,1);
+            if (item == null) return;
             if (!_selectedIdxs.contains(new Integer(i))) continue;
             item.setText(yesstr);
             item.setForeground(_pgreen);
@@ -227,9 +232,9 @@ public class VarLookup extends QDialog{
     private void deselectAll() {
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
         int len = _tbl.rowCount();
-        for (int i=0; i<len; i++) {
-            QTableWidgetItem item= _tbl.item(i,1);
-            if (item==null) return;
+        for (int i = 0; i < len; i++) {
+            QTableWidgetItem item = _tbl.item(i,1);
+            if (item == null) return;
             if (!_selectedIdxs.contains(new Integer(i))) continue;
             item.setText(nostr);
             item.setForeground(_pblack);
@@ -247,7 +252,7 @@ public class VarLookup extends QDialog{
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
         _selectedIdxs.clear();
         int len = _vars.size();
-        for (int i =0; i<len; i++ ) {
+        for (int i =0; i < len; i++ ) {
             String vname = _vars.get(i).getName();
             if (vname.length()<str.length()) {
                 _tbl.setRowHidden(i,true );
@@ -267,9 +272,9 @@ public class VarLookup extends QDialog{
     private void toggleSelection() {
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
         int len = _tbl.rowCount();
-        for (int i =0; i<len; i++ ) {
-            QTableWidgetItem item= _tbl.item(i,1);
-            if (item==null) return;
+        for (int i =0; i < len; i++ ) {
+            QTableWidgetItem item = _tbl.item(i,1);
+            if (item == null) return;
             if (item.isSelected() && _selectedIdxs.contains(new Integer(i))) {
                 if (item.text().equals(yesstr) ) {
                     item.setText(nostr);
@@ -283,4 +288,4 @@ public class VarLookup extends QDialog{
         }
         setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
     }
-} // eof-class
+}

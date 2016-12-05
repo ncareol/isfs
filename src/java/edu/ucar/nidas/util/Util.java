@@ -10,7 +10,7 @@ import com.trolltech.qt.gui.QMessageBox;
 import com.trolltech.qt.gui.QWidget;
 import com.trolltech.qt.gui.QMessageBox.StandardButton;
 
-import edu.ucar.nidas.ui.TextClient;
+import edu.ucar.nidas.ui.TextStatus;
 
 /**
  * Utility class for printing, and exception handling 
@@ -46,7 +46,7 @@ public class Util {
     /**
      * conn-debug-display
      */
-    public  static TextClient _txClient;
+    public  static TextStatus _txClient;
 
     //private ServLookup.
 
@@ -131,7 +131,7 @@ public class Util {
     public static void addDbgMsg(String msg) {
         if (_txClient!=null){
             synchronized (_txClient) {       
-                if (_txClient!=null) _txClient.receive(msg);
+                if (_txClient!=null) _txClient.show(msg);
             }
         }
 
@@ -142,8 +142,10 @@ public class Util {
             if (fwtr==null) return;
             fwtr.append(msg+"\n");
             fwtr.flush();
-        } catch (Exception e){		System.out.println("Filewriter appending exception...");}
-
+        }
+        catch (Exception e) {
+            System.out.println("Filewriter appending exception...");
+        }
     }
 
     private static void createFileWriter(){

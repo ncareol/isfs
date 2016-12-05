@@ -2,6 +2,7 @@ package edu.ucar.nidas.apps.cockpit.ui;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Collections;
 
 import com.trolltech.qt.core.Qt;
 import com.trolltech.qt.gui.QAbstractItemView;
@@ -44,32 +45,37 @@ public class HtLookup extends QDialog {
     private List<Var>              _selvars     = new ArrayList<Var>();
 
     // variables for class use only
-    private List<Integer>         _selectedIdxs = new ArrayList<Integer>();
-    private QTableWidget           _tbl;
-    private QTextEdit              _tedit;
-    private QBrush                 _pgreen      = new QBrush(QColor.green);
-    private QBrush                 _pblack      = new QBrush(QColor.black);
-    private String                 yesstr       = "Y";
-    private String                 nostr        = "N";
-    private CockPit                _cpit;
-    private UIUtil                 _uU          = new UIUtil();
+    private List<Integer> _selectedIdxs = new ArrayList<Integer>();
+    private QTableWidget _tbl;
+    private QTextEdit _tedit;
+    private QBrush _pgreen = new QBrush(new QColor(Qt.GlobalColor.green));
+    private QBrush _pblack = new QBrush(new QColor(Qt.GlobalColor.black));
+    private String yesstr = "Y";
+    private String nostr = "N";
+    private Cockpit _cpit;
 
-    public HtLookup(QFrame owner, CockPit p, List<Var> vars) {
+    public HtLookup(Cockpit cpit)
+    {
+        _cpit = cpit;
         setModal(true);
-        _cpit = p;
-        _vars = _uU.getSortedVarsByHeight(vars);
-        // create the UI-components
+
+        _vars.addAll(cpit.getVars());
+        Collections.sort(_vars, Var.HEIGHT_ORDER);
+
+        //create the UI-components
         createComp();
         if (_tbl == null) close();
         populateTbl();
-        _tbl.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows);
-        _tbl.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection);
+        _tbl.setSelectionBehavior(
+                QAbstractItemView.SelectionBehavior.SelectRows);
+        _tbl.setSelectionMode(
+                QAbstractItemView.SelectionMode.MultiSelection);
         _tbl.setMinimumSize(390, 350);
         _tbl.setColumnWidth(0, 250);
         _tbl.setColumnWidth(1, 70);
         List<String> title = new ArrayList<String>();
-        title.add(" Varaibles");
-        title.add(" Status");
+        title.add(" Variables");
+        title.add(" Status");        
         _tbl.setHorizontalHeaderLabels(title);
     }
 
@@ -93,7 +99,7 @@ public class HtLookup extends QDialog {
         hl.setMargin(0);
         _tedit = new QTextEdit();
         _tedit.setMaximumSize(120, 30);
-        QPalette pl = new QPalette(QColor.green);
+        QPalette pl = new QPalette(Qt.GlobalColor.green);
         _tedit.setPalette(pl);
         _tedit.setLineWrapColumnOrWidth(200);
         _tedit.textChanged.connect(this, "searchBegin()");
@@ -199,7 +205,7 @@ public class HtLookup extends QDialog {
             }
         }
         if (_selvars.size() > 0) {
-            _cpit._centWidget.addNewPage(_selvars,  _selvars.get(0).getName());
+            _cpit.getCentWidget().addGaugePage(_selvars, _selvars.get(0).getName());
         }
         close();
         setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
@@ -288,9 +294,6 @@ public class HtLookup extends QDialog {
         }
         setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
     }
-
-
-
-} // eof-class
+}
 
 
