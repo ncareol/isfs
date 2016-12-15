@@ -25,6 +25,8 @@ import com.trolltech.qt.gui.QMouseEvent;
 import com.trolltech.qt.gui.QStackedLayout;
 import com.trolltech.qt.gui.QTabWidget;
 import com.trolltech.qt.gui.QSizePolicy.Policy;
+import com.trolltech.qt.gui.QMessageBox;
+import com.trolltech.qt.gui.QMessageBox.StandardButton;
 
 import edu.ucar.nidas.apps.cockpit.model.CockpitConfig;
 // import edu.ucar.nidas.apps.cockpit.model.UserConfig;
@@ -35,7 +37,7 @@ import edu.ucar.nidas.model.Dsm;
 import edu.ucar.nidas.model.Sample;
 import edu.ucar.nidas.model.Var;
 import edu.ucar.nidas.model.DataSource;
-import edu.ucar.nidas.util.Util;
+import edu.ucar.nidas.model.Log;
 /**
  * This class is the center tab-widget which controls all the tab-gauge-pages
  * It tracks the current tabs and mediate between the cockpit main with the other gauge-pages
@@ -50,6 +52,8 @@ public class CentTabWidget extends QTabWidget {
      * Reference to Cockpit.
      */
     private Cockpit _cockpit = null;
+
+    private Log _log;
 
     /**
      * GaugePages by name
@@ -82,11 +86,17 @@ public class CentTabWidget extends QTabWidget {
     /***********************************************/
     public CentTabWidget(Cockpit p) {
         _cockpit = p;
+        _log = _cockpit.getLog();
         connectSlotsByName();
         // setLayout(_stacked);
         currentChanged.connect(this, "pageChanged()");  
         _cycleTm = new QTimer();
         _cycleTm.timeout.connect(this, "cycleTimeout()");
+    }
+
+    public Log getLog()
+    {
+        return _log;
     }
 
     /**
@@ -259,7 +269,9 @@ public class CentTabWidget extends QTabWidget {
      */
     public void cleanupHistory()
     {
-        if (Util.confirmMsgBox("All plot history will be lost", "Clean History")== Util.RetAbort ) return;
+        if (_cockpit.confirmMessageBox(
+            "All plot history will be lost", "Clean History") ==
+            StandardButton.Abort.value()) return;
         getCurrentGaugePage().cleanupHistory();
     }
     /**
@@ -267,7 +279,9 @@ public class CentTabWidget extends QTabWidget {
      */
     public void gcleanupHistory()
     {
-        if (Util.confirmMsgBox("All plot history will be lost", "Clean History")== Util.RetAbort ) return;
+        if (_cockpit.confirmMessageBox(
+            "All plot history will be lost", "Clean History") ==
+            StandardButton.Abort.value()) return;
         for (GaugePage gp : _gaugePageByName.values()) {
             gp.cleanupHistory();
         }
@@ -312,7 +326,9 @@ public class CentTabWidget extends QTabWidget {
      * Color the history image of each plot in the active page with new color  
      */
     public void colorHistory() {
-        if (Util.confirmMsgBox("All plot history will be lost", "Color History")== Util.RetAbort ) return;
+        if (_cockpit.confirmMessageBox(
+            "All plot history will be lost", "Color History") ==
+            StandardButton.Abort.value()) return;
         QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getHColor());
         if (c.value()==0) return;
         getCurrentGaugePage().colorHistory(c);
@@ -322,7 +338,9 @@ public class CentTabWidget extends QTabWidget {
      * Color the history image of each plot in the active page with new color  
      */
     public void gcolorHistory() {
-        if (Util.confirmMsgBox("All plot history will be lost", "Color History")== Util.RetAbort ) return;
+        if (_cockpit.confirmMessageBox(
+            "All plot history will be lost", "Color History") ==
+            StandardButton.Abort.value()) return;
         QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getHColor());
         if (c.value()==0) return;
         for (GaugePage gp : _gaugePageByName.values()) {
@@ -334,7 +352,9 @@ public class CentTabWidget extends QTabWidget {
      * Color the back-ground of each plot in the active page with new color  
      */
     public void colorBackGround() {
-        if (Util.confirmMsgBox("All plot history will be lost", "Color Background")== Util.RetAbort) return;
+        if (_cockpit.confirmMessageBox(
+            "All plot history will be lost", "Color Background") ==
+            StandardButton.Abort.value()) return;
         QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getBGColor());
         if (c.value()==0) return;
         getCurrentGaugePage().colorBackGround(c); 
@@ -344,7 +364,9 @@ public class CentTabWidget extends QTabWidget {
      * Color the back-ground of each plot in all pages with new color  
      */
     public void gcolorBackGround() {
-        if (Util.confirmMsgBox("All plot history will be lost", "Color Background")== Util.RetAbort) return;
+        if (_cockpit.confirmMessageBox(
+            "All plot history will be lost", "Color Background") ==
+            StandardButton.Abort.value()) return;
         QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getBGColor());
         if (c.value()==0) return;
         for (GaugePage gp : _gaugePageByName.values()) {
@@ -356,16 +378,19 @@ public class CentTabWidget extends QTabWidget {
      * change the gauge-time-span-x_axis for every gauge page and its plots 
      * set the time-range in milli-second in x_axis
      */
-    public void changePlotTimeMSec () {
-        if (Util.confirmMsgBox("All plot history will be lost", "Change time span")== Util.RetAbort) return;
+    public void changePlotWidthMsec()
+    {
+        if (_cockpit.confirmMessageBox(
+            "All plot history will be lost", "Change time span") ==
+            StandardButton.Abort.value()) return;
 
-        int oldtm= getCurrentGaugePage().getGaugeTimeMSec();
-        NewTimeMSec tmDlg = new NewTimeMSec(null, oldtm);
-        int newtm = tmDlg.getNewTimeMSec();
-        if (newtm <= 0 || oldtm == newtm) return;
+        int oldw = getCurrentGaugePage().getPlotWidthMsec();
+        int neww = QInputDialog.getInt(this,"Plot Width",
+                "Width of plot (seconds)",
+                oldw / 1000,60,3600,60) * 1000;
 
         for (GaugePage gp : _gaugePageByName.values()) {
-            gp.setGaugeTimeMSec(newtm);
+            gp.setPlotWidthMsec(neww);
         }
     }
 
@@ -373,35 +398,36 @@ public class CentTabWidget extends QTabWidget {
      * change the gauge-time-span-x_axis for the current gauge page and its plots 
      * set the time-range in milli-second in x_axis
      */
-    public void changeSinglePlotTimeMSec () {
-        if (Util.confirmMsgBox("All plot history will be lost", "Change time span")== Util.RetAbort) return;
+    public void changeSinglePlotWidthMsec()
+    {
+        if (_cockpit.confirmMessageBox(
+            "All plot history will be lost", "Change time span") ==
+            StandardButton.Abort.value()) return;
 
-        int oldtm= getCurrentGaugePage().getGaugeTimeMSec();
-        NewTimeMSec tmDlg = new NewTimeMSec(this, oldtm);
-        int newtm = tmDlg.getNewTimeMSec();
-        if (newtm <= 0 || oldtm == newtm) return;
-        getCurrentGaugePage().setGaugeTimeMSec(newtm);
+        int oldw = getCurrentGaugePage().getPlotWidthMsec();
+        int neww = QInputDialog.getInt(this,"Plot Width",
+                "Width of plot (seconds)",
+                oldw / 1000,60,3600,60) * 1000;
+        getCurrentGaugePage().setPlotWidthMsec(neww);
     }
 
-    public void setNodataTimeout() {
-
-        int oldtm= getCurrentGaugePage().getGaugeNoDataTmout();
-        NoDataTimeout tmDlg = new NoDataTimeout(this, oldtm);
-        int newtm = tmDlg.getNewTimeSec();
-        if (newtm <= 0 || oldtm == newtm) return;
+    public void setDataTimeout()
+    {
+        int timeout = QInputDialog.getInt(this,"Data Timeout",
+                "Seconds",600,0,3600);
 
         for (GaugePage gp : _gaugePageByName.values()) {
-            gp.setGaugeNoDataTimeout(newtm);
+            gp.setDataTimeout(timeout);
         }
     }
 
-    public void setSingleNodataTimeout() {
-
-        int oldtm= getCurrentGaugePage().getGaugeNoDataTmout();
-        NoDataTimeout tmDlg = new NoDataTimeout(null, oldtm);
-        int newtm = tmDlg.getNewTimeSec();
-        if (newtm <= 0 || oldtm == newtm) return;
-        getCurrentGaugePage().setGaugeNoDataTimeout(newtm);
+    public void setSingleDataTimeout()
+    {
+        int oldtm = getCurrentGaugePage().getDataTimeout();
+        Integer timeout = QInputDialog.getInt(this,"Data Timeout",
+                "Seconds",600,0,3600);
+        if (timeout <= 0 || oldtm == timeout) return;
+        getCurrentGaugePage().setDataTimeout(timeout);
     }
 
     public void pageChanged()
@@ -439,7 +465,7 @@ public class CentTabWidget extends QTabWidget {
         RescaleDialog rd = new RescaleDialog( g._ymax, g._ymin, geometry().width()/3, geometry().height()/3) ;
         if (!rd.getOk())  return;
         if (rd.getMax() <=rd.getMin()) {
-            Util.prtErr("Y-axis-Max is smaller than Y-axis-Min");
+            _cockpit.logError("Y-axis-Max is smaller than Y-axis-Min");
             return;
         }
 
@@ -458,22 +484,21 @@ public class CentTabWidget extends QTabWidget {
             String tx = at.text();
             if (tx.equals("AutoCycleTabs")) {
                 at.setText("StopCycleTabs");
-                NoDataTimeout tmDlg = new NoDataTimeout(null, 10);
-                tmDlg.setWindowTitle("Enter Prefered Cycle Time");
-                _cycleInt = tmDlg.getNewTimeSec();
-                if (_cycleInt <= 0 ) return;
-                _cycleTm.start(_cycleInt*1000); 
-                status("Auto_cycle_tabs every "+ _cycleInt+ " seconds", -1);
+                _cycleInt = QInputDialog.getInt(this,"Tab Cycle Time",
+                        "Seconds",_cycleInt,0,3600);
+                _cycleTm.start(_cycleInt * 1000); 
+                status("Cycle tabs every " + _cycleInt + " seconds", -1);
             } else {
                 at.setText("AutoCycleTabs");
                 _cycleTm.stop();
-                status("Stop_cycle_tabs", 10000);
+                status("Stop cycle tabs", 10000);
             }
         }
     }
 
 
-    private void renamePage(){
+    private void renamePage()
+    {
         String text = QInputDialog.getText(this,
                 "Get Page Name", "Enter a new name:", QLineEdit.EchoMode.Normal,"");
         if ( text!=null  ) {
@@ -558,8 +583,8 @@ public class CentTabWidget extends QTabWidget {
                         if (!g.getBGColor().equals(new QColor(gc.getBGColor()))) {
                             g._noDataPaint = false; g.setBGColor(new QColor(gc.getBGColor()));
                         }
-                        if (gc.getNoDataTm() != g.getNoDataTmout()) g.setNoDataTmout(gc.getNoDataTm());
-                        if (gc.getplotTmRange() != g.getGaugeTimeMSec()) g.setNewTimeMSec(gc.getplotTmRange());
+                        if (gc.getDataTimeout() != g.getDataTimeout()) g.setDataTimeout(gc.getDataTimeout());
+                        if (gc.getPlotWidthMsec() != g.getWidthMsec()) g.setWidthMsec(gc.getPlotWidthMsec());
                         DataSource ds = _cockpit.getDataSource(var);
                         ds.addClient(g);
                     }

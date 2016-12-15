@@ -3,63 +3,84 @@ package edu.ucar.nidas.ui;
 import edu.ucar.nidas.model.StatusDisplay;
 
 import com.trolltech.qt.gui.QApplication;
+import com.trolltech.qt.gui.QMainWindow;
 import com.trolltech.qt.gui.QStatusBar;
+
+import java.util.ArrayList;
 
 /**
  * This class acts as a status's client to receive messages,
  * and implements a QT thread to invoke the cockpit-UI for display  
  * @author dongl
  *
- * Not sure why a separate thread is needed... GDM
- *
+/**
+ * Class supporting writes to the QMainWindow QStatusBar
+ * from non-GUI threads.
  */
-public class StatusBar implements StatusDisplay, Runnable
-{
-    private QStatusBar _sb = null; 
-    String _str;
-    int    _ms;
-   
-    public StatusBar(QStatusBar sb)
-    {
-        _sb=sb;
-    }
+public class StatusBar implements StatusDisplay {
 
-    /**
-     * receive a new debug_message
-     */
-    public void show(String str, int ms)
+    private class StatusCache
     {
-        synchronized(this)
+        String msg;
+        int msec;
+        public StatusCache(String m, int ms)
         {
-            _str = str;
-            _ms = ms;
+            msg = m;
+            msec = ms;
         }
-        QApplication.invokeLater(this);
     }
 
-    /**
-     * receive a new debug_message
-     */
-    public void show(String str)
+    private ArrayList<StatusCache> _messageCache =
+        new ArrayList<StatusCache>();
+
+    private QStatusBar _statusbar;
+
+    private class StatusRunnable implements Runnable
     {
-        synchronized(this) {
-            _str = str;
-            _ms = -1;
+        @Override
+        public void run()
+        {
+            ArrayList<StatusCache> messageCache;
+            synchronized(_messageCache) {
+                messageCache =
+                    new ArrayList<StatusCache>(_messageCache);
+                _messageCache.clear();
+            }
+            for (StatusCache msg : messageCache) {
+                _statusbar.showMessage(msg.msg, msg.msec);
+            }
         }
-        QApplication.invokeLater(this);
     }
 
-    /**
-     * This Qa update;
-     */
-    public void run() 
+    public StatusBar(QMainWindow main) 
     {
-        synchronized(this) {
-            if (_str==null) return;
-            if (_ms > 0) _sb.showMessage(_str,_ms);
-            else _sb.showMessage(_str);
-            _str=null;
-        }
+        _statusbar = main.statusBar();
     }
 
+    @Override
+    public void show(String msg, int msec)
+    {
+        synchronized(_messageCache) {
+            _messageCache.add(new StatusCache(msg,msec));
+        }
+        QApplication.invokeLater(new StatusRunnable());
+    }
+
+    @Override
+    public void show(String msg)
+    {
+        synchronized(_messageCache) {
+            _messageCache.add(new StatusCache(msg,0));
+        }
+        QApplication.invokeLater(new StatusRunnable());
+    }
+
+    public void close()
+    {
+        synchronized(_messageCache) {
+            _messageCache.clear();
+        }
+        _statusbar.close();
+    }
 }
+

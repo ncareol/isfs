@@ -27,13 +27,10 @@ import edu.ucar.nidas.apps.cockpit.model.MinMaxer;
 import edu.ucar.nidas.model.Dsm;
 import edu.ucar.nidas.model.Sample;
 import edu.ucar.nidas.model.Var;
-import edu.ucar.nidas.util.Util;
+import edu.ucar.nidas.model.Log;
 
 /**
- * this is the main program of cockpit.
- * It contains a mainWindow ui instance,
- * an array of gauges.
- * and a timer
+ * A page of Cockpit Gauges.
  * 
  * @author dongl
  *
@@ -86,7 +83,7 @@ public class GaugePage extends QWidget {
     /**
      * plot-nodata-timeout,default is 10 minutes
      */
-    int _gaugeNoDataTmout = 600; 
+    int _dataTimeout = 600; 
 
     HashMap<String, Gauge> _gaugesByName = new HashMap<String,Gauge>();
 
@@ -94,12 +91,15 @@ public class GaugePage extends QWidget {
 
     CentTabWidget _centTabWidget = null;
 
+    private Log _log;
+
     /**
      *  constructor.
      */	
     public GaugePage(CentTabWidget p, String name)
     {
         super.setParent(p);
+        _log = p.getLog();
         _centTabWidget = p;
         _name = name;
 
@@ -150,6 +150,11 @@ public class GaugePage extends QWidget {
         _gaugePolicy.setHeightForWidth(true);
         _ncols = calcGaugeColumns();
         System.out.printf("ncols=%d\n",_ncols);
+    }
+
+    public Log getLog()
+    {
+        return _log;
     }
 
     /**
@@ -227,12 +232,12 @@ public class GaugePage extends QWidget {
      * set the new time-width-in-milli-seconds
      * @param msec
      */
-    public void setGaugeTimeMSec(int msec) {
+    public void setPlotWidthMsec(int msec) {
         if (msec != _gaugeWidthMsec)
         {
             _gaugeWidthMsec = msec;
             for (Gauge gauge : _gauges) {
-                gauge.setNewTimeMSec(msec);
+                gauge.setWidthMsec(msec);
             }
         }
     }
@@ -241,27 +246,29 @@ public class GaugePage extends QWidget {
      * get the time-width-in-milli-seconds
      * @return
      */
-    public int getGaugeTimeMSec() {
+    public int getPlotWidthMsec()
+    {
         return _gaugeWidthMsec;
     }
 
     /**
      * get reduction period
      */
-    public int getReductionPeriod() {
+    public int getReductionPeriod()
+    {
         return _reductionPeriod;
     }
 
     /**
-     * set the new time-width-in-milli-seconds
+     * Set the data timeout in seconds.
      * @param msec
      */
-    public void setGaugeNoDataTimeout(int sec) {
-        if (sec != _gaugeNoDataTmout)
+    public void setDataTimeout(int sec) {
+        if (sec != _dataTimeout)
         {
-            _gaugeNoDataTmout = sec;
+            _dataTimeout = sec;
             for (Gauge gauge : _gauges) {
-                gauge.setNoDataTmout(sec);
+                gauge.setDataTimeout(sec);
             }
         }
     }
@@ -270,9 +277,9 @@ public class GaugePage extends QWidget {
      * get the time-width-in-milli-seconds
      * @return
      */
-    public int getGaugeNoDataTmout()
+    public int getDataTimeout()
     {
-        return _gaugeNoDataTmout;
+        return _dataTimeout;
     }
 
     /**
@@ -523,7 +530,8 @@ public class GaugePage extends QWidget {
     private void renamePage(){
         boolean ok;
         String text = QInputDialog.getText(this,
-                "Get Page Name", "Enter a new name:", QLineEdit.EchoMode.Normal,"");
+                "Get Page Name", "Enter a new name:",
+                QLineEdit.EchoMode.Normal,"");
         if ( text!=null  ) {
             setWindowTitle(text);  // user entered something and pressed OK
         } 

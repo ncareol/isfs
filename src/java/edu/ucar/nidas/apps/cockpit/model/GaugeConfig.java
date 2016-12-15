@@ -30,9 +30,9 @@ public class GaugeConfig {
 
     float _min;
 
-    int _noDataTm;
+    int _dataTimeout;
 
-    int _plotTmRange;
+    int _plotWidthMsec;
 
     int _ccolor;
 
@@ -42,13 +42,13 @@ public class GaugeConfig {
 
     public GaugeConfig(String name,
             float min, float max,
-            int dtm, int ptm,  int c,  int h, int b )
+            int timeout, int widthMsec,  int c,  int h, int b )
     {
         _name = name;
         _min = min;
         _max = max;
-        _noDataTm = dtm;
-        _plotTmRange = ptm;
+        _dataTimeout = timeout;
+        _plotWidthMsec = widthMsec;
         _ccolor = c;
         _hcolor= h;
         _bgcolor = b;
@@ -65,10 +65,10 @@ public class GaugeConfig {
         if (value!=null && value.length()>0) _max = (Float.valueOf(value).floatValue());
         value = getValue(n, "min");
         if (value!=null && value.length()>0) _min = (Float.valueOf(value).floatValue());
-        value = getValue(n, "noDataTm");
-        if (value!=null && value.length()>0) _noDataTm = (Integer.valueOf(value).intValue());
-        value = getValue(n, "plotTmRange");
-        if (value!=null && value.length()>0) _plotTmRange = (Integer.valueOf(value).intValue());
+        value = getValue(n, "dataTimeout");
+        if (value!=null && value.length()>0) _dataTimeout = (Integer.valueOf(value).intValue());
+        value = getValue(n, "plotWidthMsec");
+        if (value!=null && value.length()>0) _plotWidthMsec = (Integer.valueOf(value).intValue());
         value = getValue(n, "ccolor");
         if (value!=null && value.length()>0) _ccolor = (Integer.valueOf(value).intValue());  
         value = getValue(n, "hcolor");
@@ -77,64 +77,77 @@ public class GaugeConfig {
         if (value!=null && value.length()>0) _bgcolor = (Integer.valueOf(value).intValue()); 
     }
 
-    public String getName() {
+    public String getName()
+    {
         return _name;
     }
 
-    public int getCColor() {
+    public int getCColor()
+    {
         return _ccolor;
     }
 
-    public int getHColor() {
+    public int getHColor()
+    {
         return _hcolor;
     }
 
-    public int getBGColor() {
+    public int getBGColor()
+    {
         return _bgcolor;
     }
 
-    public void setCColor(int color) {
-        _ccolor = color;
+    public void setCColor(int val)
+    {
+        _ccolor = val;
     }
 
-    public void setHColor(int color) {
-        _hcolor = color;
+    public void setHColor(int val)
+    {
+        _hcolor = val;
     }
 
-    public void setBGColor(int color) {
-        _ccolor = color;
+    public void setBGColor(int val) 
+    {
+        _ccolor = val;
     }
 
-    public void setMin(int min){
-        _min=min;
+    public void setMin(int val)
+    {
+        _min = val;
     }
 
-    public float getMin(){
+    public float getMin()
+    {
         return _min;
     }
 
-    public void setMax(int m){
-        _max=m;
+    public void setMax(int val)
+    {
+        _max = val;
     }
 
-    public float getMax(){
+    public float getMax()
+    {
         return _max;
     }
 
-    public void setNoDataTm(int t){
-        _noDataTm=t;
+    public void setDataTimeout(int val)
+    {
+        _dataTimeout = val;
     }
 
-    public int getNoDataTm(){
-        return _noDataTm;
+    public int getDataTimeout()
+    {
+        return _dataTimeout;
     }
 
-    public void setPlottmRange(int tm){
-        _plotTmRange=tm;
+    public void setPlotWidthMsec(int tm){
+        _plotWidthMsec = tm;
     }
 
-    public int getplotTmRange(){
-        return _plotTmRange;
+    public int getPlotWidthMsec(){
+        return _plotWidthMsec;
     }
 
     public void toDOM(Document document, Element parent)
@@ -144,8 +157,8 @@ public class GaugeConfig {
         //    subem.setAttribute("cname", _cname);
         subem.setAttribute("max",  String.valueOf(_max));
         subem.setAttribute("min",  String.valueOf(_min));
-        subem.setAttribute("noDataTm", String.valueOf(_noDataTm));
-        subem.setAttribute("plotTmRange", String.valueOf(_plotTmRange));
+        subem.setAttribute("dataTimeout", String.valueOf(_dataTimeout));
+        subem.setAttribute("plotWidthMsec", String.valueOf(_plotWidthMsec));
         subem.setAttribute("ccolor", String.valueOf(_ccolor));
         subem.setAttribute("hcolor", String.valueOf(_hcolor));
         subem.setAttribute("bgcolor", String.valueOf(_bgcolor));
@@ -153,7 +166,7 @@ public class GaugeConfig {
     }
 
     private String getValue(Node n, String attr) {
-        Node nn=n.getAttributes().getNamedItem(attr);
+        Node nn = n.getAttributes().getNamedItem(attr);
         if (nn==null) return null;
         return nn.getNodeValue();
     }

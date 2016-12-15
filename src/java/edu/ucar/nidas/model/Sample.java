@@ -129,14 +129,11 @@ public class Sample
                 if (range ==null || range.length()<1) {
                     v.setMin(-10);
                     v.setMax(10);
-                    // Util.prtDbg("sample-walk-var: varname=" +varname+" range=null" );
                 } else {
-                    // Util.prtDbg("sample-walk-var: varname=" +varname+ " range="+ range);
                     float min = Float.valueOf(range.split(" ")[0].trim());
                     float max = Float.valueOf(range.split(" ")[1].trim());
                     v.setMin(Float.valueOf(range.split(" ")[0].trim()));
                     v.setMax(Float.valueOf(range.split(" ")[1].trim()));
-    //				Util.prtDbg("sample-walk-var: varname=" +varname+"  min="+min + "  max="+max );
                 }
                 site.add(v);
             }

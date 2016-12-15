@@ -118,7 +118,6 @@ public class UdpDataReaderThread extends Thread
      */
     public void run( )
     {
-        Util.prtDbg("dataTh-run()");
         
         // Now loop forever, waiting to receive packets and printing them.
         int retry = 0;
@@ -171,6 +170,5 @@ public class UdpDataReaderThread extends Thread
             _bf.rewind();
         }
         _dsocket.close();
-        // Util.prtDbg("dataTh-run()--endof-data-loop");
     }
 }

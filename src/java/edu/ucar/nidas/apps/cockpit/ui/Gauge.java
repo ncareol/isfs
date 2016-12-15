@@ -17,6 +17,7 @@ import com.trolltech.qt.core.QTimer;
 import com.trolltech.qt.core.Qt;
 import com.trolltech.qt.core.Qt.MouseButton;
 import com.trolltech.qt.gui.QColor;
+import com.trolltech.qt.gui.QInputDialog;
 import com.trolltech.qt.gui.QColorDialog;
 import com.trolltech.qt.gui.QFont;
 import com.trolltech.qt.gui.QMenu;
@@ -33,7 +34,7 @@ import com.trolltech.qt.gui.QSizePolicy.Policy;
 import edu.ucar.nidas.model.FloatSample;
 import edu.ucar.nidas.model.DataClient;
 import edu.ucar.nidas.model.Var;
-import edu.ucar.nidas.util.Util;
+import edu.ucar.nidas.model.Log;
 
 /**
  * Gauge class is a plot unit of cockpit.
@@ -70,7 +71,7 @@ public class Gauge extends QWidget implements DataClient
     /**
      * If it does not receive the data for the max-time-out, it will put no-data-image to the plot 
      */
-    int     _tmoutMax = 300; 
+    int     _timeoutSec = 300; 
     /**
      * represent the no-data-time-out
      */
@@ -202,6 +203,8 @@ public class Gauge extends QWidget implements DataClient
 
     static QColor _red = new QColor(Qt.GlobalColor.red);
 
+    private Log _log;
+
     /**
      * @param parent
      * @param w Initial widget width (pixels)
@@ -212,12 +215,12 @@ public class Gauge extends QWidget implements DataClient
     public Gauge(GaugePage p, QSize size, int gaugeWidthMsec, Var var) {
 
         _parent = p;
+        _log = p.getLog();
         _xmin = 0; //plot-start-tm-in-sec
         _xwidth = gaugeWidthMsec;  //in-milli-seconds
         _reductionTm = p.getReductionPeriod();
 
         setMinimumSize(size.width()/2,size.height()/2);
-
 
         resize(size);
 
@@ -239,9 +242,9 @@ public class Gauge extends QWidget implements DataClient
         _lastTm = System.currentTimeMillis();
         _tm = new QTimer();
         _tm.timeout.connect(this, "timeout()");
-        // wakeup more often than the _tmoutMax so that we
-        // detect a timeout quicker. 10th of the MaxTmout
-        int tmlen = (_tmoutMax*1000)/10;
+        // wakeup more often than the _timeoutSec so that we
+        // detect a timeout quicker. 10th of timeoutSec
+        int tmlen = (_timeoutSec*1000)/10;
         _tm.start(tmlen);
         /*
         System.out.printf("new Gauge %s: w=%d,h=%d\n",
@@ -291,7 +294,7 @@ public class Gauge extends QWidget implements DataClient
         }
     }
 
-    public void setNewTimeMSec(int msec)
+    public void setWidthMsec(int msec)
     {
         if (msec== _xwidth) return;
         synchronized(this) {
@@ -306,19 +309,20 @@ public class Gauge extends QWidget implements DataClient
         }
     }
 
-    public void setNoDataTmout() {
-        NoDataTimeout tmDlg = new NoDataTimeout(null,_tmoutMax);
-        int newtm = tmDlg.getNewTimeSec();
-        if (newtm<=0 || _tmoutMax == newtm) return;    
-        setNoDataTmout(newtm);
+    public void setDataTimeout()
+    {
+        int timeout = QInputDialog.getInt(this,"Data Timeout",
+                "Seconds",_timeoutSec,1,3600);
+        if (timeout <= 0 || _timeoutSec == timeout) return;    
+        setDataTimeout(timeout);
     }
 
-    public void setNoDataTmout(int sec) {
+    public void setDataTimeout(int sec) {
 
-        if (_tmoutMax == sec) return;
-        _tmoutMax = sec;
+        if (_timeoutSec == sec) return;
+        _timeoutSec = sec;
         _tm.stop();
-        _tm.start(sec*1000/6);
+        _tm.start(sec * 1000 / 6);
         _noDataPaint = false;
         _parent.repaint();
     }
@@ -501,7 +505,7 @@ public class Gauge extends QWidget implements DataClient
      */
     private void timeout() {
         long c = System.currentTimeMillis();
-        if ((c - _lastTm) / 1000 < _tmoutMax) return; 
+        if ((c - _lastTm) / 1000 < _timeoutSec) return; 
         _noDataPaint = true;
         repaint();
     }
@@ -547,7 +551,7 @@ public class Gauge extends QWidget implements DataClient
             QMenu scale = option.addMenu("Scale");
             scale.addAction("&ManuallyScale_Plot", this, "changeYMaxMin()");
             scale.addAction("&AutoScale_Plot", this, "forcedAutoScalePlot()");
-            option.addAction("SetNoDataTmout", this, "setNoDataTmout()");
+            option.addAction("SetData&Timeout", this, "setDataTimeout()");
             option.addAction("&AutoResize", this, "autoResize()");
             option.addAction("&DeletePlot", this, "deletePlot()");
             _xmouse= pEvent.globalX();
@@ -644,7 +648,7 @@ public class Gauge extends QWidget implements DataClient
         RescaleDialog rd = new RescaleDialog( _ymax, _ymin, _xmouse, _ymouse) ;
         if (!rd.getOk())  return;
         if (rd.getMax() <=rd.getMin()) {
-            Util.prtErr("Y-axis-Max is smaller than Y-axis-Min");
+            _log.error("Y-axis-Max is smaller than Y-axis-Min");
             return;
         }
 
@@ -961,15 +965,13 @@ public class Gauge extends QWidget implements DataClient
         return _ymin;
     }
 
-    //public void setNoDataTmout(float ymax) exists
+    //public void setDataTimeout(float ymax) exists
 
-    public int getNoDataTmout(){
-        return _tmoutMax;
+    public int getDataTimeout(){
+        return _timeoutSec;
     }
 
-    //public void setNewTimeMSec(int tm) exists
-
-    public int getGaugeTimeMSec()
+    public int getWidthMsec()
     {
         return _xwidth;
     }

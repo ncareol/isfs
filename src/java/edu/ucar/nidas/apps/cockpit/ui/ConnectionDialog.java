@@ -21,9 +21,6 @@ import com.trolltech.qt.gui.QVBoxLayout;
 
 import edu.ucar.nidas.core.UdpConnection;
 import edu.ucar.nidas.core.UdpConnInfo;
-import edu.ucar.nidas.ui.TextStatus;
-import edu.ucar.nidas.util.Util;
-
 
 /**
  * This class provides a UI interface for users to 
@@ -60,23 +57,34 @@ public class ConnectionDialog extends QDialog
 
     //diag-ui
     private QRadioButton _mcserv, _ucserv, _rb;
+
     private QPushButton _bcancel, _bok;
-    private QTextEdit _jtPort, _jtmName, _jtsName, _debugTe;
+
+    private QTextEdit _jtPort, _jtmName, _jtsName;
+
     private QComboBox _jc, _cbData;
+
     private QLabel _jlServData, _jlPort;
-    private QCheckBox _cbDetail;
-    private TextStatus _txClient;
+
+    private QCheckBox _connDebug;
+
+    private Cockpit _cockpit;
+
+    private boolean _debug = false;
 
     /**
      * The dialog that provides users with UI interface to perform selection and search of the data connection.
      * 
-     * @param owner
+     * @param cockpit
      * @param modal
      * @param cp
      * @param inputS
      */
-    public ConnectionDialog(QFrame owner, UdpConnection conn, String addr, int port)
+    public ConnectionDialog(Cockpit cockpit,
+            UdpConnection conn, String addr, int port)
     {
+        super(cockpit);
+        _cockpit = cockpit;
         _udpConnection = conn;
         _connAddr = addr;
         _unicastAddr = addr;
@@ -86,6 +94,11 @@ public class ConnectionDialog extends QDialog
 
         //create the UI-components
         createUI();
+    }
+
+    public boolean getDebug()
+    {
+        return _debug;
     }
 
     /**
@@ -221,15 +234,10 @@ public class ConnectionDialog extends QDialog
         mlayout.addItem(hlayout);
 
         //row-5 text-edit
-        _cbDetail = new QCheckBox("Display Connection Details");
-        _cbDetail.setChecked(false);
-        _cbDetail.clicked.connect(this, "connDetail()");
-        mlayout.addWidget(_cbDetail);
-        _debugTe = new QTextEdit();
-        //_debugTe.setGeometry(400,300,400,300);
-        _debugTe.hide();
-        mlayout.addWidget(_debugTe);
-        _txClient = new TextStatus(_debugTe);
+        _connDebug = new QCheckBox("Log connection debug messages");
+        _connDebug.setChecked(false);
+        _connDebug.clicked.connect(this, "connDebug()");
+        mlayout.addWidget(_connDebug);
 
         //row-last   --ok-cancel buttons
         hlayout = new QHBoxLayout();
@@ -249,14 +257,10 @@ public class ConnectionDialog extends QDialog
         exec();
     }
 
-    void connDetail() {
-        if (_cbDetail.isChecked()) {
-            _debugTe.show();
-            setGeometry(400,300,600,400);
-        } else {
-            _debugTe.hide();
-            setGeometry(400,300,400,300);
-        }
+    void connDebug()
+    {
+        _debug = _connDebug.isChecked();
+        if (_debug) _cockpit.showLog();
     }
 
     void multicastServerRadio()
@@ -276,40 +280,26 @@ public class ConnectionDialog extends QDialog
      * if it shows "Search", it looks up the potential servers
      * else, it join the multicast group if needed, and close the dialog
      */
-    void pressOk(){
+    void pressOk()
+    {
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
-        Util._txClient = _txClient;
         if (_bok.text().trim().equals("Search")) {
 
             search();
             if (_connections.size() == 1 ) {  //ONLY ONE- find it
                 _selectedConnection = _connections.get(0);
-                Util.prtDbg("only one _servIp= "+_selectedConnection.getServer());
-                Util._txClient = null;
                 close();
             }
         } else {
             _selectedConnection = _connections.get(_cbData.currentIndex());
-            Util._txClient = null;
             close();
         }
-        Util._txClient = null;
         setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
-
     }
 
     void pressCancel()
     {
         close();
-    }
-
-    void pressRb()
-    {
-        if (!_rb.isChecked()) {
-            Util.debugConnct = null;
-        } else {
-            Util.debugConnct +="Enable connection debug";
-        }
     }
 
     /**
@@ -319,21 +309,23 @@ public class ConnectionDialog extends QDialog
     private void search()
     {
 
-        int ttl = getTTL(); // unused
+        int ttl = getTTL();
 
         String addr = getAddress();
         int port = getPort();
 
         try {
-            _connections = _udpConnection.search(addr, port);
+            _connections = _udpConnection.search(addr, port, ttl,
+                    _cockpit.getLog(), _debug);
         }
         catch (IOException e) {
-            Util.prtException(e, "\n search() exception - ");
+            _cockpit.getLog().error("search: " + e.toString());
             return;
         }
 
         if (_connections == null || _connections.size()==0 ) {
-            Util.prtErr("No server found...");
+            _cockpit.getLog().error("search: No server found");
+            _cockpit.status("search: No server found");
             return;
         }
 

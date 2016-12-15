@@ -32,7 +32,7 @@ public class GaugePageConfig {
         for (Gauge gauge : gp.getGauges()) {
             GaugeConfig vui = new GaugeConfig(gauge.getName(),
                 gauge.getYMin(), gauge.getYMax(),
-                gauge.getNoDataTmout(), gauge.getGaugeTimeMSec(),
+                gauge.getDataTimeout(), gauge.getWidthMsec(),
                 gauge.getCColor().rgb(), gauge.getHColor().rgb(),
                 gauge.getBGColor().rgb());
             _gaugeConfigs.add(vui);

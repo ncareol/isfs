@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.net.DatagramSocket;
+import java.net.MulticastSocket;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -24,7 +25,7 @@ import org.xml.sax.SAXException;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import edu.ucar.nidas.util.Util;
+import edu.ucar.nidas.model.Log;
 
 /**
  * 
@@ -40,11 +41,16 @@ public class UdpConnection {
     }
 
     //create a udp socket to find data connections
-    public DatagramSocket open()
+    public DatagramSocket open(boolean multicast, int ttl)
         throws  IOException
     {
         close();
-        _udpSocket = new DatagramSocket();
+        if (multicast) {
+            MulticastSocket sock = new MulticastSocket();
+            sock.setTimeToLive(ttl);
+            _udpSocket = sock;
+        }
+        else _udpSocket = new DatagramSocket();
         return _udpSocket;
     }
 
@@ -61,11 +67,14 @@ public class UdpConnection {
         }
     }
 
-    public ArrayList<UdpConnInfo> search(String addr, int port) throws IOException
+    public ArrayList<UdpConnInfo> search(String addr, int port,
+        int ttl, Log log, boolean debug)
+        throws IOException
     {
         ArrayList<UdpConnInfo> connections = new ArrayList<UdpConnInfo>();
+        InetAddress inetAddr = InetAddress.getByName(addr);
 
-        if (_udpSocket == null) open();
+        if (_udpSocket == null) open(inetAddr.isMulticastAddress(),ttl);
 
         //build packet and display the contents
         DatagramPacket reqPacket =
@@ -75,12 +84,14 @@ public class UdpConnection {
 
         reqPacket.setSocketAddress(sockAddr);
 
-        long stime = System.currentTimeMillis();
-        _udpSocket.setSoTimeout(2500); //.25sec
+        _udpSocket.setSoTimeout(1000); // .5sec
 
         for (int i = 0; i < 3 && connections.size()==0 ;i++) {
             _udpSocket.send(reqPacket);
+            if (debug) log.debug("Sending connection request to " +
+                    sockAddr.toString());
 
+            long stime = System.currentTimeMillis();
             while ((stime + 2000)> System.currentTimeMillis()) {
                 //receive server info 
                 int buffLen = 1024;
@@ -89,27 +100,36 @@ public class UdpConnection {
 
                 try {
                     _udpSocket.receive(packet);
-                    UdpConnInfo info = parseConnInfo(packet);
+                    if (debug) log.debug("Packet received from " +
+                           packet.getSocketAddress().toString());
+                    UdpConnInfo info = parseConnInfo(packet, log, debug);
                     connections.add(info);
                 }
                 catch(SocketTimeoutException e)
                 {
-                    // no problem
+                    if (debug)
+                        log.debug("Timeout receiving connection response");
                 }
                 catch(IOException ee) {
-                    Util.prtException(ee,"UdpConn search" );
+                    log.error("search: " + ee.toString());
                 }
             }
         }
         _udpSocket.setSoTimeout(0);
+        if (inetAddr.isMulticastAddress()) close();
         return connections;
     }
 
-    public Socket connect(UdpConnInfo conn) throws IOException
+    public Socket connect(UdpConnInfo conn,
+            Log log, boolean debug) throws IOException
     {
-        if (_udpSocket == null) open();
+        if (_udpSocket == null) open(false, 0);
         if (_tcpSocket != null) _tcpSocket.close();
 
+        if (debug)
+            log.debug("Creating TCP socket: " +
+                    conn.getIpAddr().getHostAddress() + ':' +
+                    String.valueOf(conn.getPort()));
         _tcpSocket = new Socket(conn.getIpAddr(), conn.getPort());
 
         ByteBuffer buf =  ByteBuffer.allocate(6);
@@ -118,6 +138,10 @@ public class UdpConnection {
         buf.putShort((short)_udpSocket.getLocalPort());	
 
         _tcpSocket.setSoTimeout(500); //.5sec
+
+        if (debug)
+            log.debug("Senging TCP request: local UDP port=" +
+                    String.valueOf(_udpSocket.getLocalPort()));
         _tcpSocket.getOutputStream().write(buf.array());
 
         _tcpSocket.setSoTimeout(0);
@@ -142,7 +166,7 @@ public class UdpConnection {
         return new DatagramPacket(buf.array(), buffLen);
     }
     
-    public UdpConnInfo parseConnInfo(DatagramPacket packet)
+    public UdpConnInfo parseConnInfo(DatagramPacket packet, Log log, boolean debug)
         throws IOException  
     {
 
@@ -150,7 +174,6 @@ public class UdpConnection {
 
         UdpConnInfo conn = new UdpConnInfo();
         conn.setIpAddr(packet.getAddress());
-        System.out.println("packet.getAddress=" + packet.getAddress().toString());
 
         // decode _packet data to get servname, dsmname, tcpport -> list<servInf>
         //get port
@@ -163,23 +186,28 @@ public class UdpConnection {
             throw new UnknownServiceException("incorrect magic number received: " + Integer.toHexString(magic));
 
         conn.setPort(cb.getShort());
-        System.out.printf("conn port=%d\n",conn.getPort());
+        if (debug) log.debug("Connection response: remote TCP port=" +
+                String.valueOf(conn.getPort()));
 
         conn.setUDPPort(cb.getShort());
-        System.out.printf("conn udp port=%d\n",conn.getUDPPort());
+        if (debug) log.debug("Connection response: remote UPD port=" +
+                String.valueOf(conn.getUDPPort()));
 
         conn.setServer(packet.getAddress().getHostName());
-        System.out.println("conn serv=" + conn.getServer());
+        if (debug) log.debug("Connection response: remote host=" +
+            conn.getServer());
+
         getString(cb); //skip short server name
         conn.setProjectName(getString(cb));
-        System.out.println("conn project=" + conn.getProjectName());
+        if (debug) log.debug("Connection response: project=" +
+            conn.getProjectName());
 
         for ( ;; ) {
             String str = getString(cb);
             if (str == null) break;
             conn.addDsm(str);
-            System.out.println("dsm=" + str);
-            Util.prtDbg("dsm="+str);
+            if (debug) log.debug("Connection response: dsm=" + str);
+            // System.out.println("dsm=" + str);
         }
         return conn;
     }
@@ -235,7 +263,7 @@ public class UdpConnection {
 
             if (count == 1 && c[0] == 4){
                 _eof = true;
-                System.out.println("eof="+ _eof );
+                // System.out.println("eof="+ _eof );
                 return -1;
             }
             return c[0];
@@ -245,7 +273,7 @@ public class UdpConnection {
             if (_eof) return -1;
             int count = 0;
             count = _is.read(b);
-            System.out.printf("b=%s\n", b.toString());
+            // System.out.printf("b=%s\n", b.toString());
             for (int i = 0; i < count; i++) {
                 if (b[i] == 4) {
                     count = i;

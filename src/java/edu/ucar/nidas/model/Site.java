@@ -79,41 +79,7 @@ public class Site {
             dsm.setName(DOMUtils.getValue(n, "name"));
             dsm.setLocation(DOMUtils.getValue(n, "location"));
             dsm.walkSamples(n, this);
-            //printDsm(dsm);
             _dsms.add(dsm);
-        }
-    }
-
-    /**
-     * Print all dsms in the site
-     */
-    public void printAll() {
-        Util.prtDbg("Site = "+ _name);
-        for (int i=0; i<_dsms.size();i++) {
-            Dsm dsm = _dsms.get(i);
-            printDsm(dsm);
-        }
-    }
-
-    /**
-     * Print a dsm's information
-     * @param dsm
-     */
-    private void printDsm(Dsm dsm) {
-        Util.prtDbg("Dsm "+dsm.getId()+ "  name= "+dsm.getName());
-        ArrayList<Sample> samples = dsm.getSamples();
-
-        //Util.prtDbg("Print out all _samples:");
-        for (int j=0; j<samples.size();j++) {
-            Sample s = samples.get(j);
-            Util.prtDbg("Sample "+ s.getId());
-
-            ArrayList<Var>  vars= s.getVars();
-            Util.prtDbg("Print out all _vars:");
-            for (int k=0; k<vars.size();k++) {
-                Var v = vars.get(k);
-                Util.prtDbg("Var "+ s.getOffset(v)+ "  name= "+v.getName()+ "  pid= "+ "  dsmid= "+(Integer.valueOf(s.getId())>>16)+ " _gid= "+s.getId()+ " min="+v.getMin()+ " max="+v.getMax());
-            }
         }
     }
 
@@ -129,7 +95,6 @@ public class Site {
         }
 	return sites;
     }
-
-} //eof Site
+}
 
 

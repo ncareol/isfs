@@ -24,6 +24,8 @@ import com.trolltech.qt.gui.QMenuBar;
 import com.trolltech.qt.gui.QPalette;
 import com.trolltech.qt.gui.QStatusBar;
 import com.trolltech.qt.gui.QFileDialog;
+import com.trolltech.qt.gui.QMessageBox;
+import com.trolltech.qt.gui.QMessageBox.StandardButton;
 
 import edu.ucar.nidas.apps.cockpit.model.CockpitConfig;
 import edu.ucar.nidas.apps.cockpit.model.MinMaxer;
@@ -39,8 +41,10 @@ import edu.ucar.nidas.model.DataSource;
 import edu.ucar.nidas.model.DataClient;
 import edu.ucar.nidas.model.QProxyDataClient;
 import edu.ucar.nidas.model.NotifyClient;
+import edu.ucar.nidas.ui.StatusBar;
+import edu.ucar.nidas.ui.LogDisplay;
 import edu.ucar.nidas.model.StatusDisplay;
-import edu.ucar.nidas.util.Util;
+import edu.ucar.nidas.model.Log;
 import edu.ucar.nidas.util.DOMUtils;
 
 import org.w3c.dom.Document;
@@ -85,11 +89,20 @@ public class Cockpit extends QMainWindow {
      * menu etc
      */
     private QMenu _file;
+
     private QMenu _tabsetup;
+
     private QMenu _add;
+
     public QMenu gsetup;
+
     private QMenu _config;
+
     private StatusBar _statusbar;
+
+    private LogDialog _logDialog;
+
+    private Log _log;
 
     /**
      * map order to def-bg-color
@@ -148,10 +161,13 @@ public class Cockpit extends QMainWindow {
     public Cockpit(String[] args)
     {
        
-        if (args!=null && args.length>0)  parseArg(args);
+        if (args != null && args.length > 0)  parseArg(args);
         connectSlotsByName();
-        _statusbar = new StatusBar();
         setHidden(true);
+
+        _statusbar = new StatusBar(this);
+        _logDialog = new LogDialog(this);
+        _log = new LogDisplay(_logDialog.getTextWidget());
         setGeometry(PageGeometry.x,  PageGeometry.y, PageGeometry.w, PageGeometry.h);  
         orderToColor.put("gdefBColor", gdefBColor);
         orderToColor.put("gdefBColor2", gdefBColor2);
@@ -177,10 +193,16 @@ public class Cockpit extends QMainWindow {
                 CockpitConfig config = new CockpitConfig(document);
                 _centWidget.apply(config);
             }
-            catch(FileNotFoundException fnf) {
-                status(fnf.getMessage());
+            catch(Exception e) {
+                status(e.getMessage());
+                logError(e.getMessage());
             }
         }
+    }
+
+    public Log getLog()
+    {
+        return _log;
     }
 
     public Var getVar(String name) 
@@ -236,6 +258,21 @@ public class Cockpit extends QMainWindow {
         _statusbar.show(msg);
     }
       
+    public void logError(String msg)
+    {
+        _log.error(msg);
+    }
+      
+    public void logInfo(String msg)
+    {
+        _log.info(msg);
+    }
+      
+    public void logDebug(String msg)
+    {
+        _log.debug(msg);
+    }
+      
     private void createUIs()
     {
         // status
@@ -258,9 +295,10 @@ public class Cockpit extends QMainWindow {
         setMenuBar(menuBar);
 
         //file and items
-        _file = menuBar.addMenu(" &File");
+        _file = menuBar.addMenu("&File");
         menuBar.setFont(new QFont("Ariel", 12));
-        _file.addAction("&ConnectServer", this, "connect()");
+        _file.addAction("&Connect", this, "connect()");
+        _file.addAction("Show &Log", this, "showLog()");
         _file.addAction("&Exit", this, "close()");
 
         //current-tab setup
@@ -278,8 +316,8 @@ public class Cockpit extends QMainWindow {
         // sort.addAction("Height", _centWidget, "sortHeight()");
         // _tabsetup.addAction("DeletePage", _centWidget, "closeTab()");
         QMenu tmsetup = _tabsetup.addMenu("TimeSetup");
-        tmsetup.addAction("&PlotTimeRange", _centWidget, "changeSinglePlotTimeMSec()");
-        tmsetup.addAction("&NodataTimeout", _centWidget, "setSingleNodataTimeout()");
+        tmsetup.addAction("&PlotTimeWidth", _centWidget, "changeSinglePlotWidthMsec()");
+        tmsetup.addAction("Data&Timeout", _centWidget, "setSingleDataTimeout()");
         _tabsetup.setEnabled(false);
 
         //add 
@@ -305,8 +343,8 @@ public class Cockpit extends QMainWindow {
         // srt.addAction("Variable", _centWidget, "gsortVariable()");
         // srt.addAction("Height", _centWidget, "gsortHeight()");
         QMenu tmset = gsetup.addMenu("TimeSetup");
-        tmset.addAction("&PlotTimeRange", _centWidget, "changePlotTimeMSec()");
-        tmset.addAction("&NodataTimeout", _centWidget, "setNodataTimeout()");
+        tmset.addAction("&PlotTimeRange", _centWidget, "changePlotWidthMsec()");
+        tmset.addAction("&NodataTimeout", _centWidget, "setDataTimeout()");
         gsetup.setEnabled(false);
 
         //_config and items
@@ -316,13 +354,11 @@ public class Cockpit extends QMainWindow {
         _config.setEnabled(false);
     }
 
-    /*
-    public void exitApp()
+    public void showLog()
     {
-        closeResources();        
-        QApplication.shutdown();
+        _logDialog.setVisible(true);
+        // _logDialog.raise();
     }
-    */
 
     public void shutdown()
     {
@@ -395,8 +431,9 @@ public class Cockpit extends QMainWindow {
             config.toDOM(document);
             DOMUtils.writeXML(document, cname);
         }
-        catch(ParserConfigurationException pce) {
-            status(pce.getMessage());
+        catch(Exception e) {
+            status(e.getMessage());
+            logError(e.getMessage());
         }
     }
 
@@ -412,8 +449,9 @@ public class Cockpit extends QMainWindow {
             CockpitConfig config = new CockpitConfig(document);
             _centWidget.apply(config);
         }
-        catch(FileNotFoundException fnf) {
-            status(fnf.getMessage());
+        catch(Exception e) {
+            status(e.getMessage());
+            logError(e.getMessage());
         }
     }
 
@@ -427,8 +465,8 @@ public class Cockpit extends QMainWindow {
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
 
 	// create modal dialog to establish connection
-        ConnectionDialog connDialog = new ConnectionDialog(null,
-                _udpConnection, getConnAddress(), getConnPort());
+        ConnectionDialog connDialog = new ConnectionDialog(this,
+            _udpConnection, getConnAddress(), getConnPort());
 
         UdpConnInfo udpConnInfo = connDialog.getSelectedConnection();
         if (udpConnInfo == null) return false;
@@ -439,13 +477,13 @@ public class Cockpit extends QMainWindow {
 
         ArrayList<Site> sites = null;
         try {
-            _udpConnection.connect(udpConnInfo);
-
+            _udpConnection.connect(udpConnInfo, _log, connDialog.getDebug());
             Document doc = _udpConnection.readDOM();
             sites = Site.parse(doc);
         }
         catch (Exception e) {
             status(e.getMessage());
+            logError(e.getMessage());
             return false;
         }
 
@@ -530,10 +568,9 @@ public class Cockpit extends QMainWindow {
     
     /**
      * parse the parameters received from user's input
-     * [-s server:port] [-debug true] [-c config.xml] 
-     * Note: -debug is for developers, this option is not documented in user's manual
+     * [-s server:port] [-c config.xml] 
      * Silently ignores unrecognized arguments.
-     * @param args  -s serv:port -debug true/false serv:port
+     * @param args  -s serv:port -c config.xml
      * @return      void
      */
     private void parseArg(String[] args)
@@ -548,10 +585,7 @@ public class Cockpit extends QMainWindow {
                 if (ss.length > 1)
                     _connPort = Integer.valueOf(ss[1]);
             }
-            else if (args[i].equals("-debug") && i + 1 < args.length &&
-                args[++i].equals("true")) {
-                Util.setDebug(true);
-            } else if (args[i].equals("-c") && i + 1 < args.length ) {
+            else if (args[i].equals("-c") && i + 1 < args.length ) {
                 String cname = args[++i];
                 if (cname.length() > 0) {
                     if (QDir.isRelativePath(cname))
@@ -565,7 +599,8 @@ public class Cockpit extends QMainWindow {
                 String op = args[++i];
                 String[] trs = op.split(" ");
                 if (trs.length != 2) {
-                    Util.prtErr("option is not a pair"+ op);
+                    status("Invalid argument: " + op);
+                    logError("Invalid argument: " + op);
                 }
                 else parseArg(trs);
             }
@@ -575,7 +610,6 @@ public class Cockpit extends QMainWindow {
     /**
      * Construct a cockpit mainframe, and only one mainframe
      * options: -s to pass address:port example: -s   "porter.atd.ucar.edu:30000"
-     * options: -debug to print debug information
      */
     public static void main(String[] args) {
         QApplication.initialize(args);
@@ -608,70 +642,16 @@ public class Cockpit extends QMainWindow {
 	    }
 	}
     }
-    public class StatusBar implements StatusDisplay {
 
-        private class StatusCache
-        {
-            String msg;
-            int msec;
-	    public StatusCache(String m, int ms)
-            {
-                msg = m;
-                msec = ms;
-            }
-        }
-
-        private ArrayList<StatusCache> _messageCache =
-            new ArrayList<StatusCache>();
-
-        private QStatusBar _statusbar;
-
-        private class StatusRunnable implements Runnable
-        {
-            @Override
-            public void run()
-            {
-                ArrayList<StatusCache> messageCache;
-                synchronized(_messageCache) {
-                    messageCache =
-                        new ArrayList<StatusCache>(_messageCache);
-                    _messageCache.clear();
-                }
-                for (StatusCache msg : messageCache) {
-                    _statusbar.showMessage(msg.msg, msg.msec);
-                }
-            }
-        }
-
-        public StatusBar() 
-        {
-            _statusbar = Cockpit.this.statusBar();
-        }
-
-        @Override
-        public void show(String msg, int msec)
-        {
-	    synchronized(_messageCache) {
-                _messageCache.add(new StatusCache(msg,msec));
-            }
-            QApplication.invokeLater(new StatusRunnable());
-        }
-
-        @Override
-        public void show(String msg)
-        {
-	    synchronized(_messageCache) {
-                _messageCache.add(new StatusCache(msg,0));
-            }
-            QApplication.invokeLater(new StatusRunnable());
-        }
-
-        public void close()
-        {
-	    synchronized(_messageCache) {
-                _messageCache.clear();
-            }
-            _statusbar.close();
-        }
+    public int confirmMessageBox(String s, String title) {
+	try {
+	    int ret =
+                QMessageBox.warning(this, title, s,
+                        StandardButton.Ok, StandardButton.Abort);
+	    return ret;
+	} catch (Exception e) {
+	    System.err.println(e.toString());
+	}
+        return StandardButton.Abort.value();
     }
 }
