@@ -165,26 +165,38 @@ public class GaugePage extends QWidget {
     {
         synchronized(this) {
             int ng = _gauges.size();
-            Gauge g = new Gauge(this, _gaugeSize, _gaugeWidthMsec, var);
+            Gauge g = _gaugesByName.get(var.getNameWithStn());
+            if (g == null) {
+                g = new Gauge(this, _gaugeSize, _gaugeWidthMsec, var);
 
-            g.setSizePolicy(_gaugePolicy);
-            _gauges.add(g);
-            String pname = g.getName();
-            _gaugesByName.put(pname, g);
+                g.setSizePolicy(_gaugePolicy);
+                _gauges.add(g);
+                String pname = g.getName();
+                _gaugesByName.put(pname, g);
 
-            int row = ng / _ncols;
-            int col = ng % _ncols;
-            /*
-            System.out.printf("adding Gauge=%s, row=%d,col=%d\n",
-                    g.getName(),row,col);
-            */
-            _gaugelayout.addWidget(g,row,col);
+                int row = ng / _ncols;
+                int col = ng % _ncols;
+                /*
+                System.out.printf("adding Gauge=%s, row=%d,col=%d\n",
+                        g.getName(),row,col);
+                */
+                _gaugelayout.addWidget(g,row,col);
+            }
             return g;
         }
     } 
 
     public QSize getGaugeSize()
     {
+        System.out.printf("gauges size=%d\n",
+                _gauges.size());
+        System.out.printf("gauge QSize=%d x %d\n",
+                _gaugeSize.width(), _gaugeSize.height());
+        if (!_gauges.isEmpty())
+            _gaugeSize = _gauges.get(0).size();
+        System.out.printf("gauge QSize=%d x %d, valid=%b\n",
+                _gaugeSize.width(), _gaugeSize.height(),
+                _gaugeSize.isValid());
         return _gaugeSize;
     }
 
@@ -287,11 +299,11 @@ public class GaugePage extends QWidget {
      */
     public void freezeLayout(int ncols, QSize gaugeSize)
     {
+        _gaugeSize = gaugeSize;
+        setSizeOfGauges();
         _gaugePolicy.setHorizontalPolicy(Policy.Fixed);
         _gaugePolicy.setVerticalPolicy(Policy.Fixed);
         setSizePolicyOfGauges();
-        _gaugeSize = gaugeSize;
-        setSizeOfGauges();
         if (ncols != _ncols) {
             _ncols = ncols;
             redoLayout();
@@ -483,8 +495,6 @@ public class GaugePage extends QWidget {
 
     public void createGauges(Dsm dsm)
     {
-        setCursor(new QCursor(Qt.CursorShape.WaitCursor));
-
         ArrayList<Sample> samples = dsm.getSamples();
         for (Sample samp : samples) {
             ArrayList<Var> vars = samp.getVars();
@@ -492,17 +502,13 @@ public class GaugePage extends QWidget {
                 addGauge(var);
             }
         }
-
-        setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
     }
 
     public void createGauges(List<Var> vars) 
     {
-        setCursor(new QCursor(Qt.CursorShape.WaitCursor));
         for (Var var : vars) {
             addGauge(var);
         }
-        setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
     }
 
     /*

@@ -74,7 +74,8 @@ public class UdpConnection {
         ArrayList<UdpConnInfo> connections = new ArrayList<UdpConnInfo>();
         InetAddress inetAddr = InetAddress.getByName(addr);
 
-        if (_udpSocket == null) open(inetAddr.isMulticastAddress(),ttl);
+        close();
+        open(inetAddr.isMulticastAddress(),ttl);
 
         //build packet and display the contents
         DatagramPacket reqPacket =
@@ -86,7 +87,7 @@ public class UdpConnection {
 
         _udpSocket.setSoTimeout(1000); // .5sec
 
-        for (int i = 0; i < 3 && connections.size()==0 ;i++) {
+        for (int i = 0; i < 3 && connections.isEmpty() ;i++) {
             _udpSocket.send(reqPacket);
             if (debug) log.debug("Sending connection request to " +
                     sockAddr.toString());
@@ -124,7 +125,10 @@ public class UdpConnection {
             Log log, boolean debug) throws IOException
     {
         if (_udpSocket == null) open(false, 0);
-        if (_tcpSocket != null) _tcpSocket.close();
+        if (_tcpSocket != null) {
+            _tcpSocket.close();
+            _tcpSocket = null;
+        }
 
         if (debug)
             log.debug("Creating TCP socket: " +
@@ -140,7 +144,7 @@ public class UdpConnection {
         _tcpSocket.setSoTimeout(500); //.5sec
 
         if (debug)
-            log.debug("Senging TCP request: local UDP port=" +
+            log.debug("Sending TCP request: local UDP port=" +
                     String.valueOf(_udpSocket.getLocalPort()));
         _tcpSocket.getOutputStream().write(buf.array());
 
@@ -148,7 +152,6 @@ public class UdpConnection {
         
         return _tcpSocket;
     }
-
 
     private DatagramPacket buildRequestPacket(int clientPort)
     {
@@ -206,9 +209,9 @@ public class UdpConnection {
             String str = getString(cb);
             if (str == null) break;
             conn.addDsm(str);
-            if (debug) log.debug("Connection response: dsm=" + str);
             // System.out.println("dsm=" + str);
         }
+        if (debug) log.debug("Number of DSMs=" + conn.getDsms().size());
         return conn;
     }
 

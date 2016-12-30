@@ -17,6 +17,7 @@ import edu.ucar.nidas.model.DataClient;
 import edu.ucar.nidas.model.FloatSample;
 import edu.ucar.nidas.model.Sample;
 import edu.ucar.nidas.model.Var;
+import edu.ucar.nidas.model.Log;
 import edu.ucar.nidas.util.Util;
 
 /**
@@ -36,6 +37,8 @@ public class UdpDataReaderThread extends Thread
 
     NotifyClient _notify;
     
+    Log _log;
+
     //UI
     StatusDisplay _status;
   
@@ -61,9 +64,10 @@ public class UdpDataReaderThread extends Thread
         new HashMap<Var, HashSet<DataClient> >();
 
     public UdpDataReaderThread(DatagramSocket sock,
-            StatusDisplay status, NotifyClient notify)
+            StatusDisplay status, Log log, NotifyClient notify)
     {
         _dsocket = sock;
+        _log = log;
         _status = status;
         _notify = notify;
         buildDataBuf();
@@ -73,6 +77,7 @@ public class UdpDataReaderThread extends Thread
     public void interrupt()
     {
         _status = null;
+        _log = null;
         _notify = null;
         super.interrupt();
         _dsocket.close();
@@ -130,14 +135,15 @@ public class UdpDataReaderThread extends Thread
             }
             catch (IOException e) {
                 _dsocket.close();
+                _log.error(e.toString());
                 if (_notify != null) {
                     if (_status != null)
-                        _status.show(e.getMessage() + ". Reconnecting...", -1);
-                    _notify.notify();
+                        _status.show(e.toString() + ". Reconnecting...");
+                    _notify.wake();
                 }
                 else {
                     if (_status != null)
-                        _status.show(e.getMessage(), -1);
+                        _status.show(e.toString());
                 }
                 return;
             }

@@ -126,7 +126,7 @@ public class ConnectionDialog extends QDialog
      * Get the connection address from UI
      * @return
      */
-    private String getAddress() {
+    private String getAddressInput() {
         if (_ucserv.isChecked()) {
             _unicastAddr = _jtsName.toPlainText().trim();
             _connAddr = _unicastAddr;
@@ -137,19 +137,34 @@ public class ConnectionDialog extends QDialog
         return _connAddr;
     }
 
+    public String getAddress()
+    {
+        return _connAddr;
+    }
+
     /**
      *  Get the user preferred port
      * @return
      */
-    private int getPort()
+    private int getPortInput()
     {
         _connPort = Integer.valueOf(_jtPort.toPlainText().trim());
         return _connPort;
     }
 
-    private int getTTL()
+    public int getPort()
+    {
+        return _connPort;
+    }
+
+    private int getTTLInput()
     {
         _ttl = _jc.currentIndex()+1;
+        return _ttl;
+    }
+
+    public int getTTL()
+    {
         return _ttl;
     }
 
@@ -309,10 +324,9 @@ public class ConnectionDialog extends QDialog
     private void search()
     {
 
-        int ttl = getTTL();
-
-        String addr = getAddress();
-        int port = getPort();
+        String addr = getAddressInput();
+        int port = getPortInput();
+        int ttl = getTTLInput();
 
         try {
             _connections = _udpConnection.search(addr, port, ttl,

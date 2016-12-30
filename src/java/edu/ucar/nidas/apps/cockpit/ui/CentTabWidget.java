@@ -111,24 +111,22 @@ public class CentTabWidget extends QTabWidget {
             ArrayList<Dsm> dsms = site.getDsms();
 
             for (Dsm dsm : dsms) {
-                GaugePage gp = new GaugePage(this, dsm.getName());
-                int n = _gaugePageByName.size();
-                String color = "gdefBColor";
-                if ((n%4)!=0)  color += (n%4+1); //skip 0
+                GaugePage gp = _gaugePageByName.get(dsm.getName());
+                if (gp == null) {
+                    gp = new GaugePage(this, dsm.getName());
+                    _gaugePageByName.put(dsm.getName(), gp);
+                    int n = _gaugePageByName.size();
+                    String color = "gdefBColor";
+                    if ((n%4)!=0)  color += (n%4+1); //skip 0
                 
-                gp.setBGColor(Cockpit.orderToColor.get(color));
-                gp.setGeometry(_pageGeometry);
+                    gp.setBGColor(Cockpit.orderToColor.get(color));
+                    gp.setGeometry(_pageGeometry);
+                    addTab(gp, gp.getName());
+                }
                 gp.createGauges(dsm);
-                _gaugePageByName.put(dsm.getName(), gp);
-                addTab(gp, gp.getName());
             }
         }
 
-        /*
-        for (GaugePage gpp : _gaugePageByName.values()) {
-            setCurrentWidget(gpp);
-        }
-        */
         setCurrentIndex(0);
         update();
 

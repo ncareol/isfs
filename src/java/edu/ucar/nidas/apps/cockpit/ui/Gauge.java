@@ -254,10 +254,8 @@ public class Gauge extends QWidget implements DataClient
 
     public int heightForWidth(int w)
     {
-        /*
         System.out.printf("Gauge heightForWidth %s: w=%d,h=%d\n",
                 getName(),w,w*2/3);
-        */
         return w * 2 / 3;
     }
 
@@ -290,7 +288,7 @@ public class Gauge extends QWidget implements DataClient
     public void autoResize(){
         synchronized(this) {
             QSize qs = size();
-            resize(qs.width(), qs.height());
+            resize(qs);
         }
     }
 

@@ -26,7 +26,6 @@ public class LogDisplay implements Log
     public LogDisplay(QPlainTextEdit text)
     {
         _text = text;
-        // _text.setReadOnly(true);
     }
 
     /**
@@ -82,10 +81,6 @@ public class LogDisplay implements Log
                 ": " + type + ": " + msg;
             _queue.add(logmsg);
             QApplication.invokeLater(new LogRunnable());
-            /* If a modal window is active, do this to
-             * see the log messages.
-             */
-            QApplication.processEvents();
         }
     }
 
@@ -100,6 +95,9 @@ public class LogDisplay implements Log
                     else _text.appendPlainText(msg);
                 }
                 _queue.clear();
+                /* If a modal window is active, do this to
+                 * see the log messages.  */
+                QApplication.processEvents();
             }
         }
     }

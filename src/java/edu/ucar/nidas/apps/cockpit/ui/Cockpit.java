@@ -122,6 +122,13 @@ public class Cockpit extends QMainWindow {
     private String _connAddress = "localhost"; 
     private int _connPort = 30005;
 
+    private ConnectionDialog _connDialog = null;
+
+    /**
+     * Parameters associated with the current data connection.
+     */
+    private UdpConnInfo _udpConnInfo = null;
+
     /**
      * UdpConnection
      */
@@ -136,8 +143,8 @@ public class Cockpit extends QMainWindow {
      * list of data clients by variable and by
      * index of data value in the variable's data array.
      */
-    private HashMap<Var, DataProcessor> _dataProcessorByVar =
-        new HashMap<Var, DataProcessor>();
+    private HashMap<String, DataProcessor> _dataProcessorByVarName =
+        new HashMap<String, DataProcessor>();
 
     /**
      * cent widget for all tabs
@@ -183,7 +190,7 @@ public class Cockpit extends QMainWindow {
 
 	_reconnector = this.new Reconnector();
 
-        connect();
+        connect(true);
 
         String cname = getConfigFileName();
         if (cname != null) {
@@ -222,7 +229,7 @@ public class Cockpit extends QMainWindow {
 
     public DataSource getDataSource(Var var) 
     {
-        return _dataProcessorByVar.get(var);
+        return _dataProcessorByVarName.get(var.getNameWithStn());
     }
 
     @Override
@@ -456,43 +463,86 @@ public class Cockpit extends QMainWindow {
     }
 
     /** 
-     * Connect to the data 
+     * Establish a data connection.
      * @return
      */
-    public boolean connect()
+    public boolean connect(boolean dialog)
     {
 
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
 
-	// create modal dialog to establish connection
-        ConnectionDialog connDialog = new ConnectionDialog(this,
-            _udpConnection, getConnAddress(), getConnPort());
+        if (dialog) {
+            // create modal dialog to establish connection
+            _connDialog = new ConnectionDialog(this,
+                _udpConnection, getConnAddress(), getConnPort());
 
-        UdpConnInfo udpConnInfo = connDialog.getSelectedConnection();
-        if (udpConnInfo == null) return false;
+            _udpConnInfo = _connDialog.getSelectedConnection();
+            if (_udpConnInfo == null) return false;
+        }
+        else {
+            String addr = _connDialog.getAddress();
+            int port = _connDialog.getPort();
+            int ttl = _connDialog.getTTL();
+            ArrayList<UdpConnInfo> connections = null;
+            try {
+                connections = _udpConnection.search(addr, port, ttl,
+                        getLog(), _connDialog.getDebug());
+            }
+            catch (IOException e) {
+                status(e.getMessage());
+                logError(e.getMessage());
+                return false;
+            }
+            UdpConnInfo matchConn = null;
+            for (UdpConnInfo conn : connections) {
+                if (_udpConnInfo.getServer().equals(conn.getServer()) &&
+                    _udpConnInfo.getProjectName().equals(conn.getProjectName())) {
+                    matchConn = conn;
+                    break;
+                }
+            }
+            if (matchConn == null) {
+                String msg = "Data connection for server " +
+                    _udpConnInfo.getServer() +
+                    " and project " +
+                    _udpConnInfo.getProjectName() + " not found";
+                status(msg);
+                logError(msg);
+                return false;
+            }
+            _udpConnInfo = matchConn;
+        }
 
-        String projectname = udpConnInfo.getProjectName();
+        String projectname = _udpConnInfo.getProjectName();
 
         setWindowTitle(projectname + " COCKPIT");
 
+        try {
+            _udpConnection.connect(_udpConnInfo, _log, _connDialog.getDebug());
+        }
+        catch (IOException e) {
+            status(e.getMessage());
+            logError(e.getMessage());
+            return false;
+        }
         ArrayList<Site> sites = null;
         try {
-            _udpConnection.connect(udpConnInfo, _log, connDialog.getDebug());
             Document doc = _udpConnection.readDOM();
             sites = Site.parse(doc);
         }
         catch (Exception e) {
-            status(e.getMessage());
-            logError(e.getMessage());
+            status("Parsing XML: " + e.getMessage());
+            logError("Parsing XML: " + e.getMessage());
             return false;
         }
 
         if (_dataThread != null) {
             _dataThread.interrupt();
         }
-        _dataThread = new UdpDataReaderThread(_udpConnection.getUdpSocket(),
-                _statusbar, _reconnector);
-        _dataProcessorByVar.clear();
+        _dataThread = new UdpDataReaderThread(
+                _udpConnection.getUdpSocket(), _statusbar, _log, _reconnector);
+        _dataProcessorByVarName.clear();
+        _varsByName.clear();
 
         for (Site site : sites) {
             ArrayList<Dsm> dsms = site.getDsms();
@@ -505,14 +555,11 @@ public class Cockpit extends QMainWindow {
                     
                     for (Var var : vars) {
                         if (var.getLength() != 1) continue;
-                        // System.out.println("var name=" + var.getNameWithStn());
-
                         _varsByName.put(var.getNameWithStn(), var);
-
-                        DataProcessor dc = _dataProcessorByVar.get(var);
+                        DataProcessor dc = _dataProcessorByVarName.get(var.getNameWithStn());
                         if (dc == null) {
                             dc = new MinMaxer(_reductionPeriod);
-                            _dataProcessorByVar.put(var,dc);
+                            _dataProcessorByVarName.put(var.getNameWithStn(),dc);
                         }
                         _dataThread.addClient(samp,var,dc);
 
@@ -522,8 +569,7 @@ public class Cockpit extends QMainWindow {
         }
 
         _centWidget.setName(projectname);
-        if (_centWidget.getGaugePages().isEmpty())
-            _centWidget.addGaugePages(sites);
+        _centWidget.addGaugePages(sites);
 
         Collection<GaugePage> pages = _centWidget.getGaugePages();
 
@@ -532,7 +578,7 @@ public class Cockpit extends QMainWindow {
             for (Gauge gauge: gauges) {
                 // System.out.println("gauge name=" + gauge.getName());
                 Var var = _varsByName.get(gauge.getName());
-                DataProcessor dc = _dataProcessorByVar.get(var);
+                DataProcessor dc = _dataProcessorByVarName.get(var.getNameWithStn());
                 DataClient proxy = QProxyDataClient.getProxy(gauge);
                 dc.addClient(proxy);
             }
@@ -552,6 +598,11 @@ public class Cockpit extends QMainWindow {
         setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
 
         return true;
+    }
+
+    public boolean connect()
+    {
+        return connect(true);
     }
 
     private  void openImage() {
@@ -619,39 +670,38 @@ public class Cockpit extends QMainWindow {
         QApplication.shutdown();
     }
 
-    private class Reconnector implements NotifyClient, Runnable {
-
-        private boolean _running = false;
-
+    private class Reconnector implements NotifyClient, Runnable
+    {
+        @Override
 	public void wake()
 	{
-	    QApplication.invokeLater(this);
+            QApplication.invokeLater(this);
 	}
 
 	/**
-	 * This implements a Runnable
+	 * Do the reconnection.
 	 */
+        @Override
 	public void run()
 	{
-	    synchronized (this) {
-		if (_running) return;
-		_running = true;
-		connect();
-		status("Reconnection is done. ", 20000);
-		_running = false;
-	    }
+            status("Attempting reconnect...");
+            while (!connect(false)) {
+                status("Attempting reconnect...");
+                QApplication.processEvents();
+            }
+            status("Reconnected",5*1000);
 	}
     }
 
     public int confirmMessageBox(String s, String title) {
-	try {
+	// try {
 	    int ret =
                 QMessageBox.warning(this, title, s,
                         StandardButton.Ok, StandardButton.Abort);
 	    return ret;
-	} catch (Exception e) {
-	    System.err.println(e.toString());
-	}
-        return StandardButton.Abort.value();
+	// } catch (Exception e) {
+	    // System.err.println(e.toString());
+	// }
+        // return StandardButton.Abort.value();
     }
 }
