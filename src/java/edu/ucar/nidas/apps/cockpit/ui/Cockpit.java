@@ -363,8 +363,8 @@ public class Cockpit extends QMainWindow {
 
     public void showLog()
     {
-        _logDialog.setVisible(true);
-        // _logDialog.raise();
+        _logDialog.raise();
+        _logDialog.show();
     }
 
     public void shutdown()

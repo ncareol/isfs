@@ -92,7 +92,11 @@ public class LogDisplay implements Log
             synchronized(_queue) {
                 for(String msg : _queue) {
                     if (msg == "CLEAR") _text.clear();
-                    else _text.appendPlainText(msg);
+                    else {
+                        _text.appendPlainText(msg);
+                        _text.verticalScrollBar().setValue(
+                            _text.verticalScrollBar().maximum());
+                    }
                 }
                 _queue.clear();
                 /* If a modal window is active, do this to

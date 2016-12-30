@@ -1,37 +1,16 @@
 package edu.ucar.nidas.apps.cockpit.ui;
 
-/*
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
-import com.trolltech.qt.core.Qt;
-import com.trolltech.qt.core.Qt.Alignment;
-import com.trolltech.qt.gui.QCheckBox;
-import com.trolltech.qt.gui.QComboBox;
-import com.trolltech.qt.gui.QCursor;
-import com.trolltech.qt.gui.QFrame;
-import com.trolltech.qt.gui.QGroupBox;
-import com.trolltech.qt.gui.QHBoxLayout;
-import com.trolltech.qt.gui.QLabel;
-import com.trolltech.qt.gui.QRadioButton;
-
-*/
-
 import com.trolltech.qt.core.Qt;
 import com.trolltech.qt.gui.QWidget;
-import com.trolltech.qt.gui.QDialog;
 import com.trolltech.qt.gui.QDialogButtonBox;
 import com.trolltech.qt.gui.QVBoxLayout;
 import com.trolltech.qt.gui.QPlainTextEdit;
 import com.trolltech.qt.gui.QPushButton;
 
-
 /**
  * A log window for cockpit.
  */
-public class LogDialog extends QDialog
+public class LogDialog extends QWidget
 {
     private QPlainTextEdit _text;
 
@@ -39,10 +18,7 @@ public class LogDialog extends QDialog
      */
     public LogDialog(QWidget owner)
     {
-        super(owner);
-        setModal(false);
-
-        //create the UI-components
+        super(owner, Qt.WindowType.Window);
 
         setWindowTitle("Cockpit Log");
         QVBoxLayout layout = new QVBoxLayout();
@@ -65,8 +41,7 @@ public class LogDialog extends QDialog
 
         setLayout(layout);
         setGeometry(0, 0, 400, 300);
-        // move(-width(), -height());
-        setVisible(false);
+        hide();
     }
 
     public QPlainTextEdit getTextWidget()
@@ -81,6 +56,6 @@ public class LogDialog extends QDialog
 
     public void dismiss()
     {
-        setVisible(false);
+        hide();
     }
 }
