@@ -18,7 +18,8 @@ public class RescaleDialog extends QDialog {
     QTextEdit 	_tfymin;
     boolean 	_ok=false;
 
-    RescaleDialog( float max, float min,  int xmouse, int ymouse)  {
+    RescaleDialog(float max, float min, int xmouse, int ymouse)
+    {
         // super(null, true);
         super.setModal(true);
         setModal(true);

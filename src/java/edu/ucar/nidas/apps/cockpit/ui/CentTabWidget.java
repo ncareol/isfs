@@ -61,7 +61,7 @@ public class CentTabWidget extends QTabWidget {
     private HashMap<String, GaugePage> _gaugePageByName =
         new HashMap<String,GaugePage>();
 
-    private boolean _layoutFrozen;
+    private GaugePage _currentPage = null;
 
     /**
      * Layout manager.
@@ -84,7 +84,9 @@ public class CentTabWidget extends QTabWidget {
     private QRect _pageGeometry = new QRect(350, 250, 1000, 700);
 
     /***********************************************/
-    public CentTabWidget(Cockpit p) {
+    public CentTabWidget(Cockpit p)
+    {
+        super(p);
         _cockpit = p;
         _log = _cockpit.getLog();
         connectSlotsByName();
@@ -115,11 +117,8 @@ public class CentTabWidget extends QTabWidget {
                 if (gp == null) {
                     gp = new GaugePage(this, dsm.getName());
                     _gaugePageByName.put(dsm.getName(), gp);
-                    int n = _gaugePageByName.size();
-                    String color = "gdefBColor";
-                    if ((n%4)!=0)  color += (n%4+1); //skip 0
-                
-                    gp.setBGColor(Cockpit.orderToColor.get(color));
+                    int n = _gaugePageByName.size() % Cockpit.defBGColors.size();
+                    gp.setBGColor(Cockpit.defBGColors.get(n));
                     gp.setGeometry(_pageGeometry);
                     addTab(gp, gp.getName());
                 }
@@ -142,11 +141,8 @@ public class CentTabWidget extends QTabWidget {
 
         GaugePage gp = new GaugePage(this, name);
 
-        int n = _gaugePageByName.size();
-        String color = "gdefBColor";
-        if ((n%4)!=0)  color += (n%4+1); //skip 0
-                
-        gp.setBGColor(Cockpit.orderToColor.get(color));
+        int n = _gaugePageByName.size() % Cockpit.defBGColors.size();
+        gp.setBGColor(Cockpit.defBGColors.get(n));
         gp.setGeometry(_pageGeometry);
         gp.createGauges(vars);
         _gaugePageByName.put(name, gp);
@@ -166,14 +162,11 @@ public class CentTabWidget extends QTabWidget {
         if (idx >= 0) removeTab(idx);
         if (idx <= cidx) cidx = cidx - 1;
         setCurrentIndex(cidx);
-
-        gp.destroyWidget(true);
     }
 
     public void closeCurrentTab()
     {
-        GaugePage gp = (GaugePage)currentWidget();
-        remove(gp);
+        remove(getCurrentGaugePage());
     }
 
     public GaugePage getCurrentGaugePage()
@@ -225,70 +218,64 @@ public class CentTabWidget extends QTabWidget {
         return _gaugePageByName.values();
     }
 
-
     /**
-     * 
+     * Change all pages' policy to resize 
      */
-    /*
-    public void freezeUnfreezePageLayout()
+    public void freezePlotSizes()
     {
-        getCurrentGaugePage().freezeUnfreezeLayout();
-    }
-    */
-
-    public boolean isLayoutFrozen()
-    {
-        return _layoutFrozen;
+        for (GaugePage gpp : _gaugePageByName.values()) {
+            gpp.freezePlotSizes();
+        }
     }
 
     /**
      * Change all pages' policy to resize 
      */
-    public void freezeUnfreezeAllLayout()
+    public void unfreezePlotSizes()
     {
-        GaugePage gp = getCurrentGaugePage();
-        if (gp == null) return;
-        QSize sz = gp.getGaugeSize();
-        int nc = gp.getNumColumns();
-        if (sz.isValid()) {
-            for (GaugePage gpp : _gaugePageByName.values()) {
-                if (_layoutFrozen)
-                    gpp.unfreezeLayout();
-                else
-                    gpp.freezeLayout(nc, sz);
-            }
-            _layoutFrozen = !_layoutFrozen;
+        for (GaugePage gpp : _gaugePageByName.values()) {
+            gpp.unfreezePlotSizes();
         }
     }
 
+    /**
+     * Change all pages' policy to resize 
+     */
+    public void freezeGrids()
+    {
+        for (GaugePage gpp : _gaugePageByName.values()) {
+            gpp.freezeGrid();
+        }
+    }
 
     /**
-     * Clean up history for all plots in the current page
+     * Change all pages' policy to resize 
      */
-    public void cleanupHistory()
+    public void unfreezeGrids()
     {
-        if (_cockpit.confirmMessageBox(
-            "All plot history will be lost", "Clean History") ==
-            StandardButton.Abort.value()) return;
-        getCurrentGaugePage().cleanupHistory();
+        for (GaugePage gpp : _gaugePageByName.values()) {
+            gpp.unfreezeGrid();
+        }
     }
+
     /**
      * Clean up history for all plots in all pages
      */
-    public void gcleanupHistory()
+    public void clearHistory()
     {
         if (_cockpit.confirmMessageBox(
-            "All plot history will be lost", "Clean History") ==
+            "All plot history will be lost", "Clear History") ==
             StandardButton.Abort.value()) return;
         for (GaugePage gp : _gaugePageByName.values()) {
-            gp.cleanupHistory();
+            gp.clearHistory();
         }
     }
 
     /**
      * Scale each plot in the active page based on its max-min in the span 
      */
-    public void gautoScalePlots() {
+    public void gautoScalePlots()
+    {
         getCurrentGaugePage().gautoScalePlots(true);
     }
 
@@ -307,7 +294,7 @@ public class CentTabWidget extends QTabWidget {
      * Color each plot in the active page with new color  
      */
     public void colorCurrent() {
-        QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getCColor());
+        QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getTraceColor());
         if (c.value()==0) return;
         getCurrentGaugePage().colorCurrent(c);
     }
@@ -315,7 +302,7 @@ public class CentTabWidget extends QTabWidget {
      * Color each plot in all pages with new color  
      */
     public void gcolorCurrent() {
-        QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getCColor());
+        QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getTraceColor());
         if (c.value()==0) return;
         for (GaugePage gp : _gaugePageByName.values()) gp.colorCurrent(c);
     }
@@ -327,7 +314,7 @@ public class CentTabWidget extends QTabWidget {
         if (_cockpit.confirmMessageBox(
             "All plot history will be lost", "Color History") ==
             StandardButton.Abort.value()) return;
-        QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getHColor());
+        QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getHistoryColor());
         if (c.value()==0) return;
         getCurrentGaugePage().colorHistory(c);
     }
@@ -339,7 +326,7 @@ public class CentTabWidget extends QTabWidget {
         if (_cockpit.confirmMessageBox(
             "All plot history will be lost", "Color History") ==
             StandardButton.Abort.value()) return;
-        QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getHColor());
+        QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getHistoryColor());
         if (c.value()==0) return;
         for (GaugePage gp : _gaugePageByName.values()) {
             gp.colorHistory(c);
@@ -430,8 +417,10 @@ public class CentTabWidget extends QTabWidget {
 
     public void pageChanged()
     {
-        int index = currentIndex();
-        // if (getCurrentGaugePage()!=null)  syncCurrentSizePolicy(getCurrentGaugePage().getPolicy());    
+        if (_currentPage != null && !_currentPage.frozenPlotSizes()) {
+            _currentPage.freezePlotSizes();
+        }
+        _currentPage = getCurrentGaugePage();
     }
 
 
@@ -443,16 +432,14 @@ public class CentTabWidget extends QTabWidget {
     }
     */
 
-    public void mouseReleaseEvent(QMouseEvent pEvent)
+    public void mouseReleaseEvent(QMouseEvent event)
     {
-        if (pEvent.button()==MouseButton.RightButton)
+        if (event.button()==MouseButton.RightButton)
         {
             QMenu pMenu = new QMenu("");
             QMenu option = pMenu.addMenu("RenamePage");
             option.addAction("&RenamePage", this, "renamePage()");
-            int xmouse = pEvent.globalX();
-            int ymouse = pEvent.globalY();
-            option.popup(new QPoint(xmouse, ymouse) );    
+            option.popup(event.globalPos());
         }
     }
 
@@ -572,11 +559,11 @@ public class CentTabWidget extends QTabWidget {
                         if ((g.getYMax() != gc.getMax()) || (g.getYMin() != gc.getMin())) {
                             g.changeYMaxMin(gc.getMax(),gc.getMin());
                         }
-                        if (!g.getCColor().equals(new QColor(gc.getCColor()))) {
-                            g._noDataPaint = false; g.setCColor(new QColor(gc.getCColor()));
+                        if (!g.getTraceColor().equals(new QColor(gc.getTraceColor()))) {
+                            g._noDataPaint = false; g.setTraceColor(new QColor(gc.getTraceColor()));
                         }
-                        if (!g.getHColor().equals(new QColor(gc.getHColor()))) {
-                            g._noDataPaint = false; g.setHColor(new QColor(gc.getHColor()));
+                        if (!g.getHistoryColor().equals(new QColor(gc.getHistoryColor()))) {
+                            g._noDataPaint = false; g.setHistoryColor(new QColor(gc.getHistoryColor()));
                         }
                         if (!g.getBGColor().equals(new QColor(gc.getBGColor()))) {
                             g._noDataPaint = false; g.setBGColor(new QColor(gc.getBGColor()));

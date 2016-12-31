@@ -56,7 +56,7 @@ public class Gauge extends QWidget implements DataClient
     /*
      * gauge's parent page
      */
-    GaugePage _parent;
+    GaugePage _gaugePage;
 
     /**
      * reduction-time-of minMaxer, mili-seconds
@@ -189,7 +189,7 @@ public class Gauge extends QWidget implements DataClient
     /**
      * x and y locate when a mouse is clicked 
      */
-    int _xmouse, _ymouse;  //when right-mouse clicks, get the location
+    QPoint _mousePoint = null;
 
     /**
      * plot width  and height in pix
@@ -197,9 +197,9 @@ public class Gauge extends QWidget implements DataClient
     int _pwidth, _pheight;  //plot-height-in-pix
 
     //color
-    QColor _cColor= Cockpit.gdefCColor;
-    QColor _hColor = Cockpit.gdefHColor;	
-    QColor _bgColor = Cockpit.gdefBColor;
+    QColor _traceColor= Cockpit.defTraceColor;
+    QColor _historyColor = Cockpit.defHistoryColor;	
+    QColor _bgColor = Cockpit.defBGColors.get(0);
 
     static QColor _red = new QColor(Qt.GlobalColor.red);
 
@@ -207,22 +207,22 @@ public class Gauge extends QWidget implements DataClient
 
     /**
      * @param parent
-     * @param w Initial widget width (pixels)
-     * @param h Initial widget height (pixels)
+     * @param size Initial widget QSize
      * @param gaugeWidthMsec - gauge-width in milli-seconds
      * @param var - variable whose data is plotted
      */
     public Gauge(GaugePage p, QSize size, int gaugeWidthMsec, Var var) {
 
-        _parent = p;
+        super(p);
+        _gaugePage = p;
         _log = p.getLog();
         _xmin = 0; //plot-start-tm-in-sec
         _xwidth = gaugeWidthMsec;  //in-milli-seconds
         _reductionTm = p.getReductionPeriod();
 
-        setMinimumSize(size.width()/2,size.height()/2);
+        setMinimumSize(0,0);
 
-        resize(size);
+        // resize(size);
 
         _name = var.getNameWithStn();
         _units = var.getUnits();
@@ -235,8 +235,8 @@ public class Gauge extends QWidget implements DataClient
         rescale(size());
         initPixmaps();
 
-        _cColor= p.getCColor();
-        _hColor = p.getHColor();
+        _traceColor= p.getTraceColor();
+        _historyColor = p.getHistoryColor();
         _bgColor = p.getBGColor();
         //show();
         _lastTm = System.currentTimeMillis();
@@ -254,14 +254,11 @@ public class Gauge extends QWidget implements DataClient
 
     public int heightForWidth(int w)
     {
+        /*
         System.out.printf("Gauge heightForWidth %s: w=%d,h=%d\n",
                 getName(),w,w*2/3);
+        */
         return w * 2 / 3;
-    }
-
-    public void destroyWidget(boolean destroyWindow)
-    {
-        super.destroy(destroyWindow);
     }
 
     /**
@@ -278,19 +275,23 @@ public class Gauge extends QWidget implements DataClient
         return Math.round((_ymax - y) * _yscale);
     }
 
-
     /**
      * get the parent of the plot
      * @return
      */
-    public GaugePage getPage() { return _parent;}
+    public GaugePage getPage()
+    {
+        return _gaugePage;
+    }
 
+    /*
     public void autoResize(){
         synchronized(this) {
             QSize qs = size();
             resize(qs);
         }
     }
+    */
 
     public void setWidthMsec(int msec)
     {
@@ -322,7 +323,7 @@ public class Gauge extends QWidget implements DataClient
         _tm.stop();
         _tm.start(sec * 1000 / 6);
         _noDataPaint = false;
-        _parent.repaint();
+        parentWidget().repaint();
     }
 
     /**
@@ -363,7 +364,7 @@ public class Gauge extends QWidget implements DataClient
     /**
      * Clean up the data-history
      */
-    public void cleanupHistory ()
+    public void clearHistory ()
     {
         initPixmaps();
         paintLines();
@@ -374,9 +375,9 @@ public class Gauge extends QWidget implements DataClient
      * Color the current data with the new color
      * @param 
      */
-    public void changeCColor(QColor c)
+    public void changeTraceColor(QColor c)
     {
-        _cColor = c;
+        _traceColor = c;
         resetPainter();
         paintLines();
         //repaint();
@@ -387,9 +388,9 @@ public class Gauge extends QWidget implements DataClient
      * This method will clean up history, and make a new image 
      * @param c
      */
-    public void changeHColor(QColor c)
+    public void changeHistoryColor(QColor c)
     {
-        _hColor = c;
+        _historyColor = c;
         initPixmaps();
         paintLines();
         //repaint();
@@ -400,7 +401,7 @@ public class Gauge extends QWidget implements DataClient
      * Color the back-ground of a plot with the new color
      * @param 
      */
-    public   void changeBGColor(QColor c)
+    public void changeBGColor(QColor c)
     {
         _bgColor = c;
         initPixmaps();
@@ -488,7 +489,7 @@ public class Gauge extends QWidget implements DataClient
 
     public void resizeEvent(QResizeEvent ent)
     {
-        // if (_parent.getPolicy() == Policy.Fixed) return;
+        // if (parentWidget().getPolicy() == Policy.Fixed) return;
         synchronized(this) {
             rescale(ent.size());
             initPixmaps();
@@ -535,32 +536,49 @@ public class Gauge extends QWidget implements DataClient
         if (p!=null) p.end();
     }
 
-    public void mouseReleaseEvent(QMouseEvent pEvent)
+    public void mouseReleaseEvent(QMouseEvent event)
     {
-        if (pEvent.button() == MouseButton.RightButton)
+        if (event.button() == MouseButton.RightButton)
         {
-            QMenu pMenu = new QMenu("");
-            QMenu option = pMenu.addMenu("Plot_Option");
-            QMenu color = option.addMenu("Color"); 
-            color.addAction("&CleanUp_History", this, "cleanupLocalHistory()");
-            color.addAction("Co&lor_Current", this, "changeLocalCColor()");
-            color.addAction("Color_&History", this, "changeLocalHColor()");
-            color.addAction("Color_&BackGround", this, "changeLocalBGColor()");
-            QMenu scale = option.addMenu("Scale");
-            scale.addAction("&ManuallyScale_Plot", this, "changeYMaxMin()");
-            scale.addAction("&AutoScale_Plot", this, "forcedAutoScalePlot()");
-            option.addAction("SetData&Timeout", this, "setDataTimeout()");
-            option.addAction("&AutoResize", this, "autoResize()");
-            option.addAction("&DeletePlot", this, "deletePlot()");
-            _xmouse= pEvent.globalX();
-            _ymouse= pEvent.globalY();
-            option.popup(new QPoint(_xmouse, _ymouse) );	
+            QMenu menu = new QMenu("Plot Options");
+
+            if (_gaugePage.frozenPlotSizes()) {
+                menu.addAction("Unfreeze &Plot Sizes",
+                        _gaugePage, "unfreezePlotSizes()");
+            }
+            else {
+                menu.addAction("Freeze &Plot Sizes",
+                        _gaugePage, "freezePlotSizes()");
+            }
+
+            if (_gaugePage.frozenGrid()) {
+                menu.addAction("Unfreeze &Grid",
+                        _gaugePage, "unfreezeGrid()");
+            }
+            else {
+                menu.addAction("Freeze &Grid",
+                        _gaugePage, "freezeGrid()");
+            }
+            QMenu color = menu.addMenu("Color"); 
+            color.addAction("&Clear History", this, "clearHistory()");
+            color.addAction("&Trace Color", this, "changeTraceColor()");
+            color.addAction("&History Color", this, "changeHistoryColor()");
+            color.addAction("&Background Color", this, "changeBGColor()");
+            QMenu scale = menu.addMenu("Scale");
+            scale.addAction("&Manual Scale Plot", this, "changeYMaxMin()");
+            scale.addAction("&Auto Scale Plot", this, "forcedAutoScalePlot()");
+            menu.addAction("Set Data &Timeout", this, "setDataTimeout()");
+            // menu.addAction("&Auto Resize", this, "autoResize()");
+            menu.addAction("&Delete Plot", this, "deletePlot()");
+            _mousePoint = event.globalPos();
+            menu.popup(_mousePoint);
         }
     }
 
     private void deletePlot()
     {
-        _parent.remove(this) ;
+        hide();
+        _gaugePage.remove(this) ;
     }
 
     /**
@@ -603,29 +621,29 @@ public class Gauge extends QWidget implements DataClient
     /**
      * Color the plot with new color
      */
-    private void changeLocalCColor()
+    private void changeTraceColor()
     {
-        QColor cc = QColorDialog.getColor(_cColor);
+        QColor cc = QColorDialog.getColor(_traceColor);
         if (cc.value()==0) return;
-        _cColor = cc;
-        changeCColor(_cColor);
+        _traceColor = cc;
+        changeTraceColor(_traceColor);
     }
 
     /**
      * Color the history data with new color, discard the previous histroy image
      */
-    private void changeLocalHColor()
+    private void changeHistoryColor()
     {
-        QColor cc = QColorDialog.getColor(_hColor);
+        QColor cc = QColorDialog.getColor(_historyColor);
         if (cc.value()==0) return;
-        _hColor = cc;
-        changeHColor(_hColor);
+        _historyColor = cc;
+        changeHistoryColor(_historyColor);
     }
 
     /**
      *  Color the plot back-ground with new color.
      */
-    private void changeLocalBGColor()
+    private void changeBGColor()
     {
         QColor cc = QColorDialog.getColor(_bgColor);
         if (cc.value()==0) return;
@@ -633,17 +651,13 @@ public class Gauge extends QWidget implements DataClient
         changeBGColor(_bgColor);
     }
 
-    private void cleanupLocalHistory()
-    {
-        cleanupHistory();
-    }
-
     /**
      * Rescale y-axis  (pix/1.0data-value)
      */
     private void changeYMaxMin()
     {
-        RescaleDialog rd = new RescaleDialog( _ymax, _ymin, _xmouse, _ymouse) ;
+        RescaleDialog rd = new RescaleDialog( _ymax, _ymin, _mousePoint.x(),
+                _mousePoint.y()) ;
         if (!rd.getOk())  return;
         if (rd.getMax() <=rd.getMin()) {
             _log.error("Y-axis-Max is smaller than Y-axis-Min");
@@ -735,7 +749,7 @@ public class Gauge extends QWidget implements DataClient
     public void removeSelf()
     {
         // _var.setDisplay(false);
-        _parent.removeGaugeFromWidget(this); //use GaugePageThread instead
+        _gaugePage.removeGaugeFromWidget(this); //use GaugePageThread instead
     }
      */
 
@@ -747,7 +761,7 @@ public class Gauge extends QWidget implements DataClient
         } 
         if (_historyPainter!=null) _historyPainter.end();
         _historyPainter  = new QPainter(_historyPixmap);
-        _historyPainter.setPen(_hColor);
+        _historyPainter.setPen(_historyColor);
     }
 
     // not synchronized, only called from other synchronized methods
@@ -766,7 +780,7 @@ public class Gauge extends QWidget implements DataClient
 
             //_pixmap = map.copy();
             _painter = new QPainter(_pixmap);
-            _painter.setPen(_cColor);
+            _painter.setPen(_traceColor);
         }
     }
 
@@ -891,7 +905,7 @@ public class Gauge extends QWidget implements DataClient
 
     private void status(String msg, int tm)
     {
-        _parent.status(msg, tm);
+        _gaugePage.status(msg, tm);
     }
 
 
@@ -943,18 +957,17 @@ public class Gauge extends QWidget implements DataClient
             if (yy > _ymax && _painter!=null) {
                 _painter.setPen(_red);
                 _painter.drawEllipse(pts.get(i).x(), ypixel(_ymax), 2, 2);
-                _painter.setPen(_cColor);
+                _painter.setPen(_traceColor);
             }
             if (yy < _ymin && _painter!=null) {
                 _painter.setPen(_red);
                 _painter.drawEllipse(pts.get(i).x(), ypixel(_ymin)-3, 2, 2);
-                _painter.setPen(_cColor);
+                _painter.setPen(_traceColor);
             }
 
         }
     }
 
-    //changeYMaxMin(float ymax, float ymin)
     public float getYMax(){
         return _ymax;
     }
@@ -979,24 +992,24 @@ public class Gauge extends QWidget implements DataClient
         return _name;
     }
 
-    public void setCColor(QColor c)
+    public void setTraceColor(QColor c)
     {
-        changeCColor(c);
+        changeTraceColor(c);
     }
 
-    public QColor getCColor()
+    public QColor getTraceColor()
     {
-        return _cColor;
+        return _traceColor;
     }
 
-    public void setHColor(QColor c)
+    public void setHistoryColor(QColor c)
     {
-        changeHColor(c);
+        changeHistoryColor(c);
     }
 
-    public QColor getHColor()
+    public QColor getHistoryColor()
     {
-        return _hColor;
+        return _historyColor;
     }
 
     public void setBGColor(QColor c)

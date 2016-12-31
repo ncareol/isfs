@@ -74,13 +74,10 @@ public class Cockpit extends QMainWindow {
      */
     static QImage gnodataImg = null;  //nodataImg-rip
 
-    public static QColor gdefCColor = new QColor(255,255,0);
-    public static QColor gdefHColor = new QColor(170,170,255);
+    public static QColor defTraceColor = new QColor(255,255,0);
+    public static QColor defHistoryColor = new QColor(170,170,255);
 
-    public static QColor gdefBColor = new QColor(0,85,127);
-    public static QColor gdefBColor2 = new QColor(82,85,79);
-    public static QColor gdefBColor3 = new QColor(85,85,127);
-    public static QColor gdefBColor4 = new QColor(65,94,84);
+    public static ArrayList<QColor> defBGColors = new ArrayList<QColor>();
 
     public static final int gwdef = 120;
     public static final int ghdef = 80;
@@ -90,13 +87,11 @@ public class Cockpit extends QMainWindow {
      */
     private QMenu _file;
 
-    private QMenu _tabsetup;
+    // private QMenu _tabsetup;
 
     private QMenu _add;
 
     public QMenu gsetup;
-
-    private QMenu _config;
 
     private StatusBar _statusbar;
 
@@ -104,11 +99,6 @@ public class Cockpit extends QMainWindow {
 
     private Log _log;
 
-    /**
-     * map order to def-bg-color
-     */
-    public static HashMap<String, QColor> orderToColor = new HashMap<String,QColor>();
-    
     /**
      * Config file, specifed in runstring, or in dialog.
      */
@@ -167,20 +157,24 @@ public class Cockpit extends QMainWindow {
      */
     public Cockpit(String[] args)
     {
-       
-        if (args != null && args.length > 0)  parseArg(args);
+        if (args != null && args.length > 0) parseArg(args);
+
+        // Just in case we have more than one cockpits :-)
+        if (defBGColors.isEmpty()) {
+            defBGColors.add(new QColor(0,85,127));
+            defBGColors.add(new QColor(82,85,79));
+            defBGColors.add(new QColor(85,85,127));
+            defBGColors.add(new QColor(65,94,84));
+        }
+
         connectSlotsByName();
         setHidden(true);
 
         _statusbar = new StatusBar(this);
         _logDialog = new LogDialog(this);
         _log = new LogDisplay(_logDialog.getTextWidget());
-        setGeometry(PageGeometry.x,  PageGeometry.y, PageGeometry.w, PageGeometry.h);  
-        orderToColor.put("gdefBColor", gdefBColor);
-        orderToColor.put("gdefBColor2", gdefBColor2);
-        orderToColor.put("gdefBColor3", gdefBColor3);
-        orderToColor.put("gdefBColor4", gdefBColor4);
-
+        setGeometry(PageGeometry.x,  PageGeometry.y,
+                PageGeometry.w, PageGeometry.h);  
         _centWidget = new CentTabWidget(this);
         setCentralWidget(_centWidget); 
         createUIs();
@@ -306,18 +300,22 @@ public class Cockpit extends QMainWindow {
         menuBar.setFont(new QFont("Ariel", 12));
         _file.addAction("&Connect", this, "connect()");
         _file.addAction("Show &Log", this, "showLog()");
+        _file.addAction("&Save_Config", this, "saveConfig()");
+        _file.addAction("&Open_Config", this, "openConfig()");
         _file.addAction("&Exit", this, "close()");
+
+        /*
 
         //current-tab setup
         _tabsetup = menuBar.addMenu("&Page Setup");
-        // _tabsetup.addAction("&Freeze Layout", this, "freezeUnfreezePageLayout()");
+        _tabsetup.addAction("&UnFreeze Layout", this, "unfreezePage()");
         _tabsetup.addAction("&AutoScale_Plots", _centWidget, "gautoScalePlots()");
         _tabsetup.addAction("&ManualScale_Plots", _centWidget, "rescaleGaugesInTab()");
         QMenu clr = _tabsetup.addMenu("Color");
         clr.addAction("Co&lor_Current", _centWidget, "colorCurrent()");
         clr.addAction("Color_&History", _centWidget, "colorHistory()");
         clr.addAction("Color_&BackGround", _centWidget, "colorBackGround()");
-        clr.addAction("&CleanUp_History", _centWidget, "cleanupHistory()");
+        clr.addAction("&CleanUp_History", _centWidget, "clearHistory()");
         QMenu sort = _tabsetup.addMenu("SortBy");
         // sort.addAction("Variable", _centWidget, "sortVariable()");
         // sort.addAction("Height", _centWidget, "sortHeight()");
@@ -326,6 +324,7 @@ public class Cockpit extends QMainWindow {
         tmsetup.addAction("&PlotTimeWidth", _centWidget, "changeSinglePlotWidthMsec()");
         tmsetup.addAction("Data&Timeout", _centWidget, "setSingleDataTimeout()");
         _tabsetup.setEnabled(false);
+        */
 
         //add 
         _add = menuBar.addMenu("Add");
@@ -336,16 +335,18 @@ public class Cockpit extends QMainWindow {
         _add.setEnabled(false);
 
         //global setup
-        gsetup = menuBar.addMenu("&GlobalSetup");
-        gsetup.addAction("Freeze Layouts", this, "freezeUnfreezeAllLayout()");
-        // gsetup.addAction("Freeze Number of Columns ", this, "freezeUnfreezeAllColumns()");
+        gsetup = menuBar.addMenu("&Options");
+        gsetup.addAction("&Freeze All Plot Sizes", _centWidget, "freezePlotSizes()");
+        gsetup.addAction("&UnFreeze All Plot Sizes", _centWidget, "unfreezePlotSizes()");
+        gsetup.addAction("&Freeze All Grids", _centWidget, "freezeGrids()");
+        gsetup.addAction("&UnFreeze All Grids", _centWidget, "unfreezeGrids()");
         gsetup.addAction("&AutoScalePlots", _centWidget, "ggautoScalePlots()");
         gsetup.addAction("AutoCycleTabs", _centWidget, "autoCycleTabs()");
         QMenu cr = gsetup.addMenu("Color");
         cr.addAction("Co&lor_Current", _centWidget, "gcolorCurrent()");
         cr.addAction("Color_&History", _centWidget, "gcolorHistory()");
         cr.addAction("Color_&BackGround", _centWidget, "gcolorBackGround()");
-        cr.addAction("&CleanUp_History", _centWidget, "gcleanupHistory()");
+        cr.addAction("&Clear History", _centWidget, "clearHistory()");
         QMenu srt = gsetup.addMenu("SortBy");
         // srt.addAction("Variable", _centWidget, "gsortVariable()");
         // srt.addAction("Height", _centWidget, "gsortHeight()");
@@ -354,11 +355,6 @@ public class Cockpit extends QMainWindow {
         tmset.addAction("&NodataTimeout", _centWidget, "setDataTimeout()");
         gsetup.setEnabled(false);
 
-        //_config and items
-        _config = menuBar.addMenu("&Config");
-        _config.addAction("&Save_Config", this, "saveConfig()");
-        _config.addAction("&Open_Config", this, "openConfig()");
-        _config.setEnabled(false);
     }
 
     public void showLog()
@@ -392,22 +388,11 @@ public class Cockpit extends QMainWindow {
      * Unfreeze the current GaugePage.
      */
     /*
-    private void freezeUnfreezePageLayout()
+    private void unfreezePage()
     {
-        _centWidget.freezeUnfreezePageLayout();
+        _centWidget.unfreezePage();
     }
     */
-    
-    private void freezeUnfreezeAllLayout()
-    {
-        _centWidget.freezeUnfreezeAllLayout();
-        if (_centWidget.isLayoutFrozen()) {
-            gsetup.actions().get(0).setText("Unfreeze Layouts");
-        }
-        else {
-            gsetup.actions().get(0).setText("Freeze Layouts");
-        }
-    }
     
     private void addPageByVar()
     {
@@ -586,10 +571,9 @@ public class Cockpit extends QMainWindow {
 
         status("   No sensor data yet...", 10000);
         
-        _tabsetup.setEnabled(true);
+        // _tabsetup.setEnabled(true);
         _add.setEnabled(true);
         gsetup.setEnabled(true);
-        _config.setEnabled(true);
 
         _file.actions().get(0).setEnabled(false);
 
@@ -615,7 +599,6 @@ public class Cockpit extends QMainWindow {
     static class PageGeometry {
         static public int x = 350, y = 250, w = 1000, h = 700;
     }
-
     
     /**
      * parse the parameters received from user's input

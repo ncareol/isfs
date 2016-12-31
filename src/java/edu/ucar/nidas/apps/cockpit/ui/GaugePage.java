@@ -4,12 +4,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+import com.trolltech.qt.core.Qt;
 import com.trolltech.qt.core.QSize;
 import com.trolltech.qt.core.QTimer;
-import com.trolltech.qt.core.Qt;
+import com.trolltech.qt.core.QPoint;
 import com.trolltech.qt.core.Qt.MouseButton;
 import com.trolltech.qt.gui.QColor;
 import com.trolltech.qt.gui.QCursor;
+import com.trolltech.qt.gui.QAction;
 import com.trolltech.qt.gui.QFocusEvent;
 import com.trolltech.qt.gui.QGridLayout;
 import com.trolltech.qt.gui.QInputDialog;
@@ -48,14 +50,20 @@ public class GaugePage extends QWidget {
      */
     List<Gauge> _gauges = new ArrayList<Gauge>();
 
+    private boolean _frozenPlotSizes = false;
+
+    private boolean _frozenGrid = false;
+
     /**
      * QSizePolicy of Gauges.
      */
-    private QSizePolicy _gaugePolicy = null;
+    private QSizePolicy _fixedPolicy;
+
+    private QSizePolicy _varyingPolicy;
 
     private QSize _gaugeSize = null;
 
-    private QGridLayout _gaugelayout;
+    private QGridLayout _gaugeLayout;
 
     private QScrollArea _scrollArea;
 
@@ -64,9 +72,9 @@ public class GaugePage extends QWidget {
      */
     int _ncols;
 
-    QColor _currentColor = Cockpit.gdefCColor;
-    QColor _historyColor = Cockpit.gdefHColor;
-    QColor _bgColor = Cockpit.gdefBColor;
+    QColor _traceColor = Cockpit.defTraceColor;
+    QColor _historyColor = Cockpit.defHistoryColor;
+    QColor _bgColor = Cockpit.defBGColors.get(0);
 
     /**
      * Data reduction period, in milliseconds. Points will
@@ -93,6 +101,38 @@ public class GaugePage extends QWidget {
 
     private Log _log;
 
+    private boolean _doFreezeOnResize = false;
+
+    public class PlotArea extends QWidget
+    {
+        public void mouseReleaseEvent(QMouseEvent event)
+        {
+            if (event.button() == MouseButton.RightButton)
+            {
+                QMenu menu = new QMenu("Page options");
+
+                if (frozenPlotSizes()) {
+                    menu.addAction("Unfreeze &Plot Sizes",
+                            GaugePage.this, "unfreezePlotSizes()");
+                }
+                else {
+                    menu.addAction("Freeze &Plot Sizes",
+                            GaugePage.this, "freezePlotSizes()");
+                }
+
+                if (frozenGrid()) {
+                    menu.addAction("Unfreeze &Grid",
+                            GaugePage.this, "unfreezeGrid()");
+                }
+                else {
+                    menu.addAction("Freeze &Grid",
+                            GaugePage.this, "freezeGrid()");
+                }
+                menu.popup(event.globalPos());
+            }
+        }
+    }
+
     /**
      *  constructor.
      */	
@@ -103,58 +143,55 @@ public class GaugePage extends QWidget {
         _centTabWidget = p;
         _name = name;
 
-        /*
-        // policy for this GaugePage
-        QSizePolicy sizePolicy = new QSizePolicy(
-            Policy.Expanding,Policy.Expanding);
-        // sizePolicy.setHorizontalStretch((byte)0);
-        // sizePolicy.setVerticalStretch((byte)0);
-        // sizePolicy.setHeightForWidth(true);
-        setSizePolicy(sizePolicy);
-        */
-
-        /*
-         * minimumSizeHint() returns an invalid size if there is no
-         * layout for this widget, and returns the layouts minimum
-         * size otherwise.  If minimumSize() is set, minimumSizeHint()
-         * is ignored.
-         * CentTabWidget (QTabWidget) has a layout manager,
-         * QStackedLayout.
-         *  resize(new QSize(900, 600).expandedTo(minimumSizeHint()));
-         */
-        resize(new QSize(900, 600));
-
-        _gaugelayout = new QGridLayout();
-        QWidget plotwidget = new QWidget();
-        plotwidget.resize(new QSize(800, 600));//.expandedTo(minimumSizeHint()));
-        plotwidget.setLayout(_gaugelayout);
+        QWidget plotarea = new PlotArea();
+        _gaugeLayout = new QGridLayout();
+        plotarea.setLayout(_gaugeLayout);
 
         _scrollArea = new QScrollArea(this);
-        _scrollArea.resize(800,600);
-        _scrollArea.setWidget(plotwidget);
-        _scrollArea.setWidgetResizable( true);
+        _scrollArea.setWidget(plotarea);
+        _scrollArea.setWidgetResizable(true);
         _scrollArea.adjustSize();
         _scrollArea.setHorizontalScrollBarPolicy(
                 Qt.ScrollBarPolicy.ScrollBarAlwaysOff);
 
-	// create layout for this
+	// create layout for this page of plots
         QVBoxLayout verticalLayout = new QVBoxLayout(this);
         verticalLayout.addWidget(_scrollArea);
         setLayout(verticalLayout);
 
         _gaugeSize = new QSize(Cockpit.gwdef, Cockpit.ghdef);
-        _gaugePolicy = new QSizePolicy(
+
+        _fixedPolicy = new QSizePolicy(
+            Policy.Fixed,Policy.Fixed);
+        // _fixedPolicy.setHorizontalStretch((byte)0);
+        // _fixedPolicy.setVerticalStretch((byte)0);
+        // _fixedPolicy.setHeightForWidth(true);
+
+        _varyingPolicy = new QSizePolicy(
             Policy.Expanding,Policy.Expanding);
-        _gaugePolicy.setHorizontalStretch((byte)0);
-        _gaugePolicy.setVerticalStretch((byte)0);
-        _gaugePolicy.setHeightForWidth(true);
-        _ncols = calcGaugeColumns();
-        System.out.printf("ncols=%d\n",_ncols);
+        // _varyingPolicy.setHorizontalStretch((byte)0);
+        // _varyingPolicy.setVerticalStretch((byte)0);
+        _varyingPolicy.setHeightForWidth(true);
+
+        // _ncols = 
+        // _ncols = calcGaugeColumns();
+        _ncols = 7;
+        // System.out.printf("initial ncols=%d\n",_ncols);
     }
 
     public Log getLog()
     {
         return _log;
+    }
+
+    public boolean frozenPlotSizes()
+    {
+        return _frozenPlotSizes;
+    }
+
+    public boolean frozenGrid()
+    {
+        return _frozenGrid;
     }
 
     /**
@@ -169,7 +206,9 @@ public class GaugePage extends QWidget {
             if (g == null) {
                 g = new Gauge(this, _gaugeSize, _gaugeWidthMsec, var);
 
-                g.setSizePolicy(_gaugePolicy);
+                if (_frozenPlotSizes) g.setSizePolicy(_fixedPolicy);
+                else g.setSizePolicy(_varyingPolicy);
+
                 _gauges.add(g);
                 String pname = g.getName();
                 _gaugesByName.put(pname, g);
@@ -180,7 +219,7 @@ public class GaugePage extends QWidget {
                 System.out.printf("adding Gauge=%s, row=%d,col=%d\n",
                         g.getName(),row,col);
                 */
-                _gaugelayout.addWidget(g,row,col);
+                _gaugeLayout.addWidget(g,row,col);
             }
             return g;
         }
@@ -188,16 +227,21 @@ public class GaugePage extends QWidget {
 
     public QSize getGaugeSize()
     {
+        /*
         System.out.printf("gauges size=%d\n",
                 _gauges.size());
         System.out.printf("gauge QSize=%d x %d\n",
                 _gaugeSize.width(), _gaugeSize.height());
+        */
+        QSize size = new QSize();
         if (!_gauges.isEmpty())
-            _gaugeSize = _gauges.get(0).size();
+            size = _gauges.get(0).size();
+        /*
         System.out.printf("gauge QSize=%d x %d, valid=%b\n",
-                _gaugeSize.width(), _gaugeSize.height(),
-                _gaugeSize.isValid());
-        return _gaugeSize;
+                size.width(), size.height(),
+                size.isValid());
+        */
+        return size;
     }
 
 
@@ -211,22 +255,27 @@ public class GaugePage extends QWidget {
         return _gauges;
     }
 
-    public String getName() {
+    public String getName()
+    {
         return _name;
     }
 
-    public QColor getCColor() {
-        return _currentColor;
+    public QColor getTraceColor()
+    {
+        return _traceColor;
     }
 
-    public QColor getHColor() {
+    public QColor getHistoryColor()
+    {
         return _historyColor;
     }
 
-    public QColor getBGColor() {
+    public QColor getBGColor()
+    {
         return _bgColor;
     }
-    public void setBGColor(QColor bgdc) {
+    public void setBGColor(QColor bgdc)
+    {
         _bgColor = bgdc;
     }
 
@@ -296,14 +345,12 @@ public class GaugePage extends QWidget {
 
     /**
      * Freeze the layout of the Gauges.
-     */
-    public void freezeLayout(int ncols, QSize gaugeSize)
+    public void fixPlotSizes(int ncols, QSize gaugeSize)
     {
+        _frozenPlotSizes = true;
         _gaugeSize = gaugeSize;
-        setSizeOfGauges();
-        _gaugePolicy.setHorizontalPolicy(Policy.Fixed);
-        _gaugePolicy.setVerticalPolicy(Policy.Fixed);
-        setSizePolicyOfGauges();
+        setMinSizeOfGauges(_gaugeSize);
+        setSizePolicyOfGauges(_fixedPolicy);
         if (ncols != _ncols) {
             _ncols = ncols;
             redoLayout();
@@ -311,36 +358,92 @@ public class GaugePage extends QWidget {
         _ncols = ncols;
         update(); 
     }
+     */
 
-    public void unfreezeLayout()
+    /**
+     * Freeze the size of the Gauges.
+     */
+    public void freezePlotSizes()
     {
-        _gaugePolicy.setHorizontalPolicy(Policy.Expanding);
-        _gaugePolicy.setVerticalPolicy(Policy.Expanding);
-        setSizePolicyOfGauges();
+        _frozenPlotSizes = true;
+        QSize gsize = getGaugeSize();
+        System.err.printf("fixPlotSizes, before policy change, gsize valid=%b, size=%dx%d\n",
+            gsize.isValid(), gsize.width(), gsize.height());
+
+        if (gsize.isValid()) {
+            _gaugeSize = gsize;
+            setMinSizeOfGauges(_gaugeSize);
+        }
+        setSizePolicyOfGauges(_fixedPolicy);
+        if (!_frozenGrid) {
+            int ncols = calcGaugeColumns();
+            if (ncols != _ncols) {
+                _ncols = ncols;
+                redoLayout();
+            }
+            _ncols = ncols;
+        }
+    }
+
+    public void unfreezePlotSizes()
+    {
+        _frozenPlotSizes = false;
+        setSizePolicyOfGauges(_varyingPolicy);
+        // QSize gsize = new QSize(Cockpit.gwdef, Cockpit.ghdef);
+        QSize gsize = new QSize(0,0);
+        setMinSizeOfGauges(gsize);
+        if (!_frozenGrid) {
+            int ncols = calcGaugeColumns();
+            if (ncols != _ncols) {
+                _ncols = ncols;
+                redoLayout();
+            }
+            _ncols = ncols;
+        }
+        // update(); 
+        // QSize gsize = getGaugeSize();
+        // if (gsize.isValid()) _gaugeSize = gsize;
+    }
+
+    /**
+     * Freeze the grid.
+     */
+    public void freezeGrid()
+    {
+        _frozenGrid = true;
+    }
+
+    /**
+     * Freeze the grid.
+     */
+    public void unfreezeGrid()
+    {
+        _frozenGrid = false;
         int ncols = calcGaugeColumns();
         if (ncols != _ncols) {
             _ncols = ncols;
             redoLayout();
         }
         _ncols = ncols;
-        update(); 
-        fetchGaugeSize();
     }
 
-    public void setSizePolicyOfGauges()
+    public void setSizePolicyOfGauges(QSizePolicy val)
     {
         synchronized (_gauges){
             for (Gauge gauge : _gauges) {
-                gauge.setSizePolicy(_gaugePolicy);
+                gauge.setSizePolicy(val);
+                gauge.updateGeometry();
             }
         }
     }
 
-    public void setSizeOfGauges()
+    public void setMinSizeOfGauges(QSize size)
     {
         synchronized (_gauges){
             for (Gauge gauge : _gauges) {
-                gauge.resize(_gaugeSize);
+                // gauge.resize(size);
+                gauge.setMinimumSize(size);
+                // gauge.updateGeometry();
             }
         }
     }
@@ -348,51 +451,59 @@ public class GaugePage extends QWidget {
     public int calcGaugeColumns()
     {
         // TODO: account for margins
-        int cols = 1;
-        if (_gaugePolicy.horizontalPolicy() == Policy.Expanding) {
-            if (!_gauges.isEmpty()) {
-                int mW = Cockpit.gwdef;
-                int mH = Cockpit.ghdef;
-                double perarea = (double)(width() * height()) / _gauges.size();
-                perarea = Math.max(perarea, (double)(mW * mH));
+        int w = width();
+        int ncols = _ncols;
+        QSize gsize = getGaugeSize();
+        
+        if (!gsize.isValid()) {
+            System.err.printf("calcGaugeColumns, frozenPlotSizes=%b, w=%d, #gauges=%d, invalid gauge size, ncols=%d\n",
+                    _frozenPlotSizes, w, _gauges.size(), ncols);
+            return ncols;
+        }
 
-                double newW = Math.sqrt(perarea * 3 / 2);
-                // _gw = (int)newW;
-                // _gh = (int)(newW * 2 / 3);
-                cols = Math.max((int)((double)width() / newW), 1);
-            }
-            else {
-                cols = Math.max((int)((double)width() / _gaugeSize.width()), 1);
-            }
+        if (_gauges.isEmpty()) {
+            ncols = Math.max((int)((double)w / gsize.width()), 1);
+            System.err.printf("calcGaugeColumns, frozenPlotSizes=%b, w=%d, #gauges=%d, ncols=%d\n",
+                    _frozenPlotSizes, w, _gauges.size(), ncols);
+            return ncols;
+        }
+
+        if (_frozenPlotSizes) {
+            ncols = Math.max((int)((double)w / gsize.width()), 1);
+            System.err.printf("calcGaugeColumns, frozenPlotSizes, w=%d, gw=%d, gh=%d, ncols=%d\n",
+                    w, gsize.width(), gsize.height(), ncols);
         }
         else {
-            cols = Math.max((int)((double)width() / _gaugeSize.width()), 1);
-        }
-        return cols;
-    }
+            int minarea = Cockpit.gwdef * Cockpit.ghdef;
+            int h = height();
 
-    private void fetchGaugeSize()
-    {
-        if (!_gauges.isEmpty()) {
-            Gauge g = _gauges.get(0);
-            _gaugeSize = g.size();
+            double perarea = (double)(w * h) / _gauges.size();
+            perarea = Math.max(perarea, (double)(minarea));
+
+            double newW = Math.sqrt(perarea * 3 / 2);
+            // _gw = (int)newW;
+            // _gh = (int)(newW * 2 / 3);
+            ncols = Math.max((int)Math.ceil((double)w / newW), 1);
+
+            System.err.printf("calcGaugeColumns, !frozenPlotSizes, w=%d, h=%d, gw=%d, gh=%d, ncols=%d, perarea=%f, minarea=%d\n",
+                    w, h, gsize.width(), gsize.height(), ncols, perarea, minarea);
         }
+        return ncols;
     }
 
     protected void redoLayout()
     {
-        if (_gauges == null || _gauges.size() < 1) return;
         for (Gauge gauge : _gauges) {
-            _gaugelayout.removeWidget(gauge);
+            _gaugeLayout.removeWidget(gauge);
         }
 
         for (int i = 0; i < _gauges.size(); i++) {
             int row = i / _ncols;
             int col = i % _ncols;
             Gauge g = _gauges.get(i);
-            _gaugelayout.addWidget(g,row, col);
+            _gaugeLayout.addWidget(g,row, col);
         }
-        update(); 
+        // update(); 
     } 
 
     public void focusInEvent( QFocusEvent arg)
@@ -403,56 +514,53 @@ public class GaugePage extends QWidget {
 
     public void resizeEvent(QResizeEvent ent)
     {
-        if (!isActiveWindow()) return;
+        // if (!isActiveWindow()) return;
+        // System.err.println("QResizeEvent active");
 
-        if (ent.isAccepted()){
-            synchronized(this){
-                redoLayout();
+        if (ent.isAccepted()) {
+            System.err.printf("QResizeEvent, #gauges=%d, size=%dx%d\n",
+                    _gauges.size(), ent.size().width(), ent.size().height());
+            synchronized(this) {
+                /*
+                if (_doFreezeOnResize) {
+                    System.err.printf("QResizeEvent freezing\n");
+                    update();
+                    fixPlotSizes();
+                    _doFreezeOnResize = false;
+                }
+                */
+                if (! _frozenGrid) {
+                    _ncols = calcGaugeColumns();
+                    // System.err.printf("QResizeEvent ncols=%d\n", _ncols);
+                    redoLayout();
+                }
+
             }
+            QSize gsize = getGaugeSize();
+            if (gsize.isValid()) _gaugeSize = gsize;
+            System.err.printf("QResizeEvent, gsize=%dx%d\n",
+                    gsize.width(), gsize.height());
         }
-        update();
-    }
-
-    public void destroyWidget(boolean destroyWindow)
-    {
-        super.destroy(destroyWindow);
     }
 
     public void remove(Gauge g)
     {
         synchronized (this) {
-            // Is this necessary?
-            //remove all plots
-            for (Gauge gauge : _gauges) {
-                _gaugelayout.removeWidget(gauge);
-            }
-            //remove one from gauge list
             _gauges.remove(g); 
-            // g.hide();        
-            g.destroyWidget(true);
+            _gaugesByName.put(g.getName(), null);
+            _gaugeLayout.removeWidget(g);
             update();
-            //set fixed policy
-            /*
-            if (getPolicy()==Policy.Preferred) { //set it to fixed
-                setAllPolicy(Policy.Fixed);
-            }
-            */
-            //redoLayout;
+
             _ncols = calcGaugeColumns();
-            for (int i = 0; i < _gauges.size(); i++) {
-                int row = i / _ncols;
-                int col = i % _ncols;  //index
-                _gaugelayout.addWidget(_gauges.get(i),row, col);
-            }
-            update();
+            redoLayout();
         }
     }
 
-    public void cleanupHistory()
+    public void clearHistory()
     {
         for (Gauge gauge : _gauges) {
             gauge.initPixmaps();
-            gauge.changeCColor(_currentColor);
+            gauge.changeTraceColor(_traceColor);
         }
     }
 
@@ -470,9 +578,9 @@ public class GaugePage extends QWidget {
 
     public void colorCurrent(QColor c)
     {
-        _currentColor = c;// new QColor(c.getRed(), c.getGreen(), c.getBlue());
+        _traceColor = c;// new QColor(c.getRed(), c.getGreen(), c.getBlue());
         for (Gauge gauge : _gauges) {
-            gauge.changeCColor(_currentColor);
+            gauge.changeTraceColor(_traceColor);
         }
     }
 
@@ -481,12 +589,13 @@ public class GaugePage extends QWidget {
     {
         _historyColor = c;//new QColor(c.getRed(), c.getGreen(), c.getBlue());
         for (Gauge gauge : _gauges) {
-            gauge.changeHColor(_historyColor);
+            gauge.changeHistoryColor(_historyColor);
         }
     }
 
 
-    public void colorBackGround(QColor c) {
+    public void colorBackGround(QColor c)
+    {
         _bgColor = c;
         for (Gauge gauge : _gauges) {
             gauge.changeBGColor(_bgColor);
@@ -502,6 +611,9 @@ public class GaugePage extends QWidget {
                 addGauge(var);
             }
         }
+        _doFreezeOnResize = true;
+        update(); 
+        // fixPlotSizes();
     }
 
     public void createGauges(List<Var> vars) 
@@ -509,19 +621,10 @@ public class GaugePage extends QWidget {
         for (Var var : vars) {
             addGauge(var);
         }
+        _doFreezeOnResize = true;
+        update(); 
+        // fixPlotSizes();
     }
-
-    /*
-    public void removeGaugeFromWidget(Gauge g) {
-        // if (g.getVar().getDisplay() ) return;
-        _gaugelayout.removeEventFilter(g);
-    }
-
-    public void addGaugeToWidget(Gauge g) {
-        // g.getVar().setDisplay(true);
-        _gaugelayout.addWidget(g);
-    }
-    */
 
     public void mouseReleaseEvent(QMouseEvent pEvent)
     {
@@ -542,7 +645,6 @@ public class GaugePage extends QWidget {
             setWindowTitle(text);  // user entered something and pressed OK
         } 
     }
-
 }
 
 

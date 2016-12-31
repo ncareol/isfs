@@ -193,7 +193,7 @@ public class UdpConnection {
                 String.valueOf(conn.getPort()));
 
         conn.setUDPPort(cb.getShort());
-        if (debug) log.debug("Connection response: remote UPD port=" +
+        if (debug) log.debug("Connection response: remote UDP port=" +
                 String.valueOf(conn.getUDPPort()));
 
         conn.setServer(packet.getAddress().getHostName());

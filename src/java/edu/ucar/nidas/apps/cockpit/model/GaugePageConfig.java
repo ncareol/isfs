@@ -33,7 +33,7 @@ public class GaugePageConfig {
             GaugeConfig vui = new GaugeConfig(gauge.getName(),
                 gauge.getYMin(), gauge.getYMax(),
                 gauge.getDataTimeout(), gauge.getWidthMsec(),
-                gauge.getCColor().rgb(), gauge.getHColor().rgb(),
+                gauge.getTraceColor().rgb(), gauge.getHistoryColor().rgb(),
                 gauge.getBGColor().rgb());
             _gaugeConfigs.add(vui);
         }

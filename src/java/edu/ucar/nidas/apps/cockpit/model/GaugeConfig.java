@@ -82,12 +82,12 @@ public class GaugeConfig {
         return _name;
     }
 
-    public int getCColor()
+    public int getTraceColor()
     {
         return _ccolor;
     }
 
-    public int getHColor()
+    public int getHistoryColor()
     {
         return _hcolor;
     }
@@ -97,12 +97,12 @@ public class GaugeConfig {
         return _bgcolor;
     }
 
-    public void setCColor(int val)
+    public void setTraceColor(int val)
     {
         _ccolor = val;
     }
 
-    public void setHColor(int val)
+    public void setHistoryColor(int val)
     {
         _hcolor = val;
     }
