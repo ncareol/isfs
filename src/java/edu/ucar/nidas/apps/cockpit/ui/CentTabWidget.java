@@ -238,6 +238,46 @@ public class CentTabWidget extends QTabWidget {
         }
     }
 
+    public void plotSizeStateChange()
+    {
+        int nfrozen = 0;
+        for (GaugePage gpp : _gaugePageByName.values()) {
+            if (gpp.frozenPlotSizes()) nfrozen++;
+        }
+        if (nfrozen == _gaugePageByName.size()) {
+            _cockpit.disableFreezePlotSizeMenu();
+        }
+        else {
+            _cockpit.enableFreezePlotSizeMenu();
+        }
+        if (nfrozen == 0) {
+            _cockpit.disableUnfreezePlotSizeMenu();
+        }
+        else {
+            _cockpit.enableUnfreezePlotSizeMenu();
+        }
+    }
+
+    public void gridStateChange()
+    {
+        int nfrozen = 0;
+        for (GaugePage gpp : _gaugePageByName.values()) {
+            if (gpp.frozenGrid()) nfrozen++;
+        }
+        if (nfrozen == _gaugePageByName.size()) {
+            _cockpit.disableFreezeGridMenu();
+        }
+        else {
+            _cockpit.enableFreezeGridMenu();
+        }
+        if (nfrozen == 0) {
+            _cockpit.disableUnfreezeGridMenu();
+        }
+        else {
+            _cockpit.enableUnfreezeGridMenu();
+        }
+    }
+
     /**
      * Change all pages' policy to resize 
      */
@@ -259,13 +299,18 @@ public class CentTabWidget extends QTabWidget {
     }
 
     /**
+     * Clean up history for all plots on current page.
+     */
+    public void pageClearHistory()
+    {
+        getCurrentGaugePage().clearHistory();
+    }
+
+    /**
      * Clean up history for all plots in all pages
      */
-    public void clearHistory()
+    public void globalClearHistory()
     {
-        if (_cockpit.confirmMessageBox(
-            "All plot history will be lost", "Clear History") ==
-            StandardButton.Abort.value()) return;
         for (GaugePage gp : _gaugePageByName.values()) {
             gp.clearHistory();
         }
@@ -274,101 +319,56 @@ public class CentTabWidget extends QTabWidget {
     /**
      * Scale each plot in the active page based on its max-min in the span 
      */
-    public void gautoScalePlots()
+    public void pageAutoScalePlots()
     {
-        getCurrentGaugePage().gautoScalePlots(true);
+        getCurrentGaugePage().autoScalePlots(true);
     }
 
     /**
      * Scale each plot in all page based on its max-min in the span 
      */
-    public void ggautoScalePlots() {
+    public void globalAutoScalePlots()
+    {
         for (GaugePage gp : _gaugePageByName.values()) {
-            gp.gautoScalePlots(true);
+            gp.autoScalePlots(true);
         }
-        GaugePage gp = (GaugePage)currentWidget();
-        setCurrentWidget(gp);
     }
 
-    /**
-     * Color each plot in the active page with new color  
-     */
-    public void colorCurrent() {
-        QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getTraceColor());
-        if (c.value()==0) return;
-        getCurrentGaugePage().colorCurrent(c);
-    }
     /**
      * Color each plot in all pages with new color  
      */
-    public void gcolorCurrent() {
+    public void pageTraceColor()
+    {
         QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getTraceColor());
-        if (c.value()==0) return;
-        for (GaugePage gp : _gaugePageByName.values()) gp.colorCurrent(c);
+        getCurrentGaugePage().traceColor(c);
     }
 
     /**
      * Color the history image of each plot in the active page with new color  
      */
-    public void colorHistory() {
-        if (_cockpit.confirmMessageBox(
-            "All plot history will be lost", "Color History") ==
-            StandardButton.Abort.value()) return;
+    public void pageHistoryColor()
+    {
         QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getHistoryColor());
-        if (c.value()==0) return;
-        getCurrentGaugePage().colorHistory(c);
-    }
-
-    /**
-     * Color the history image of each plot in the active page with new color  
-     */
-    public void gcolorHistory() {
-        if (_cockpit.confirmMessageBox(
-            "All plot history will be lost", "Color History") ==
-            StandardButton.Abort.value()) return;
-        QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getHistoryColor());
-        if (c.value()==0) return;
-        for (GaugePage gp : _gaugePageByName.values()) {
-            gp.colorHistory(c);
-        }
-    }
-
-    /**
-     * Color the back-ground of each plot in the active page with new color  
-     */
-    public void colorBackGround() {
-        if (_cockpit.confirmMessageBox(
-            "All plot history will be lost", "Color Background") ==
-            StandardButton.Abort.value()) return;
-        QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getBGColor());
-        if (c.value()==0) return;
-        getCurrentGaugePage().colorBackGround(c); 
+        getCurrentGaugePage().historyColor(c);
     }
 
     /**
      * Color the back-ground of each plot in all pages with new color  
      */
-    public void gcolorBackGround() {
+    public void pageBackgroundColor()
+    {
         if (_cockpit.confirmMessageBox(
             "All plot history will be lost", "Color Background") ==
             StandardButton.Abort.value()) return;
         QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getBGColor());
-        if (c.value()==0) return;
-        for (GaugePage gp : _gaugePageByName.values()) {
-            gp.colorBackGround(c); 
-        }
+        getCurrentGaugePage().backgroundColor(c);
     }
 
     /**
-     * change the gauge-time-span-x_axis for every gauge page and its plots 
-     * set the time-range in milli-second in x_axis
+     * Change the time width of all plots on all pages.
      */
-    public void changePlotWidthMsec()
+    public void changeAllPlotTimeWidth()
     {
-        if (_cockpit.confirmMessageBox(
-            "All plot history will be lost", "Change time span") ==
-            StandardButton.Abort.value()) return;
-
         int oldw = getCurrentGaugePage().getPlotWidthMsec();
         int neww = QInputDialog.getInt(this,"Plot Width",
                 "Width of plot (seconds)",
@@ -380,15 +380,10 @@ public class CentTabWidget extends QTabWidget {
     }
 
     /**
-     * change the gauge-time-span-x_axis for the current gauge page and its plots 
-     * set the time-range in milli-second in x_axis
+     * Change the time width of plots on current page.
      */
-    public void changeSinglePlotWidthMsec()
+    public void changePagePlotTimeWidth()
     {
-        if (_cockpit.confirmMessageBox(
-            "All plot history will be lost", "Change time span") ==
-            StandardButton.Abort.value()) return;
-
         int oldw = getCurrentGaugePage().getPlotWidthMsec();
         int neww = QInputDialog.getInt(this,"Plot Width",
                 "Width of plot (seconds)",
@@ -465,7 +460,7 @@ public class CentTabWidget extends QTabWidget {
      */
     private void autoCycleTabs(){
         synchronized(this) {
-            QAction at = _cockpit.gsetup.actions().get(2);
+            QAction at = _cockpit.autoCycleTabsAction;
             String tx = at.text();
             if (tx.equals("AutoCycleTabs")) {
                 at.setText("StopCycleTabs");

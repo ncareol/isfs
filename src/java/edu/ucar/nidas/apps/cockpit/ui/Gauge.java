@@ -17,6 +17,7 @@ import com.trolltech.qt.core.QTimer;
 import com.trolltech.qt.core.Qt;
 import com.trolltech.qt.core.Qt.MouseButton;
 import com.trolltech.qt.gui.QColor;
+import com.trolltech.qt.gui.QAction;
 import com.trolltech.qt.gui.QInputDialog;
 import com.trolltech.qt.gui.QColorDialog;
 import com.trolltech.qt.gui.QFont;
@@ -35,6 +36,7 @@ import edu.ucar.nidas.model.FloatSample;
 import edu.ucar.nidas.model.DataClient;
 import edu.ucar.nidas.model.Var;
 import edu.ucar.nidas.model.Log;
+import edu.ucar.nidas.apps.cockpit.ui.Cockpit.QMenuActionWithToolTip;
 
 /**
  * Gauge class is a plot unit of cockpit.
@@ -543,30 +545,71 @@ public class Gauge extends QWidget implements DataClient
             QMenu menu = new QMenu("Plot Options");
 
             if (_gaugePage.frozenPlotSizes()) {
-                menu.addAction("Unfreeze &Plot Sizes",
-                        _gaugePage, "unfreezePlotSizes()");
+                QAction action = new QMenuActionWithToolTip(
+                    "&Unfreeze &Plot Sizes",
+                    "Allow plot sizes on this page to vary, losing history shadow",
+                    menu);
+                action.triggered.connect(_gaugePage, "unfreezePlotSizes()");
+                menu.addAction(action);
             }
             else {
-                menu.addAction("Freeze &Plot Sizes",
-                        _gaugePage, "freezePlotSizes()");
+                QAction action = new QMenuActionWithToolTip(
+                    "Freeze &Plot Sizes",
+                    "Fix plot sizes on this page",
+                    menu);
+                action.triggered.connect(_gaugePage, "freezePlotSizes()");
+                menu.addAction(action);
             }
 
             if (_gaugePage.frozenGrid()) {
-                menu.addAction("Unfreeze &Grid",
-                        _gaugePage, "unfreezeGrid()");
+                QAction action = new QMenuActionWithToolTip(
+                    "Unfreeze &Grid",
+                    "Allow grid layout on this page to change",
+                    menu);
+                action.triggered.connect(_gaugePage, "unfreezeGrid()");
+                menu.addAction(action);
             }
             else {
-                menu.addAction("Freeze &Grid",
-                        _gaugePage, "freezeGrid()");
+                QAction action = new QMenuActionWithToolTip(
+                    "Freeze &Grid",
+                    "Fix grid layout on this page",
+                    menu);
+                action.triggered.connect(_gaugePage, "freezeGrid()");
+                menu.addAction(action);
             }
-            QMenu color = menu.addMenu("Color"); 
-            color.addAction("&Clear History", this, "clearHistory()");
-            color.addAction("&Trace Color", this, "changeTraceColor()");
-            color.addAction("&History Color", this, "changeHistoryColor()");
-            color.addAction("&Background Color", this, "changeBGColor()");
-            QMenu scale = menu.addMenu("Scale");
-            scale.addAction("&Manual Scale Plot", this, "changeYMaxMin()");
-            scale.addAction("&Auto Scale Plot", this, "forcedAutoScalePlot()");
+
+            QAction action = new QMenuActionWithToolTip("Clear &History",
+                    "Clear history shadow on this plot", menu);
+            action.triggered.connect(this, "clearHistory()");
+            menu.addAction(action);
+
+            QMenu color = menu.addMenu("&Color"); 
+            action = new QMenuActionWithToolTip("&Trace Color",
+                    "Change trace color on this plot", color);
+            action.triggered.connect(this, "changeTraceColor()");
+            color.addAction(action);
+
+            action = new QMenuActionWithToolTip("&History Color",
+                    "Change color of history shadow on this plot", color);
+            action.triggered.connect(this, "changeHistoryColor()");
+            color.addAction(action);
+
+            action = new QMenuActionWithToolTip("&Background Color",
+                    "Change background color on this plot", color);
+            action.triggered.connect(this, "changeBGColor()");
+            color.addAction(action);
+
+            QMenu scale = menu.addMenu("&Scale");
+            action = new QMenuActionWithToolTip("&Manual Scale Plot",
+                    "Fix Y scale on this plot", scale);
+            action.triggered.connect(this, "changeYMaxMin()");
+            scale.addAction(action);
+
+            action = new QMenuActionWithToolTip("&Auto Scale Plot",
+                    "Allow Y scale to vary on this plot", scale);
+            action.triggered.connect(this, "forcedAutoScalePlot()");
+            scale.addAction(action);
+
             menu.addAction("Set Data &Timeout", this, "setDataTimeout()");
             // menu.addAction("&Auto Resize", this, "autoResize()");
             menu.addAction("&Delete Plot", this, "deletePlot()");
@@ -605,16 +648,14 @@ public class Gauge extends QWidget implements DataClient
         resetHistoryPainter();
         resetPainter();
 
-        //init nodataImg
-        if (_noDataPixmap.isNull()) return;
         QPainter p = new QPainter(_noDataPixmap);
-        //if (Cockpit.gnodataImg!=null) { 
+        
         QPen qp = p.pen();
         p.setPen(new QColor(Qt.GlobalColor.lightGray));
         p.drawText(width()/2, height()/2, "RIP");
         p.setPen(qp);
         paintText(p); 
-        //}
+       
         p.end();
     }
 
@@ -755,22 +796,14 @@ public class Gauge extends QWidget implements DataClient
 
     private void resetHistoryPainter()
     {
-        if (_historyPixmap.isNull()) {
-            //initPixmaps();
-            return;
-        } 
-        if (_historyPainter!=null) _historyPainter.end();
-        _historyPainter  = new QPainter(_historyPixmap);
+        if (_historyPainter != null) _historyPainter.end();
+        _historyPainter = new QPainter(_historyPixmap);
         _historyPainter.setPen(_historyColor);
     }
 
     // not synchronized, only called from other synchronized methods
     private void resetPainter()
     {
-        if (_historyPixmap.isNull()) {
-            //initPixmaps();
-            return;
-        }
         synchronized(this) {
             if (_painter!=null) _painter.end();
             _pixmap = _historyPixmap.copy();

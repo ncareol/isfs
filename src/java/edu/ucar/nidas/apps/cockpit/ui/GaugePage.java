@@ -101,8 +101,6 @@ public class GaugePage extends QWidget {
 
     private Log _log;
 
-    private boolean _doFreezeOnResize = false;
-
     public class PlotArea extends QWidget
     {
         public void mouseReleaseEvent(QMouseEvent event)
@@ -138,7 +136,7 @@ public class GaugePage extends QWidget {
      */	
     public GaugePage(CentTabWidget p, String name)
     {
-        super.setParent(p);
+        super(p);
         _log = p.getLog();
         _centTabWidget = p;
         _name = name;
@@ -367,8 +365,10 @@ public class GaugePage extends QWidget {
     {
         _frozenPlotSizes = true;
         QSize gsize = getGaugeSize();
+        /*
         System.err.printf("fixPlotSizes, before policy change, gsize valid=%b, size=%dx%d\n",
             gsize.isValid(), gsize.width(), gsize.height());
+        */
 
         if (gsize.isValid()) {
             _gaugeSize = gsize;
@@ -383,6 +383,7 @@ public class GaugePage extends QWidget {
             }
             _ncols = ncols;
         }
+        _centTabWidget.plotSizeStateChange();
     }
 
     public void unfreezePlotSizes()
@@ -400,9 +401,7 @@ public class GaugePage extends QWidget {
             }
             _ncols = ncols;
         }
-        // update(); 
-        // QSize gsize = getGaugeSize();
-        // if (gsize.isValid()) _gaugeSize = gsize;
+        _centTabWidget.plotSizeStateChange();
     }
 
     /**
@@ -411,6 +410,7 @@ public class GaugePage extends QWidget {
     public void freezeGrid()
     {
         _frozenGrid = true;
+        _centTabWidget.gridStateChange();
     }
 
     /**
@@ -425,6 +425,7 @@ public class GaugePage extends QWidget {
             redoLayout();
         }
         _ncols = ncols;
+        _centTabWidget.gridStateChange();
     }
 
     public void setSizePolicyOfGauges(QSizePolicy val)
@@ -456,22 +457,28 @@ public class GaugePage extends QWidget {
         QSize gsize = getGaugeSize();
         
         if (!gsize.isValid()) {
+            /*
             System.err.printf("calcGaugeColumns, frozenPlotSizes=%b, w=%d, #gauges=%d, invalid gauge size, ncols=%d\n",
                     _frozenPlotSizes, w, _gauges.size(), ncols);
+            */
             return ncols;
         }
 
         if (_gauges.isEmpty()) {
             ncols = Math.max((int)((double)w / gsize.width()), 1);
+            /*
             System.err.printf("calcGaugeColumns, frozenPlotSizes=%b, w=%d, #gauges=%d, ncols=%d\n",
                     _frozenPlotSizes, w, _gauges.size(), ncols);
+            */
             return ncols;
         }
 
         if (_frozenPlotSizes) {
             ncols = Math.max((int)((double)w / gsize.width()), 1);
+            /*
             System.err.printf("calcGaugeColumns, frozenPlotSizes, w=%d, gw=%d, gh=%d, ncols=%d\n",
                     w, gsize.width(), gsize.height(), ncols);
+            */
         }
         else {
             int minarea = Cockpit.gwdef * Cockpit.ghdef;
@@ -485,8 +492,10 @@ public class GaugePage extends QWidget {
             // _gh = (int)(newW * 2 / 3);
             ncols = Math.max((int)Math.ceil((double)w / newW), 1);
 
+            /*
             System.err.printf("calcGaugeColumns, !frozenPlotSizes, w=%d, h=%d, gw=%d, gh=%d, ncols=%d, perarea=%f, minarea=%d\n",
                     w, h, gsize.width(), gsize.height(), ncols, perarea, minarea);
+            */
         }
         return ncols;
     }
@@ -506,11 +515,13 @@ public class GaugePage extends QWidget {
         // update(); 
     } 
 
+    /*
     public void focusInEvent( QFocusEvent arg)
     {
         if (!isActiveWindow()) return;
         //_centTabWidget .setMinimumSize(_pageSize);
     }
+    */
 
     public void resizeEvent(QResizeEvent ent)
     {
@@ -518,17 +529,11 @@ public class GaugePage extends QWidget {
         // System.err.println("QResizeEvent active");
 
         if (ent.isAccepted()) {
+            /*
             System.err.printf("QResizeEvent, #gauges=%d, size=%dx%d\n",
                     _gauges.size(), ent.size().width(), ent.size().height());
+            */
             synchronized(this) {
-                /*
-                if (_doFreezeOnResize) {
-                    System.err.printf("QResizeEvent freezing\n");
-                    update();
-                    fixPlotSizes();
-                    _doFreezeOnResize = false;
-                }
-                */
                 if (! _frozenGrid) {
                     _ncols = calcGaugeColumns();
                     // System.err.printf("QResizeEvent ncols=%d\n", _ncols);
@@ -538,8 +543,10 @@ public class GaugePage extends QWidget {
             }
             QSize gsize = getGaugeSize();
             if (gsize.isValid()) _gaugeSize = gsize;
+            /*
             System.err.printf("QResizeEvent, gsize=%dx%d\n",
                     gsize.width(), gsize.height());
+            */
         }
     }
 
@@ -569,14 +576,14 @@ public class GaugePage extends QWidget {
      * Otherwise, it will check to see yf is in the range.  
      * @param flag
      */
-    public void gautoScalePlots(boolean flag)
+    public void autoScalePlots(boolean flag)
     {
         for (Gauge gauge : _gauges) {
             gauge.autoScalePlot(flag);
         }
     }
 
-    public void colorCurrent(QColor c)
+    public void traceColor(QColor c)
     {
         _traceColor = c;// new QColor(c.getRed(), c.getGreen(), c.getBlue());
         for (Gauge gauge : _gauges) {
@@ -585,7 +592,7 @@ public class GaugePage extends QWidget {
     }
 
 
-    public void colorHistory(QColor c)
+    public void historyColor(QColor c)
     {
         _historyColor = c;//new QColor(c.getRed(), c.getGreen(), c.getBlue());
         for (Gauge gauge : _gauges) {
@@ -593,8 +600,7 @@ public class GaugePage extends QWidget {
         }
     }
 
-
-    public void colorBackGround(QColor c)
+    public void backgroundColor(QColor c)
     {
         _bgColor = c;
         for (Gauge gauge : _gauges) {
@@ -611,7 +617,6 @@ public class GaugePage extends QWidget {
                 addGauge(var);
             }
         }
-        _doFreezeOnResize = true;
         update(); 
         // fixPlotSizes();
     }
@@ -621,7 +626,6 @@ public class GaugePage extends QWidget {
         for (Var var : vars) {
             addGauge(var);
         }
-        _doFreezeOnResize = true;
         update(); 
         // fixPlotSizes();
     }
