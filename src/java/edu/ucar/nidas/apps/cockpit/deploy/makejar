@@ -31,5 +31,5 @@ javac -d $d/classes \
     # -Xlint -Xlint:unchecked \
     # -target 6 -source 6 -bootclasspath jdk1.7.0/lib/rt.jar \
 
-jar cvfm cockpit.jar $d/manifest.txt $d/image/nodata.png -C $d/classes . || exit 1
+jar cvfm $d/cockpit.jar $d/manifest.txt $d/image/nodata.png -C $d/classes . || exit 1
 
