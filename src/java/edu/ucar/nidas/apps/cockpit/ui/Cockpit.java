@@ -151,6 +151,8 @@ public class Cockpit extends QMainWindow {
 
     private UdpDataReaderThread _dataThread = null;
 
+    private final Object _dataThreadLock = new Object();
+
     private Reconnector _reconnector = null;
 
     /**
@@ -237,7 +239,7 @@ public class Cockpit extends QMainWindow {
     @Override
     public void closeEvent(QCloseEvent event)
     {
-        System.out.println("close event");
+        // System.out.println("close event");
         shutdown();
         event.accept();
     }
@@ -524,7 +526,16 @@ public class Cockpit extends QMainWindow {
 
     public void shutdown()
     {
-        if (_dataThread != null) _dataThread.interrupt();
+        synchronized(_dataThreadLock) {
+            try {
+                if (_dataThread != null) {
+                    _dataThread.interrupt();
+                    _dataThread.join();
+                }
+            }
+            catch (InterruptedException e) {}
+        }
+
         _statusbar.close();
         try {
             _udpConnection.close();
@@ -670,11 +681,11 @@ public class Cockpit extends QMainWindow {
             return false;
         }
 
-        if (_dataThread != null) {
-            _dataThread.interrupt();
+        synchronized(_dataThreadLock) {
+            if (_dataThread != null) _dataThread.interrupt();
+            _dataThread = new UdpDataReaderThread(
+                    _udpConnection.getUdpSocket(), _statusbar, _log, _reconnector);
         }
-        _dataThread = new UdpDataReaderThread(
-                _udpConnection.getUdpSocket(), _statusbar, _log, _reconnector);
         _dataProcessorByVarName.clear();
         _varsByName.clear();
 
@@ -788,9 +799,11 @@ public class Cockpit extends QMainWindow {
 
     /**
      * Construct a cockpit mainframe, and only one mainframe
-     * options: -s to pass address:port example: -s   "porter.atd.ucar.edu:30000"
+     * options: -s to pass address:port example:
+     *  -s   porter.eol.ucar.edu:30000
      */
-    public static void main(String[] args) {
+    public static void main(String[] args)
+    {
         QApplication.initialize(args);
         //setNativeLookAndFeel();
         Cockpit cockpit = new Cockpit(args);
@@ -822,14 +835,9 @@ public class Cockpit extends QMainWindow {
     }
 
     public int confirmMessageBox(String s, String title) {
-	// try {
-	    int ret =
-                QMessageBox.warning(this, title, s,
-                        StandardButton.Ok, StandardButton.Abort);
-	    return ret;
-	// } catch (Exception e) {
-	    // System.err.println(e.toString());
-	// }
-        // return StandardButton.Abort.value();
+        int ret =
+            QMessageBox.warning(this, title, s,
+                    StandardButton.Ok, StandardButton.Abort);
+        return ret;
     }
 }

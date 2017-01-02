@@ -35,21 +35,30 @@ import edu.ucar.nidas.util.Util;
 public class UdpDataReaderThread extends Thread
 {
 
-    NotifyClient _notify;
-    
-    Log _log;
+    private NotifyClient _notify;
 
-    //UI
-    StatusDisplay _status;
+    static final Object _lockObj = new Object();
+    
+    /**
+     * Where to send log messages.
+     */
+    private Log _log;
+
+    /**
+     * Where to send status messages.
+     */
+    private StatusDisplay _status;
   
-    //data 
-    public static int _buffLen = 16384;
+    public static int buffLen = 16384;
+
     private DatagramPacket _packet;    	//get data from server
+
     private ByteBuffer _bf;				//get data from server
+
     private DatagramSocket _dsocket;
 
     //data_parsser
-    NidasSampleParser _nsp = new NidasSampleParser();
+    NidasSampleParser _parser = new NidasSampleParser();
 
     /**
      *  mapping from a sample id to a Sample
@@ -76,29 +85,29 @@ public class UdpDataReaderThread extends Thread
     @Override
     public void interrupt()
     {
-        _status = null;
-        _log = null;
-        _notify = null;
+        synchronized (_lockObj) {
+            _notify = null;
+        }
         super.interrupt();
         _dsocket.close();
     }
 
     /**
-     * create a new buffer with Little-Indian byte order 
+     * create a new buffer with little-endian byte order 
      */
     private void buildDataBuf() {
-        byte[] buffer = new byte[_buffLen];
+        byte[] buffer = new byte[buffLen];
         _packet = new DatagramPacket(buffer, buffer.length);
         _bf = ByteBuffer.wrap(buffer, 0, buffer.length);
         _bf.order(ByteOrder.LITTLE_ENDIAN);
     }
 
     /**
-     * Add a DataClient to the the data-thread
+     * Add a DataClient to this thread.
      *  
      * @param samp The Sample containing the Var
-     * @param var The Var containing the data for the client.
-     * @param index The index into the Var's data which the client is to receive.
+     * @param var The Var that the client is interested in.
+     * @param client The client.
      */
     public void addClient(Sample samp, Var var, DataClient client)
     {
@@ -115,20 +124,23 @@ public class UdpDataReaderThread extends Thread
     }
 
     /*****************************************************************
-     * listen to at the port from the data-socket, 
-     * read the data packets from the data server,
-     * parse the nidas data into FloatSample
-     * fetch the data to MinMax client
+     * Read data packets from a DatagramSocket.
+     * Parse the into FloatSamples. Pass the data in
+     * the samples to interested DataClients.
+     * On an IOException, call the wake() method on 
+     * a NotifyClient, which is how a reconnection is done.
      *  
      */
     public void run( )
     {
-        
-        // Now loop forever, waiting to receive packets and printing them.
+        /*
+         * Loop forever, receiving packets, parsing into
+         * to samples, and send them to DataClients.
+         */
         int retry = 0;
         
         while(!isInterrupted()) {
-            // Wait to receive a datagram
+            // Read a DatagramPacket.
             try {
                 _dsocket.setSoTimeout(10000);
                 _dsocket.receive(_packet);
@@ -136,14 +148,14 @@ public class UdpDataReaderThread extends Thread
             catch (IOException e) {
                 _dsocket.close();
                 _log.error(e.toString());
-                if (_notify != null) {
-                    if (_status != null)
+                synchronized (_lockObj) {
+                    if (_notify != null) {
                         _status.show(e.toString() + ". Reconnecting...");
-                    _notify.wake();
-                }
-                else {
-                    if (_status != null)
+                        _notify.wake();
+                    }
+                    else {
                         _status.show(e.toString());
+                    }
                 }
                 return;
             }
@@ -151,7 +163,7 @@ public class UdpDataReaderThread extends Thread
             _bf.limit(_packet.getLength());
 
             for ( ;; ) {
-                FloatSample samp = _nsp.parseSample(_bf,_packet.getLength());
+                FloatSample samp = _parser.parseSample(_bf,_packet.getLength());
                 if (samp == null) break;
                 int sampId = samp.getId();
                 // System.out.printf("sampId=%d\n",sampId);
@@ -162,17 +174,16 @@ public class UdpDataReaderThread extends Thread
 
                     for (Var var : sample.getVars()) {
 
-                        int offset = sample.getOffset(var);
                         Set<DataClient> varClients = _varToClients.get(var);
                         if (varClients == null) continue;
-                        Iterator<DataClient> itr = varClients.iterator();
-                        while (itr.hasNext()) {
-                            DataClient client = itr.next();
+
+                        int offset = sample.getOffset(var);
+                        for (DataClient client: varClients) {
                             client.receive(samp,offset);
                         }   
                     }
                 }
-            } //forloop
+            } // loop over samples in packet
             _bf.rewind();
         }
         _dsocket.close();
