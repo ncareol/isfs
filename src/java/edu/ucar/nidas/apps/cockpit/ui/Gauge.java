@@ -51,7 +51,6 @@ import edu.ucar.nidas.apps.cockpit.ui.Cockpit.QMenuActionWithToolTip;
  * history image 
  * _painter to draw the data-line  
  * 
- * @author dongl
  */
 public class Gauge extends QWidget implements DataClient
 {
@@ -61,9 +60,9 @@ public class Gauge extends QWidget implements DataClient
     GaugePage _gaugePage;
 
     /**
-     * reduction-time-of minMaxer, mili-seconds
+     * data reduction time of minMaxer, milli-seconds
      */
-    int _reductionTm = 1000;
+    int _statisticsPeriod = 1000;
 
     /**
      * pixels/sec in Int
@@ -100,16 +99,19 @@ public class Gauge extends QWidget implements DataClient
     QTimer  _tm ;
 
     /**
-     * global-request or not.
-     * If local, it is forced to re-scale; If global & there is data in the plot, ignore it   
+     * Whether to force a plot rescale.
      */
-    boolean _gautoScale = false;
+    boolean _forceRescale = true;
 
     /**
      * data-pair for current plot span
      */
     List<QPoint> _pts = new ArrayList<QPoint>();
-    float[] _maxmin;
+
+    /**
+     * Y maximum and minimum values in current trace, used when auto-scaling.
+     */
+    float[] _yminmax = new float[2];
 
     /**
      * current image
@@ -141,22 +143,26 @@ public class Gauge extends QWidget implements DataClient
      * plot label
      */
     public String _name;
+
     /**
      * plot units
      */
     String _units;
+
     /**
      * create it dynamically or not
      */
     boolean _dynamic;
+
     /**
-     * Min float value in y-range
+     * Minimum value in y range
      */
-    float _ymin; 
+    float _yRangeMin; 
+
     /**
-     * Max float value in y-range
+     * Maximum value in y range
      */
-    float _ymax;
+    float _yRangeMax;
 
     /**
      * Current time in milliseconds of start of plot.
@@ -220,7 +226,7 @@ public class Gauge extends QWidget implements DataClient
         _log = p.getLog();
         _xmin = 0; //plot-start-tm-in-sec
         _xwidth = gaugeWidthMsec;  //in-milli-seconds
-        _reductionTm = p.getReductionPeriod();
+        _statisticsPeriod = p.getStatisticsPeriod();
 
         setMinimumSize(0,0);
 
@@ -274,7 +280,7 @@ public class Gauge extends QWidget implements DataClient
      * @ param y value in data units
      */
     private int ypixel(float y) {
-        return Math.round((_ymax - y) * _yscale);
+        return Math.round((_yRangeMax - y) * _yscale);
     }
 
     /**
@@ -297,7 +303,7 @@ public class Gauge extends QWidget implements DataClient
 
     public void setWidthMsec(int msec)
     {
-        if (msec== _xwidth) return;
+        if (msec == _xwidth) return;
         synchronized(this) {
             _xwidth = msec;
 
@@ -306,7 +312,8 @@ public class Gauge extends QWidget implements DataClient
             rescale(qs);
             initPixmaps();
             _pts.clear();
-            _maxmin = null;
+            _yminmax[0] = Float.MAX_VALUE;
+            _yminmax[1] = -Float.MAX_VALUE;
         }
     }
 
@@ -354,7 +361,7 @@ public class Gauge extends QWidget implements DataClient
     private void paintLines()
     {
         synchronized(this) {
-            if (_painter!=null)  {
+            if (_painter != null)  {
                 _painter.drawLinesFromPoints(_pts);
                 drawOutliners(_pts); 
                 update();
@@ -419,7 +426,8 @@ public class Gauge extends QWidget implements DataClient
     public void receive(FloatSample samp, int offset)
     {
 
-        synchronized (this){
+        synchronized (this)
+        {
             long x = samp.getTimeTag();
             if (_xmin == 0) {
                 _xmin = x - (x % _xwidth);
@@ -432,11 +440,12 @@ public class Gauge extends QWidget implements DataClient
                 drawHistData();
                 resetPainter();
                 _pts.clear();
-                _maxmin = null;
+                _yminmax[0] = Float.MAX_VALUE;
+                _yminmax[1] = -Float.MAX_VALUE;
                 _xmin = x - (x % _xwidth);
                 xd = (int)(x - _xmin);
             }
-            int xp = xpixel(xd); //x-pixel-pos
+            int xp = xpixel(xd); // x pixel position
 
             // String str = getName();
             // if (str.equals("P.2m") || str.equals("Lon"))   System.out.println(" var="+str +"   x="+x + "  xd="+xd+ "  _xp="+ xp +" (int)_xp="+(int)xp);
@@ -455,18 +464,22 @@ public class Gauge extends QWidget implements DataClient
                 int ypmin = ypixel(ymin);
                 int ypmax = ypixel(ymax);
                 if (ypmin == ypmax) ypmax++;
-                //check the _xp-gape
+
                 List<QPoint> pa = new ArrayList<QPoint>();
+
+                //check the _xp - gap
                 int xpts = xp - _prevXp;
-                if (_prevTtag>0 && (x-_prevTtag)==_reductionTm ) {
-                    for (int i = 0; i< xpts; i++){
+
+                if (_prevTtag > 0 && (x - _prevTtag) == _statisticsPeriod ) {
+                    // fill in intervening pixels if there is no data gap
+                    for (int i = 0; i < xpts; i++) {
                         int xind = _prevXp + 1 + i;
-                        pa.add( new QPoint(xind,ypmin));
-                        pa.add( new QPoint(xind,ypmax));
+                        pa.add(new QPoint(xind, ypmin));
+                        pa.add(new QPoint(xind, ypmax));
                     }
                 } else{
-                    pa.add( new QPoint(xp,ypmin));
-                    pa.add( new QPoint(xp,ypmax));      
+                    pa.add(new QPoint(xp, ypmin));
+                    pa.add(new QPoint(xp, ypmax));      
                 }
 
                 if (_painter != null) {
@@ -477,9 +490,9 @@ public class Gauge extends QWidget implements DataClient
                 }
 
                 _pts.addAll(pa);        //push all to the pts
-                if (_maxmin == null) {_maxmin = new float[2];_maxmin[0] = ymax;_maxmin[1] = ymin;}
-                if (ymax > _maxmin[0]) _maxmin[0] = ymax;
-                if (ymin < _maxmin[1]) _maxmin[1] = ymin;
+
+                _yminmax[0] = Math.min(ymin, _yminmax[0]);
+                _yminmax[1] = Math.max(ymax, _yminmax[1]);
 
                 _prevTtag = x;            //keep prevtime
                 _prevXp = xp;
@@ -491,13 +504,12 @@ public class Gauge extends QWidget implements DataClient
 
     public void resizeEvent(QResizeEvent ent)
     {
-        // if (parentWidget().getPolicy() == Policy.Fixed) return;
         synchronized(this) {
             rescale(ent.size());
             initPixmaps();
-            // synchronized(this) {
             _pts.clear();
-            _maxmin = null;
+            _yminmax[0] = Float.MAX_VALUE;
+            _yminmax[1] = -Float.MAX_VALUE;
         }
     }
 
@@ -515,7 +527,7 @@ public class Gauge extends QWidget implements DataClient
     public void paintEvent(QPaintEvent e)
     {
         QPainter p = null;
-        if (! _pixmap.isNull()){
+        if (! _pixmap.isNull()) {
             p = new QPainter(this);
             p.drawPixmap(0,0, _pixmap);
 
@@ -524,16 +536,16 @@ public class Gauge extends QWidget implements DataClient
                 p.drawText(width() / 2, height() / 2, "RIP");
             }
         }
-        /*if (!_noDataPixmap.isNull()) 
-            {
-                CompositionMode cpmode = p.compositionMode();//QPainter::CompositionMode_Clear;
-                p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Destination);
-                p.drawPixmap(0,0,_noDataPixmap);
-            }*/
-        /*} else  {
+        /*
+        if (!_noDataPixmap.isNull()) {
+            CompositionMode cpmode = p.compositionMode();//QPainter::CompositionMode_Clear;
+            p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Destination);
+            p.drawPixmap(0,0,_noDataPixmap);
+        } else  {
             if (! _pixmap.isNull()) p.drawPixmap(0,0, _pixmap);
 
-        }*/
+        }
+        */
 
         if (p!=null) p.end();
     }
@@ -607,7 +619,7 @@ public class Gauge extends QWidget implements DataClient
 
             action = new QMenuActionWithToolTip("&Auto Scale Plot",
                     "Allow Y scale to vary on this plot", scale);
-            action.triggered.connect(this, "forcedAutoScalePlot()");
+            action.triggered.connect(this, "forceAutoScalePlot()");
             scale.addAction(action);
 
             menu.addAction("Set Data &Timeout", this, "setDataTimeout()");
@@ -697,7 +709,7 @@ public class Gauge extends QWidget implements DataClient
      */
     private void changeYMaxMin()
     {
-        RescaleDialog rd = new RescaleDialog( _ymax, _ymin, _mousePoint.x(),
+        RescaleDialog rd = new RescaleDialog(_yRangeMax, _yRangeMin, _mousePoint.x(),
                 _mousePoint.y()) ;
         if (!rd.getOk())  return;
         if (rd.getMax() <=rd.getMin()) {
@@ -713,23 +725,23 @@ public class Gauge extends QWidget implements DataClient
      */
     public void changeYMaxMin(float ymax, float ymin)
     {
-        if (ymax == _ymax && ymin == _ymin) return;
+        if (ymax == _yRangeMax && ymin == _yRangeMin) return;
         synchronized(this) {
             _yscale = getYScale(ymax, ymin);
             _pts.clear();
-            _maxmin = null;
+            _yminmax[0] = Float.MAX_VALUE;
+            _yminmax[1] = -Float.MAX_VALUE;
             initPixmaps();
         }
         repaint();
     }
 
     /**
-     * forced auto-sclae from the plot's drop-down menu
+     * forced auto-scale from the plot's drop-down menu
      */
-    public void forcedAutoScalePlot() {
-        _gautoScale = false;
-
-        autoScalePlot();
+    public void forceAutoScalePlot()
+    {
+        autoScalePlot(true);
     }
 
     /**
@@ -738,10 +750,11 @@ public class Gauge extends QWidget implements DataClient
      * Otherwise, it will check to see yf is in the range.  
      * @param g
      */
-    public void autoScalePlot(boolean g){
-        _gautoScale = g;
+    public void autoScalePlot(boolean force)
+    {
+        _forceRescale = force;
         autoScalePlot();
-        _gautoScale = false;
+        _forceRescale = true;
     }
 
 
@@ -750,35 +763,37 @@ public class Gauge extends QWidget implements DataClient
      * If the g is false, it means (local-rescale) forced rescale. 
      * Otherwise, it will check to see yf is in the range.  
      */
-    private void autoScalePlot(){
+    private void autoScalePlot()
+    {
         synchronized(this) {
-            if (_pts == null || _pts.size()<1){
+            if (_pts == null || _pts.isEmpty()){
                 _noDataPaint = true;
                 repaint();
                 return;
             }
-            if (_maxmin == null) return;
+            if (_yminmax[0] == Float.MAX_VALUE) return;
 
-            float ymax = _maxmin[0];
-            float ymin = _maxmin[1];
+            float ymin = _yminmax[0];
+            float ymax = _yminmax[1];
 
             //check the old ones with 2% margin
-            float oldmargin = Math.abs(_ymax - _ymin) * (float).02;
-            boolean ck = _gautoScale && ymin > (_ymin + oldmargin) && ymax < (_ymax - oldmargin);
-            if ( ck ) return; //in range
+            float oldmargin = Math.abs(_yRangeMax - _yRangeMin) * (float).02;
+            boolean check = !_forceRescale && ymin > (_yRangeMin + oldmargin) && ymax < (_yRangeMax - oldmargin);
+            if (check) return; //in range
 
             // add range if the range is small 
             float range = Math.abs(ymax - ymin);
             if (range < 1.0 ) {
                 ymax =  ymax + 5;
                 ymin =  ymin - 5;
-                ck = _gautoScale && ymin > (_ymin + oldmargin) && ymax < (_ymax - oldmargin);
-                if (ck) return; //in the range
+                check = !_forceRescale && ymin > (_yRangeMin + oldmargin) && ymax < (_yRangeMax - oldmargin);
+                if (check) return; //in the range
             }
 
             _yscale = getYScale(ymax, ymin);
             _pts.clear();
-            _maxmin = null;
+            _yminmax[0] = Float.MAX_VALUE;
+            _yminmax[1] = -Float.MAX_VALUE;
 
             initPixmaps();
         }
@@ -805,7 +820,7 @@ public class Gauge extends QWidget implements DataClient
     private void resetPainter()
     {
         synchronized(this) {
-            if (_painter!=null) _painter.end();
+            if (_painter != null) _painter.end();
             _pixmap = _historyPixmap.copy();
             QPainter ptr = new QPainter(_pixmap);
             paintText(ptr);
@@ -848,15 +863,15 @@ public class Gauge extends QWidget implements DataClient
             //tics and labels  
             //max and min
             rect = new QRectF(5,0,w,rect().height());
-            painter.drawText(rect,Qt.AlignmentFlag.AlignLeft.value(), getLabel(_ymax));
+            painter.drawText(rect,Qt.AlignmentFlag.AlignLeft.value(), getLabel(_yRangeMax));
             rect = new QRectF(5,rect().height()-qf.pointSizeF()*1.5,w,qf.pointSizeF()*1.5);
-            painter.drawText(rect,Qt.AlignmentFlag.AlignLeft.value(), getLabel(_ymin));
+            painter.drawText(rect,Qt.AlignmentFlag.AlignLeft.value(), getLabel(_yRangeMin));
 
             //paint the rest of ticmarks
             painter.setFont(new QFont(hfont.family(), 5));
-            int rofts = (int)((_ymax - _ymin) / _ticDelta) - 1 ;
+            int rofts = (int)((_yRangeMax - _yRangeMin) / _ticDelta) - 1 ;
             for (int i = 1; i<=rofts; i++) {
-                int y = ypixel(_ymax - i*_ticDelta);
+                int y = ypixel(_yRangeMax - i*_ticDelta);
                 painter.drawLine(0, y, 2, y);
             }
 
@@ -879,35 +894,36 @@ public class Gauge extends QWidget implements DataClient
 
     public void closePlot() {
 
-        if (_painter!=null) _painter.end();
+        if (_painter != null) _painter.end();
         if (_historyPainter!=null) _historyPainter.end();
         super.close();	
     }
 
-    private void paintLabel(int step, QPainter painter){
+    private void paintLabel(int step, QPainter painter)
+    {
         synchronized(this) {
-            float yval = _ymax - step*_ticDelta;
+            float yval = _yRangeMax - step * _ticDelta;
             int y = ypixel(yval);
             painter.drawText(3, y+2, getLabel(yval));
         }
     }
 
     /**
-     * based on the max and min, calculate _ticDelta, _ymax, and _ymin
+     * based on the max and min, calculate _ticDelta, _yRangeMax, and _yRangeMin
      * @param ymax
      * @param ymin
+     * 
+     * _ticDelta will be 1,2,5, or 10 times a power of 10, where there
+     * are at most 6 _ticDeltas on the Y axis.
      */
     public void calTics(float ymax, float ymin)
     {
-        if (ymax <= ymin) {
-            status("getTics(): The max is less or equal to min. Exit-calTics()", 10000);
-            return;
-        }      
+        if (ymax <= ymin) return;
 
-        double dt = (ymax - ymin) / 6;
-        double l10 = Math.floor(Math.log10(dt));
+        double ytic = (ymax - ymin) / 6;    // approximately 6 tics
+        double l10 = Math.floor(Math.log10(ytic));
         double p10 = Math.pow(10.0,l10);
-        int icoef = (int)Math.ceil(dt / p10);
+        int icoef = (int)Math.ceil(ytic / p10);
 
         // round 6-9 up to 10, 3-4 to 5
         if (icoef > 5) icoef = 10;
@@ -915,8 +931,8 @@ public class Gauge extends QWidget implements DataClient
 
         synchronized (this) {
             _ticDelta = (float)(icoef * p10);
-            _ymax = getMaxTick(ymax, _ticDelta );
-            _ymin = getMinTick(ymin, _ticDelta);
+            _yRangeMax = getMaxTick(ymax, _ticDelta);
+            _yRangeMin = getMinTick(ymin, _ticDelta);
         }
     }
 
@@ -944,13 +960,13 @@ public class Gauge extends QWidget implements DataClient
 
     private float getYScale(float ymax, float ymin)
     {
-        calTics(ymax, ymin); //_ticDelta , _ymax,  and _ymin
-        return  getYScale();
+        calTics(ymax, ymin); //_ticDelta , _yRangeMax,  and _yRangeMin
+        return getYScale();
     }
 
     private float getYScale()
     {
-        return _pheight / (_ymax - _ymin);
+        return _pheight / (_yRangeMax - _yRangeMin);
     }
 
     /**
@@ -985,28 +1001,30 @@ public class Gauge extends QWidget implements DataClient
     private void drawOutliners(List<QPoint> pts){
 
         for (int i = 0; i< pts.size(); i++){
-            float yy = _ymax - pts.get(i).y()/_yscale;
+            float yy = _yRangeMax - pts.get(i).y()/_yscale;
 
-            if (yy > _ymax && _painter!=null) {
+            if (yy > _yRangeMax && _painter != null) {
                 _painter.setPen(_red);
-                _painter.drawEllipse(pts.get(i).x(), ypixel(_ymax), 2, 2);
+                _painter.drawEllipse(pts.get(i).x(), ypixel(_yRangeMax), 2, 2);
                 _painter.setPen(_traceColor);
             }
-            if (yy < _ymin && _painter!=null) {
+            if (yy < _yRangeMin && _painter != null) {
                 _painter.setPen(_red);
-                _painter.drawEllipse(pts.get(i).x(), ypixel(_ymin)-3, 2, 2);
+                _painter.drawEllipse(pts.get(i).x(), ypixel(_yRangeMin)-3, 2, 2);
                 _painter.setPen(_traceColor);
             }
 
         }
     }
 
-    public float getYMax(){
-        return _ymax;
+    public float getYMax()
+    {
+        return _yRangeMax;
     }
 
-    public float getYMin(){
-        return _ymin;
+    public float getYMin()
+    {
+        return _yRangeMin;
     }
 
     //public void setDataTimeout(float ymax) exists

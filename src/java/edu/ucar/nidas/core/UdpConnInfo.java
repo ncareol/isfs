@@ -14,11 +14,9 @@ import edu.ucar.nidas.util.Util;
  *   tcp-port
  *   udp-port
  *   ip-address, etc
- *   
- * @author dongl
- *
  */
-public class UdpConnInfo {
+public class UdpConnInfo
+{
     String _server = null;
     String _projectName = null;
     int _tcpPort = -1;
@@ -46,14 +44,6 @@ public class UdpConnInfo {
     
     public String toString()
     {
-        String dsmStr = "";
-        for (String dsm : _dsms) {
-            dsmStr += dsm + ',';
-        }
-        return _server +
-            ", udpport=" + Integer.toString(_udpPort) +
-            ", tcpport=" + Integer.toString(_tcpPort) +
-            ", project=" + _projectName + ": " + dsmStr;
+        return _server + ": " + _projectName;
     }
-
 }

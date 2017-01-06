@@ -43,8 +43,6 @@ import edu.ucar.nidas.model.Log;
  * It tracks the current tabs and mediate between the cockpit main with the other gauge-pages
  * Encapsulate all cent-tab-widget code in the class to simplify the cockpit main program 
  * 
- * @author dongl
- *
  */
 public class CentTabWidget extends QTabWidget {
 
@@ -321,7 +319,7 @@ public class CentTabWidget extends QTabWidget {
      */
     public void pageAutoScalePlots()
     {
-        getCurrentGaugePage().autoScalePlots(true);
+        getCurrentGaugePage().autoScalePlots();
     }
 
     /**
@@ -330,7 +328,7 @@ public class CentTabWidget extends QTabWidget {
     public void globalAutoScalePlots()
     {
         for (GaugePage gp : _gaugePageByName.values()) {
-            gp.autoScalePlots(true);
+            gp.autoScalePlots();
         }
     }
 
@@ -429,7 +427,7 @@ public class CentTabWidget extends QTabWidget {
 
     public void mouseReleaseEvent(QMouseEvent event)
     {
-        if (event.button()==MouseButton.RightButton)
+        if (event.button() == MouseButton.RightButton)
         {
             QMenu pMenu = new QMenu("");
             QMenu option = pMenu.addMenu("RenamePage");
@@ -437,23 +435,6 @@ public class CentTabWidget extends QTabWidget {
             option.popup(event.globalPos());
         }
     }
-
-    public void rescaleGaugesInTab() {
-
-        Gauge g = getCurrentGaugePage()._gauges.get(0);
-
-        RescaleDialog rd = new RescaleDialog( g._ymax, g._ymin, geometry().width()/3, geometry().height()/3) ;
-        if (!rd.getOk())  return;
-        if (rd.getMax() <=rd.getMin()) {
-            _cockpit.logError("Y-axis-Max is smaller than Y-axis-Min");
-            return;
-        }
-
-        List<Gauge> gs = getCurrentGaugePage()._gauges;
-        for (int i = 0; i < gs.size(); i++) 
-            gs.get(i).changeYMaxMin(rd.getMax(), rd.getMin()); 
-    }
-
 
     /**
      * auto cycle tabs based on users' chosen time-interval 

@@ -16,7 +16,7 @@ import com.trolltech.qt.gui.QHBoxLayout;
 import com.trolltech.qt.gui.QLabel;
 import com.trolltech.qt.gui.QPushButton;
 import com.trolltech.qt.gui.QRadioButton;
-import com.trolltech.qt.gui.QTextEdit;
+import com.trolltech.qt.gui.QLineEdit;
 import com.trolltech.qt.gui.QVBoxLayout;
 
 import edu.ucar.nidas.core.UdpConnection;
@@ -49,24 +49,29 @@ public class ConnectionDialog extends QDialog
     private UdpConnection _udpConnection = null;
 
     private int _ttl;
+
     /**
      * Udp data connection information
      */
     private UdpConnInfo _selectedConnection = null;
+
     private List<UdpConnInfo> _connections = null;
 
-    //diag-ui
-    private QRadioButton _mcserv, _ucserv, _rb;
+    private QRadioButton _multicast, _unicast;
 
-    private QPushButton _bcancel, _bok;
+    private QPushButton _okButton;
 
-    private QTextEdit _jtPort, _jtmName, _jtsName;
+    private QLineEdit _portInput, _multicastInput, _unicastInput;
 
-    private QComboBox _jc, _cbData;
+    private QComboBox _ttlInput, _serverSelection;
 
-    private QLabel _jlServData, _jlPort;
+    private QGroupBox _addressSelectionBox;
+
+    private QGroupBox _serverSelectionBox;
 
     private QCheckBox _connDebug;
+
+    private boolean _alwaysProvideServerSelection = true;
 
     private Cockpit _cockpit;
 
@@ -110,28 +115,17 @@ public class ConnectionDialog extends QDialog
         return _selectedConnection;
     }
 
-    private void toggleUI () {
-        _bok.setText(" Ok   ");
-        _mcserv.setEnabled(false);
-        _ucserv.setEnabled(false);
-        _jtPort.setEnabled(false);
-        _jtmName.setEnabled(false);
-        _jtsName.setEnabled(false);
-        _jc.setEnabled(false);
-        _jlPort.setEnabled(false);
-        _jlServData.setVisible(true);
-    }
-
     /**
      * Get the connection address from UI
      * @return
      */
-    private String getAddressInput() {
-        if (_ucserv.isChecked()) {
-            _unicastAddr = _jtsName.toPlainText().trim();
+    private String getAddressInput()
+    {
+        if (_unicast.isChecked()) {
+            _unicastAddr = _unicastInput.text().trim();
             _connAddr = _unicastAddr;
-        } else if (_mcserv.isChecked()) {
-            _multicastAddr = _jtmName.toPlainText().trim();
+        } else if (_multicast.isChecked()) {
+            _multicastAddr = _multicastInput.text().trim();
             _connAddr = _multicastAddr;
         } 
         return _connAddr;
@@ -148,7 +142,7 @@ public class ConnectionDialog extends QDialog
      */
     private int getPortInput()
     {
-        _connPort = Integer.valueOf(_jtPort.toPlainText().trim());
+        _connPort = Integer.valueOf(_portInput.text().trim());
         return _connPort;
     }
 
@@ -159,7 +153,7 @@ public class ConnectionDialog extends QDialog
 
     private int getTTLInput()
     {
-        _ttl = _jc.currentIndex()+1;
+        _ttl = _ttlInput.currentIndex()+1;
         return _ttl;
     }
 
@@ -171,103 +165,100 @@ public class ConnectionDialog extends QDialog
     /**
      * diag-ui creation
      */
-    public void createUI() {
+    public void createUI()
+    {
 
         setWindowTitle("Data connection");
         QVBoxLayout mlayout = new QVBoxLayout();
 
-        //for row1 and row2
-        QGroupBox qf = new QGroupBox();
-        //qf.
-        QVBoxLayout qv = new QVBoxLayout();
-        //row1 multicast
-        QHBoxLayout hlayout = new QHBoxLayout();
-        _mcserv = new QRadioButton("Multicast");
-        _mcserv.clicked.connect(this, "multicastServerRadio()");
-        hlayout.addWidget(_mcserv);
-        _jtmName = new QTextEdit(_multicastAddr);
-        _jtmName.setMaximumSize(200, 30);
-        _jtmName.adjustSize();
-        hlayout.addWidget(_jtmName);
-        hlayout.addWidget(new QLabel("TTL"));
-        _jc = new QComboBox();
-        for (int k = 1; k <= 3; k++) {
-            _jc.addItem(String.valueOf(k));
-        }
-        hlayout.addWidget(_jc);
-        hlayout.addStretch();
-        Alignment qal = new Alignment();
-        qal.set(Qt.AlignmentFlag.AlignLeft);
-        qv.addLayout(hlayout);
+        _addressSelectionBox = new QGroupBox();
 
-        //row 2 : radio= server textfield = servername
+        QVBoxLayout addrBoxLayout = new QVBoxLayout();
+
+        // multicast
+        QHBoxLayout hlayout = new QHBoxLayout();
+        _multicast = new QRadioButton("Multicast");
+        _multicast.clicked.connect(this, "multicastServerRadio()");
+        hlayout.addWidget(_multicast);
+        _multicastInput = new QLineEdit(_multicastAddr);
+        // _multicastInput.setMaximumSize(200, 30);
+        // _multicastInput.adjustSize();
+        hlayout.addWidget(_multicastInput);
+        hlayout.addWidget(new QLabel("TTL"));
+        _ttlInput = new QComboBox();
+        for (int k = 1; k <= 3; k++) {
+            _ttlInput.addItem(String.valueOf(k));
+        }
+        hlayout.addWidget(_ttlInput);
+        // hlayout.addStretch();
+        // Alignment qal = new Alignment();
+        // qal.set(Qt.AlignmentFlag.AlignLeft);
+        addrBoxLayout.addLayout(hlayout);
+
+        // unicast
         hlayout = new QHBoxLayout();
-        _ucserv = new QRadioButton("Unicast  "); 
-        _ucserv.setChecked(true);
-        _ucserv.clicked.connect(this, "unicastServerRadio()");
-        hlayout.addWidget(_ucserv);
-        _jtsName = new QTextEdit(_unicastAddr);
-        _jtsName.setMaximumSize(200, 30);
-        _jtsName.adjustSize();
-        //_jtsName.setAlignment(Qt.AlignmentFlag.AlignRight);
-        hlayout.addWidget(_jtsName);
-        hlayout.addWidget(new QLabel());
-        hlayout.addStretch();
-        qv.addLayout(hlayout);
-        qf.setLayout(qv);
+        _unicast = new QRadioButton("Unicast"); 
+        _unicast.setChecked(true);
+        _unicast.clicked.connect(this, "unicastServerRadio()");
+        hlayout.addWidget(_unicast);
+        _unicastInput = new QLineEdit(_unicastAddr);
+        // _unicastInput.setMaximumSize(200, 30);
+        // _unicastInput.adjustSize();
+        //_unicastInput.setAlignment(Qt.AlignmentFlag.AlignRight);
+        hlayout.addWidget(_unicastInput);
+        // hlayout.addWidget(new QLabel());
+        // hlayout.addStretch();
+        addrBoxLayout.addLayout(hlayout);
+
+        // port 
+        hlayout = new QHBoxLayout();
+        hlayout.addWidget(new QLabel("Port"));
+        _portInput = new QLineEdit(String.valueOf(_connPort));
+        // _portInput.setMaximumSize(200, 30);
+        // _portInput.adjustSize();
+        //_portInput.setAlignment(Qt.AlignmentFlag.AlignRight);
+        hlayout.addWidget(_portInput);
+        // hlayout.addWidget(new QLabel());
+        // hlayout.addStretch();
+        //hlayout.setAlignment(qal);
+        addrBoxLayout.addLayout(hlayout);
+
+        _addressSelectionBox.setLayout(addrBoxLayout);
+        mlayout.addWidget(_addressSelectionBox);
+
         // qf.setTitle("Data Connection");
 
-        mlayout.addWidget(qf);
+        // if more than one server responds, a selection of servers
+        _serverSelectionBox = new QGroupBox();
+        QHBoxLayout slayout = new QHBoxLayout();
+        slayout.addWidget(new QLabel("Server"));
+        _serverSelection = new QComboBox();
+        slayout.addWidget(_serverSelection);
+        _serverSelectionBox.setLayout(slayout);
+        _serverSelectionBox.setVisible(false);
 
-        //row-3  == port 
         hlayout = new QHBoxLayout();
-        _jlPort = new QLabel("         Port#     ");
-        hlayout.addWidget(_jlPort);
-        _jtPort = new QTextEdit("" + _connPort);
-        _jtPort.setMaximumSize(200, 30);
-        _jtPort.adjustSize();
-        //_jtPort.setAlignment(Qt.AlignmentFlag.AlignRight);
-        hlayout.addWidget(_jtPort);
-        hlayout.addWidget(new QLabel());
-        hlayout.addStretch();
-        //hlayout.setAlignment(qal);
+        hlayout.addWidget(_serverSelectionBox);
         mlayout.addLayout(hlayout);
 
-
-        //row 4  -servInf selection combobox
-        hlayout = new QHBoxLayout();
-        hlayout.addWidget(new QLabel());
-        mlayout.addLayout(hlayout);
-
-        hlayout = new QHBoxLayout();
-        _jlServData = new QLabel("Server Option:");
-        _jlServData.setVisible(false);
-        hlayout.addWidget(_jlServData);
-        _cbData = new QComboBox();
-        _cbData.setVisible(false);
-        hlayout.addWidget(_cbData);
-        mlayout.addItem(hlayout);
-
-        //row-5 text-edit
         _connDebug = new QCheckBox("Log connection debug messages");
         _connDebug.setChecked(false);
         _connDebug.clicked.connect(this, "connDebug()");
         mlayout.addWidget(_connDebug);
 
-        //row-last   --ok-cancel buttons
+        // ok, cancel buttons
         hlayout = new QHBoxLayout();
-        hlayout.addWidget(new QLabel());
-        _bok = new QPushButton("Search", this);
-        _bok.clicked.connect(this, "pressOk()");
-        hlayout.addWidget(_bok);
-        _bcancel = new QPushButton("Cancel", this);
-        _bcancel.clicked.connect(this, "pressCancel()");
-        hlayout.addWidget(_bcancel);
-        hlayout.addWidget(new QLabel());
+        // hlayout.addWidget(new QLabel());
+        _okButton = new QPushButton("Search", this);
+        _okButton.clicked.connect(this, "pressOk()");
+        hlayout.addWidget(_okButton);
+        QPushButton cancel = new QPushButton("Cancel", this);
+        cancel.clicked.connect(this, "pressCancel()");
+        hlayout.addWidget(cancel);
         mlayout.addItem(hlayout);
 
         setLayout(mlayout);
-        setGeometry(400, 300, 400, 300);
+        // setGeometry(400, 300, 400, 300);
         setVisible(true);
         exec();
     }
@@ -280,33 +271,31 @@ public class ConnectionDialog extends QDialog
 
     void multicastServerRadio()
     {
-        if (_mcserv.isChecked()) _ucserv.setChecked(false);
-        if (!_mcserv.isChecked() && !_ucserv.isChecked()) _mcserv.setChecked(true);
+        if (_multicast.isChecked()) _unicast.setChecked(false);
+        if (!_multicast.isChecked() && !_unicast.isChecked()) _multicast.setChecked(true);
     }
 
     void unicastServerRadio()
     {
-        if (_ucserv.isChecked()) _mcserv.setChecked(false);
-        if (!_mcserv.isChecked() && !_ucserv.isChecked()) _ucserv.setChecked(true);
+        if (_unicast.isChecked()) _multicast.setChecked(false);
+        if (!_multicast.isChecked() && !_unicast.isChecked()) _unicast.setChecked(true);
     }
 
     /**
-     * This is a toggled button to search and finalize the data connection.
-     * if it shows "Search", it looks up the potential servers
-     * else, it join the multicast group if needed, and close the dialog
+     * Dialog button to search or select a server.
      */
     void pressOk()
     {
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
-        if (_bok.text().trim().equals("Search")) {
 
+        if (_okButton.text().trim().equals("Search")) {
             search();
-            if (_connections.size() == 1 ) {  //ONLY ONE- find it
+            if (!_alwaysProvideServerSelection && _connections.size() == 1) {
                 _selectedConnection = _connections.get(0);
                 close();
             }
         } else {
-            _selectedConnection = _connections.get(_cbData.currentIndex());
+            _selectedConnection = _connections.get(_serverSelection.currentIndex());
             close();
         }
         setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
@@ -337,23 +326,20 @@ public class ConnectionDialog extends QDialog
             return;
         }
 
-        if (_connections == null || _connections.size()==0 ) {
+        if (_connections.isEmpty()) {
             _cockpit.getLog().error("search: No server found");
             _cockpit.status("search: No server found");
             return;
         }
 
-        if (_connections.size()==1) {
-            _selectedConnection = _connections.get(0);
-            return;
+        if (_connections.size() > 1 ||_alwaysProvideServerSelection) {
+            // display connections
+            for (UdpConnInfo conn : _connections) {
+                _serverSelection.addItem(conn.toString());
+            }
+            _okButton.setText("Select");
+            _addressSelectionBox.setEnabled(false);
+            _serverSelectionBox.setVisible(true);
         }
-
-        // display connections
-        //
-        for (UdpConnInfo conn : _connections) {
-            _cbData.addItem(conn.toString());
-        }
-        _cbData.setVisible(true);
-        toggleUI();
     }
 }

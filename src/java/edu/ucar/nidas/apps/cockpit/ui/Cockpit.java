@@ -61,8 +61,6 @@ import javax.xml.parsers.ParserConfigurationException;
  * It contains a mainWindow ui instance,
  * an array of gauges.
  * and a timer
- * 
- * @author dongl
  *
  */
 
@@ -112,7 +110,7 @@ public class Cockpit extends QMainWindow {
      */
     private String _configFileName = null;
 
-    private String defaultConfigName = QDir.current().filePath("cockpit.conf");
+    private String defaultConfigName = QDir.current().filePath("cockpit.xml");
     
     /**
      * UDP data server address.
@@ -160,7 +158,7 @@ public class Cockpit extends QMainWindow {
      * be plotted at this interval, typically 1000 msec for
      * 1 second data points.
      */
-    private int _reductionPeriod = 1000;
+    private int _statisticsPeriod = 1000;
 
     /**
      * Cockpit constructor.
@@ -368,8 +366,8 @@ public class Cockpit extends QMainWindow {
         action.triggered.connect(this, "showLog()");
         file.addAction(action);
 
-        file.addAction("&Save_Config", this, "saveConfig()");
-        file.addAction("&Open_Config", this, "openConfig()");
+        file.addAction("&Save Config", this, "saveConfig()");
+        file.addAction("&Open Config", this, "openConfig()");
         file.addAction("&Exit", this, "close()");
 
         QMenu add = menuBar.addMenu("Add");
@@ -703,7 +701,7 @@ public class Cockpit extends QMainWindow {
                         _varsByName.put(var.getNameWithStn(), var);
                         DataProcessor dc = _dataProcessorByVarName.get(var.getNameWithStn());
                         if (dc == null) {
-                            dc = new MinMaxer(_reductionPeriod);
+                            dc = new MinMaxer(_statisticsPeriod);
                             _dataProcessorByVarName.put(var.getNameWithStn(),dc);
                         }
                         _dataThread.addClient(samp,var,dc);

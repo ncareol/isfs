@@ -34,8 +34,6 @@ import edu.ucar.nidas.model.Log;
 /**
  * A page of Cockpit Gauges.
  * 
- * @author dongl
- *
  */
 public class GaugePage extends QWidget {
     /**
@@ -81,7 +79,7 @@ public class GaugePage extends QWidget {
      * be plotted at this interval, typically 1000 msec for
      * 1 second data points.
      */
-    int _reductionPeriod = 1000;
+    int _statisticsPeriod = 1000;
 
     /**
      *  plot-width-in-time-msec, Default width of Gauge plots, in milliseconds.
@@ -311,11 +309,11 @@ public class GaugePage extends QWidget {
     }
 
     /**
-     * get reduction period
+     * get data reduction period
      */
-    public int getReductionPeriod()
+    public int getStatisticsPeriod()
     {
-        return _reductionPeriod;
+        return _statisticsPeriod;
     }
 
     /**
@@ -576,10 +574,10 @@ public class GaugePage extends QWidget {
      * Otherwise, it will check to see yf is in the range.  
      * @param flag
      */
-    public void autoScalePlots(boolean flag)
+    public void autoScalePlots()
     {
         for (Gauge gauge : _gauges) {
-            gauge.autoScalePlot(flag);
+            gauge.autoScalePlot(false);
         }
     }
 
