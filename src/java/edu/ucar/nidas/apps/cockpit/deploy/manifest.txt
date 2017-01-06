@@ -1,4 +1,4 @@
 Main-Class: edu.ucar.nidas.apps.cockpit.ui.Cockpit
-Class-Path: lib/serializer.jar lib/xml-apis.jar lib/linux64/qtjambi-4.8.7.jar lib/linux64/qtjambi-native-linux64-gcc-4.8.7.jar
+Class-Path: lib/linux64/qtjambi-4.8.7.jar lib/linux64/qtjambi-native-linux64-gcc-4.8.7.jar
 
 

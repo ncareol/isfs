@@ -13,17 +13,21 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import org.apache.xml.serializer.DOMSerializer;
-import org.apache.xml.serializer.Method;
-import org.apache.xml.serializer.OutputPropertiesFactory;
-import org.apache.xml.serializer.Serializer;
-import org.apache.xml.serializer.SerializerFactory;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerConfigurationException;
+import javax.xml.transform.dom.DOMSource; 
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.OutputKeys;
+
+import org.xml.sax.SAXException;
+
 import org.w3c.dom.Attr;
 import org.w3c.dom.DOMException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
-import org.xml.sax.SAXException;
 
 import edu.ucar.nidas.util.Util;
 
@@ -68,20 +72,46 @@ public class DOMUtils {
     /**
      * Save a xml parser document to a file
      * @param doc -    The document that contains the xml items 
-     * @param fn -  The file name to save the xml items 
+     * @param fileName -  The file name to save the xml items 
      */
-    public static void writeXML(Document doc, String fn)
+    public static void writeXML(Document doc, String fileName)
         throws FileNotFoundException, IOException
     {
-        Properties props = OutputPropertiesFactory.getDefaultMethodProperties(Method.XML);
-        Serializer ser = SerializerFactory.getSerializer(props);
-     
-        FileOutputStream fout= new FileOutputStream(new File(fn));
-        ser.setOutputStream( fout);
-        DOMSerializer dser = ser.asDOMSerializer(); // a DOM will be serialized
-        dser.serialize(doc); // serialize the DOM, sending output to owriter
-        fout.close();
-   }
+
+	try {
+            TransformerFactory tFactory = TransformerFactory.newInstance();
+            Transformer transformer = tFactory.newTransformer();
+            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+	    if (doc.getDoctype() != null) {
+		String systemValue = (new File (doc.getDoctype().getSystemId())).getName();
+		transformer.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, systemValue);
+	    }
+
+            DOMSource source = new DOMSource(doc);
+            StreamResult result = new StreamResult(new FileOutputStream(new File(fileName)));
+            transformer.transform(source, result);
+
+        } 
+        catch (TransformerConfigurationException tce) {
+            System.out.println("* Transformer Factory error");
+            System.out.println(" " + tce.getMessage());
+
+            Throwable x = tce;
+            if (tce.getException() != null)
+                x = tce.getException();
+            x.printStackTrace(); 
+        } 
+        catch (TransformerException te) {
+            System.out.println("* Transformation error");
+            System.out.println(" " + te.getMessage());
+
+            Throwable x = te;
+            if (te.getException() != null)
+                x = te.getException();
+            x.printStackTrace();
+        } 
+
+    }
     
     public static String getValue(Node n, String attr)
     {

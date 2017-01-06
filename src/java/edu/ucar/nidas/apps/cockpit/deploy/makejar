@@ -8,7 +8,7 @@ d=$(dirname $0)
 cd $d/../../..
 
 # cp=($d/lib/*.jar $d/lib/linux/*.jar)
-cp=($d/lib/serializer.jar $d/lib/linux64/qtjambi-4.8.7.jar $d/lib/linux64/qtjambi-native-linux64-gcc-4.8.7.jar)
+cp=($d/lib/linux64/qtjambi-4.8.7.jar $d/lib/linux64/qtjambi-native-linux64-gcc-4.8.7.jar)
 OLDIFS=$IFS
 IFS=:
 # This syntax for expanding an array expands to a single word
