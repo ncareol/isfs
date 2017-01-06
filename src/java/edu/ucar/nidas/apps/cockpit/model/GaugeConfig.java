@@ -152,7 +152,7 @@ public class GaugeConfig {
 
     public void toDOM(Document document, Element parent)
     {
-        Element subem = document.createElement("GaugeConfig");
+        Element subem = document.createElement("Gauge");
         subem.setAttribute("name", _name);
         //    subem.setAttribute("cname", _cname);
         subem.setAttribute("max",  String.valueOf(_max));

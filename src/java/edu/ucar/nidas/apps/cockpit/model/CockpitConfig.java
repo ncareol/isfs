@@ -66,7 +66,7 @@ public class CockpitConfig {
     }
 
     public void toDOM(Document document) {
-        Element rootElement = document.createElement("CockpitConfig");
+        Element rootElement = document.createElement("Cockpit");
         rootElement.setAttribute("name",_name);
         document.appendChild(rootElement);
         int size = _tabpages.size();

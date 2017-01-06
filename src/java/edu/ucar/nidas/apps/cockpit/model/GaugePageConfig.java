@@ -84,7 +84,7 @@ public class GaugePageConfig {
             
     public void toDOM(Document document, Element parent)
     {
-        Element em = document.createElement("GaugePageConfig");
+        Element em = document.createElement("GaugePage");
         em.setAttribute("name", _name);
         // em.setAttribute("prim", String.valueOf(_primary));
         em.setAttribute("width", String.valueOf(_size[0]));
