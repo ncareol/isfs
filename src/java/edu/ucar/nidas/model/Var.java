@@ -1,3 +1,29 @@
+// -*- mode: java; indent-tabs-mode: nil; tab-width: 4; -*-
+// vim: set shiftwidth=4 softtabstop=4 expandtab:
+/*
+ ********************************************************************
+ ** ISFS: NCAR Integrated Surface Flux System software
+ **
+ ** 2016, Copyright University Corporation for Atmospheric Research
+ **
+ ** This program is free software; you can redistribute it and/or modify
+ ** it under the terms of the GNU General Public License as published by
+ ** the Free Software Foundation; either version 2 of the License, or
+ ** (at your option) any later version.
+ **
+ ** This program is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+ **
+ ** The LICENSE.txt file accompanying this software contains
+ ** a copy of the GNU General Public License. If it is not found,
+ ** write to the Free Software Foundation, Inc.,
+ ** 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ **
+ ********************************************************************
+*/
+
 package edu.ucar.nidas.model;
 
 import java.util.regex.Pattern;
@@ -5,21 +31,14 @@ import java.util.regex.Matcher;
 import java.util.Comparator;
 
 /**
- *  This class contains a variable parameters in the data-descriptor
- *  
- *  var-name
- *  var-unit
- *  var-len
- *  
- * @author dongl
- *
+ *  This class describes an ISFS data variable.
  */
 public class Var {
 
     /**
      * regex for getting height:
      */
-    static Pattern htregex = Pattern.compile("\\.([0-9]+]\\.?[0-9]*)(c?m)");
+    static Pattern htregex = Pattern.compile("\\.([0-9]+(\\.[0-9]+)?)(c?m)");
 
     String _name;
 
@@ -92,10 +111,12 @@ public class Var {
     {
         float val = Float.NaN;
 	Matcher matcher = htregex.matcher(str);
-        if (matcher.matches() && matcher.groupCount() == 2) {
+
+        if (matcher.find() && matcher.groupCount() == 3) {
             try {
                 val = Float.parseFloat(matcher.group(1));
-                if (matcher.group(2) == "cm") {
+                // depth in cm
+                if (matcher.group(3).equals("cm")) {
                     val = -val * 0.01f;
                 }
             }
@@ -108,8 +129,32 @@ public class Var {
     public static final Comparator<Var> HEIGHT_ORDER = 
         new Comparator<Var>() {
             public int compare(Var v1, Var v2) {
-                // return new Float(v1.getHeight()).compareTo(new Float(v2.getHeight()));
-                return Float.compare(v1.getHeight(),v2.getHeight());
+                // Float.compare treats NaN as greater than all other float values
+                // We'll flip that around
+                int res;
+                if (Float.isNaN(v1.getHeight()) || Float.isNaN(v2.getHeight()))
+                    res =  -Float.compare(v1.getHeight(),v2.getHeight());
+                else
+                    res = Float.compare(v1.getHeight(),v2.getHeight());
+
+                if (res != 0) return res;
+                return v1.getNameWithStn().compareTo(v2.getNameWithStn());
+            }
+        };
+
+    public static final Comparator<Var> HEIGHT_INVERSE_ORDER = 
+        new Comparator<Var>() {
+            public int compare(Var v1, Var v2) {
+                // Float.compare treats NaN as greater than all other float values
+                // We'll flip that around
+                int res;
+                if (Float.isNaN(v1.getHeight()) || Float.isNaN(v2.getHeight()))
+                    res = -Float.compare(v2.getHeight(),v1.getHeight());
+                else
+                    res = Float.compare(v2.getHeight(),v1.getHeight());
+
+                if (res != 0) return res;
+                return v1.getNameWithStn().compareTo(v2.getNameWithStn());
             }
         };
 
@@ -120,20 +165,26 @@ public class Var {
             }
         };
 
-    public void setUnits(String val) {_units=val; }
+    public static final Comparator<Var> NAME_INVERSE_ORDER = 
+        new Comparator<Var>() {
+            public int compare(Var v1, Var v2) {
+                return v2.getNameWithStn().compareTo(v1.getNameWithStn());
+            }
+        };
 
-    public void setMin(float val) {_plotMin=val; }
+    public void setUnits(String val) { _units = val; }
 
-    public void setMax(float val) {_plotMax=val; }
+    public void setMin(float val) { _plotMin = val; }
 
-    public void setDynamic(boolean dyn)	{_dynamic=dyn; }
+    public void setMax(float val) { _plotMax = val; }
 
-    public void setDisplay(boolean disp) {_display=disp; }
+    public void setDynamic(boolean val)	{ _dynamic = val; }
+
+    public void setDisplay(boolean val) { _display = val; }
     
     /**
-     * set the data-length of the variable. 
-     * Most time, it has one measurement per variable; but it
-     * can has more than one.
+     * The data length of the variable. 
+     * Usually there is one measurement per variable.
      */
     public void setLength(int val)
     {
