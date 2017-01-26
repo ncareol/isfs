@@ -1,4 +1,4 @@
-// -*- mode: C++; indent-tabs-mode: nil; c-basic-offset: 4; tab-width: 4; -*-
+// -*- mode: java; indent-tabs-mode: nil; c-basic-offset: 4; tab-width: 4; -*-
 // vim: set shiftwidth=4 softtabstop=4 expandtab:
 /*
  ********************************************************************
@@ -249,6 +249,12 @@ public class NewGaugePageDialog extends QDialog {
     List<Var> getSelectedVariables()
     {
         return _selectedVars;
+    }
+
+    String getName()
+    {
+        if (_selectedVars.isEmpty()) return "";
+        return _selectedVars.get(0).getNameWithStn();
     }
 
     private void selectAll(boolean select)
