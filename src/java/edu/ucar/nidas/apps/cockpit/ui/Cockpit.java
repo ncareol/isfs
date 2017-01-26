@@ -591,12 +591,13 @@ public class Cockpit extends QMainWindow {
         NewGaugePageDialog ngp = new NewGaugePageDialog(this);
 
         List<Var> vars = ngp.getSelectedVariables();
+        String name = ngp.getName();
         /*
         System.err.printf("# vars from dialog=%d\n",
                 vars.size());
         */
         if (!vars.isEmpty())
-            _centWidget.addGaugePage(vars, vars.get(0).getName());
+            _centWidget.addGaugePage(name, vars);
     }
     
     private void saveConfig()
@@ -724,6 +725,9 @@ public class Cockpit extends QMainWindow {
         _dataProcessorByVarName.clear();
         _varsByName.clear();
 
+        /*
+         * Create DataProcessors for all variables.
+         */
         for (Site site : sites) {
             ArrayList<Dsm> dsms = site.getDsms();
 
@@ -750,9 +754,9 @@ public class Cockpit extends QMainWindow {
 
         _centWidget.setName(projectname);
 
-        _centWidget.addGaugePages(sites);
+        _centWidget.connect(sites);
 
-        status("   No sensor data yet...", 10000);
+        status("No sensor data yet...", 10000);
         
         _connectAction.setEnabled(false);
         _addPage.setEnabled(true);
@@ -770,7 +774,7 @@ public class Cockpit extends QMainWindow {
     }
 
     private  void openImage() {
-        if (gnodataImg !=null) return;
+        if (gnodataImg != null) return;
         String nodatapath = "classpath:image/nodata.png";
         gnodataImg = new QImage(nodatapath);
         gnodataImg.setColor(1,new QColor(Qt.GlobalColor.red).rgb());

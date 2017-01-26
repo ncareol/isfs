@@ -126,11 +126,14 @@ public class CentTabWidget extends QTabWidget {
     }
 
     /**
-     * Create a GaugePage for every dsm.
+     * Create a GaugePage for every dsm in the array of sites.
      */
-    public void addGaugePages(ArrayList<Site> sites)
+    public void connect(ArrayList<Site> sites)
     {
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
+
+        HashMap<String, GaugePage> nonDSMGauges =
+            new HashMap<String,GaugePage>(_gaugePageByName);
 
         for (Site site : sites) {
 
@@ -147,11 +150,19 @@ public class CentTabWidget extends QTabWidget {
                     addTab(gp, gp.getName());
                 }
                 gp.createGauges(dsm);
+                nonDSMGauges.remove(dsm.getName());
             }
         }
 
         setCurrentIndex(0);
         update();
+
+        /* Reconnect the gauges on GaugePages that are not associated with
+         * a specific DSM, i.e. added by the user.
+         */
+        for (GaugePage gp: nonDSMGauges.values()) {
+            gp.connectGauges();
+        }
 
         setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
     }
@@ -159,7 +170,7 @@ public class CentTabWidget extends QTabWidget {
     /**
      * Create a GaugePage for a list of Var.
      */
-    public void addGaugePage(List<Var> vars, String name)
+    public void addGaugePage(String name, List<Var> vars)
     {
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
 

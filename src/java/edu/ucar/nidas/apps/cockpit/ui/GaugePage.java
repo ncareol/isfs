@@ -246,14 +246,22 @@ public class GaugePage extends QWidget {
                         g.getName(),row,col);
                 */
                 _gaugeLayout.addWidget(g,row,col);
-
-                DataSource ds = _centTabWidget.getCockpit().getDataSource(var);
-                if (ds != null)
-                    ds.addClient(g.getDataClient());
             }
             return g;
         }
     } 
+
+    /**
+     * Connect the Gauges to their DataSources.
+     */
+    public void connectGauges()
+    {
+        for (Gauge gauge: _gauges) {
+            DataSource ds = _centTabWidget.getCockpit().getDataSource(gauge.getName());
+            if (ds != null)
+                ds.addClient(gauge.getDataClient());
+        }
+    }
 
     public QSize getGaugeSize()
     {
@@ -655,6 +663,7 @@ public class GaugePage extends QWidget {
             }
         }
         update(); 
+        connectGauges();
         // fixPlotSizes();
     }
 
@@ -665,6 +674,7 @@ public class GaugePage extends QWidget {
                     getBGColor());
         }
         update(); 
+        connectGauges();
         // fixPlotSizes();
     }
 
