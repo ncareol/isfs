@@ -1,3 +1,29 @@
+// -*- mode: java; indent-tabs-mode: nil; tab-width: 4; -*-
+// vim: set shiftwidth=4 softtabstop=4 expandtab:
+/*
+ ********************************************************************
+ ** ISFS: NCAR Integrated Surface Flux System software
+ **
+ ** 2016, Copyright University Corporation for Atmospheric Research
+ **
+ ** This program is free software; you can redistribute it and/or modify
+ ** it under the terms of the GNU General Public License as published by
+ ** the Free Software Foundation; either version 2 of the License, or
+ ** (at your option) any later version.
+ **
+ ** This program is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+ **
+ ** The LICENSE.txt file accompanying this software contains
+ ** a copy of the GNU General Public License. If it is not found,
+ ** write to the Free Software Foundation, Inc.,
+ ** 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ **
+ ********************************************************************
+*/
+
 package edu.ucar.nidas.apps.cockpit.model;
 
 import java.util.ArrayList;
@@ -22,37 +48,52 @@ public class GaugePageConfig {
 
     String _name;
 
-    int[] _size = new int[2];
+    QSize _size;
+
+    boolean _frozenPlotSizes = false;
+
+    boolean _frozenGridLayout = false;
+
+    int _ncols;
     
     public GaugePageConfig(GaugePage gp)
     {
         _name = gp.getName();
-        _size[0] = gp.size().width();
-        _size[1] = gp.size().height();
+        _size = gp.size();
+        _frozenPlotSizes = gp.frozenPlotSizes();
+        _frozenGridLayout = gp.frozenGridLayout();
         for (Gauge gauge : gp.getGauges()) {
             GaugeConfig vui = new GaugeConfig(gauge.getName(),
                 gauge.getYMin(), gauge.getYMax(),
                 gauge.getDataTimeout(), gauge.getWidthMsec(),
-                gauge.getTraceColor().rgb(), gauge.getHistoryColor().rgb(),
-                gauge.getBGColor().rgb());
+                gauge.getTraceColor(), gauge.getHistoryColor(),
+                gauge.getBGColor());
             _gaugeConfigs.add(vui);
         }
     }
 
-    public GaugePageConfig(Node n)
+    public GaugePageConfig(Node n) throws NumberFormatException
     {
 
         String value = getValue(n,"name");
-        if (value!=null && value.length() > 0) _name = value;
+        if (value != null && value.length() > 0) _name = value;
 
         value = getValue(n,"width");
-        if (value!=null && value.length() > 0) _size[0] = (Integer.valueOf(value).intValue());
+        if (value != null && value.length() > 0) _size.setWidth(Integer.valueOf(value).intValue());
 
         value = getValue(n,"height");
-        if (value!=null && value.length() > 0) _size[1] = (Integer.valueOf(value).intValue());
+        if (value != null && value.length() > 0) _size.setHeight(Integer.valueOf(value).intValue());
+
+        value = getValue(n,"frozenPlotSizes");
+        if (value != null && value.length() > 0) _frozenPlotSizes =
+            (Boolean.valueOf(value).booleanValue());
+
+        value = getValue(n,"frozenGridLayout");
+        if (value != null && value.length() > 0) _frozenGridLayout =
+            (Boolean.valueOf(value).booleanValue());
 
         // value = getValue(n, "prim");
-        // if (value!=null && value.length() > 0) _primary = (Boolean.valueOf(value).booleanValue());
+        // if (value != null && value.length() > 0) _primary = (Boolean.valueOf(value).booleanValue());
             
         NodeList nl = n.getChildNodes();
         for (int i = 0; i < nl.getLength(); i++) {
@@ -61,11 +102,13 @@ public class GaugePageConfig {
         }
     }
     
-    public String getName() {
+    public String getName()
+    {
         return _name;
     }
     
-    public int[] getSize(){
+    public QSize getSize()
+    {
         return _size;
     }
     
@@ -73,47 +116,37 @@ public class GaugePageConfig {
         return _gaugeConfigs;
     }
     
-    public void setName(String name) {
+    public void setName(String name)
+    {
         _name = name;
     }
     
-    public void setSize(int[] size){
+    public void setSize(QSize size)
+    {
         _size = size;
     }
-    
             
     public void toDOM(Document document, Element parent)
     {
         Element em = document.createElement("GaugePage");
         em.setAttribute("name", _name);
         // em.setAttribute("prim", String.valueOf(_primary));
-        em.setAttribute("width", String.valueOf(_size[0]));
-        em.setAttribute("height", String.valueOf(_size[1]));
+        em.setAttribute("width", String.valueOf(_size.width()));
+        em.setAttribute("height", String.valueOf(_size.height()));
+
+        em.setAttribute("frozenPlotSizes", String.valueOf(_frozenPlotSizes));
+        em.setAttribute("frozenGridLayout", String.valueOf(_frozenGridLayout));
+
         parent.appendChild(em);
         for (GaugeConfig config : _gaugeConfigs) {
             config.toDOM(document, em);
         }
     }
     
-    /*
-    public void applyGaugePageConfig(GaugePage gp){
-        gp.setWindowTitle(_name);
-        gp.resize(_size[0], _size[1]);
-        gp.setPrimary(_primary);
-        System.out.println("tabpage-apply "+_name);
-
-        for (int i = 0; i<_gaugeConfigs.size(); i++) {
-            GaugeConfig plotc = _gaugeConfigs.get(i);
-            Gauge g = gp.getNameToGauge().get(plotc.getName());
-            System.out.println(i+" gauge= "+_name);
-            if (g!=null) plotc.applyGaugeConfig(g);
-        }
-    }
-    */
-    
-    private String getValue(Node n, String attr) {
+    private String getValue(Node n, String attr)
+    {
         Node nn=n.getAttributes().getNamedItem(attr);
-        if (nn==null) return null;
+        if (nn == null) return null;
         return nn.getNodeValue();
     }
     

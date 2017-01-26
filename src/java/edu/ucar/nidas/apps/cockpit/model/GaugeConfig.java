@@ -1,3 +1,29 @@
+// -*- mode: java; indent-tabs-mode: nil; tab-width: 4; -*-
+// vim: set shiftwidth=4 softtabstop=4 expandtab:
+/*
+ ********************************************************************
+ ** ISFS: NCAR Integrated Surface Flux System software
+ **
+ ** 2016, Copyright University Corporation for Atmospheric Research
+ **
+ ** This program is free software; you can redistribute it and/or modify
+ ** it under the terms of the GNU General Public License as published by
+ ** the Free Software Foundation; either version 2 of the License, or
+ ** (at your option) any later version.
+ **
+ ** This program is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+ **
+ ** The LICENSE.txt file accompanying this software contains
+ ** a copy of the GNU General Public License. If it is not found,
+ ** write to the Free Software Foundation, Inc.,
+ ** 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ **
+ ********************************************************************
+*/
+
 package edu.ucar.nidas.apps.cockpit.model;
 
 import java.util.List;
@@ -12,7 +38,6 @@ import com.trolltech.qt.gui.QColor;
 
 import edu.ucar.nidas.apps.cockpit.ui.Gauge;
 import edu.ucar.nidas.model.Var;
-import edu.ucar.nidas.util.Util;
 
 /**
  * Configuration for a Gauge.
@@ -34,47 +59,61 @@ public class GaugeConfig {
 
     int _plotWidthMsec;
 
-    int _ccolor;
+    QColor _traceColor;
 
-    int _hcolor;
+    QColor _historyColor;
 
-    int _bgcolor;
+    QColor _bgColor;
 
     public GaugeConfig(String name,
             float min, float max,
-            int timeout, int widthMsec,  int c,  int h, int b )
+            int timeout, int widthMsec,
+            QColor c,  QColor h, QColor b)
     {
         _name = name;
         _min = min;
         _max = max;
         _dataTimeout = timeout;
         _plotWidthMsec = widthMsec;
-        _ccolor = c;
-        _hcolor= h;
-        _bgcolor = b;
+        _traceColor = c;
+        _historyColor= h;
+        _bgColor = b;
     }
 
-    public GaugeConfig(Node n)
+    public GaugeConfig(Node n) throws NumberFormatException
     {
         Node vn = n.getChildNodes().item(0); //only one
 
         String value = getValue(n, "name");
-        if (value!=null && value.length()>0) _name = value;
+        if (value!=null && value.length() > 0) _name = value;
 
         value = getValue(n, "max");
-        if (value!=null && value.length()>0) _max = (Float.valueOf(value).floatValue());
+        if (value != null && value.length() > 0)
+            _max = (Float.valueOf(value).floatValue());
+
         value = getValue(n, "min");
-        if (value!=null && value.length()>0) _min = (Float.valueOf(value).floatValue());
+        if (value != null && value.length() > 0)
+            _min = (Float.valueOf(value).floatValue());
+
         value = getValue(n, "dataTimeout");
-        if (value!=null && value.length()>0) _dataTimeout = (Integer.valueOf(value).intValue());
+        if (value != null && value.length() > 0)
+            _dataTimeout = (Integer.valueOf(value).intValue());
+
         value = getValue(n, "plotWidthMsec");
-        if (value!=null && value.length()>0) _plotWidthMsec = (Integer.valueOf(value).intValue());
-        value = getValue(n, "ccolor");
-        if (value!=null && value.length()>0) _ccolor = (Integer.valueOf(value).intValue());  
-        value = getValue(n, "hcolor");
-        if (value!=null && value.length()>0) _hcolor = (Integer.valueOf(value).intValue()); 
-        value = getValue(n, "bgcolor");
-        if (value!=null && value.length()>0) _bgcolor = (Integer.valueOf(value).intValue()); 
+        if (value != null && value.length() > 0)
+            _plotWidthMsec = (Integer.valueOf(value).intValue());
+
+        value = getValue(n, "traceColor");
+        if (value != null && value.length() > 0)
+            _traceColor = new QColor(Integer.decode(value).intValue());  
+
+        value = getValue(n, "historyColor");
+        if (value != null && value.length() > 0)
+            _historyColor = new QColor(Integer.decode(value).intValue()); 
+
+        value = getValue(n, "bgColor");
+        if (value != null && value.length() > 0)
+            _bgColor = new QColor(Integer.decode(value).intValue()); 
     }
 
     public String getName()
@@ -82,34 +121,34 @@ public class GaugeConfig {
         return _name;
     }
 
-    public int getTraceColor()
+    public QColor getTraceColor()
     {
-        return _ccolor;
+        return _traceColor;
     }
 
-    public int getHistoryColor()
+    public QColor getHistoryColor()
     {
-        return _hcolor;
+        return _historyColor;
     }
 
-    public int getBGColor()
+    public QColor getBGColor()
     {
-        return _bgcolor;
+        return _bgColor;
     }
 
-    public void setTraceColor(int val)
+    public void setTraceColor(QColor val)
     {
-        _ccolor = val;
+        _traceColor = val;
     }
 
-    public void setHistoryColor(int val)
+    public void setHistoryColor(QColor val)
     {
-        _hcolor = val;
+        _historyColor = val;
     }
 
-    public void setBGColor(int val) 
+    public void setBGColor(QColor val) 
     {
-        _ccolor = val;
+        _bgColor = val;
     }
 
     public void setMin(int val)
@@ -142,11 +181,13 @@ public class GaugeConfig {
         return _dataTimeout;
     }
 
-    public void setPlotWidthMsec(int tm){
+    public void setPlotWidthMsec(int tm)
+    {
         _plotWidthMsec = tm;
     }
 
-    public int getPlotWidthMsec(){
+    public int getPlotWidthMsec()
+    {
         return _plotWidthMsec;
     }
 
@@ -159,15 +200,16 @@ public class GaugeConfig {
         subem.setAttribute("min",  String.valueOf(_min));
         subem.setAttribute("dataTimeout", String.valueOf(_dataTimeout));
         subem.setAttribute("plotWidthMsec", String.valueOf(_plotWidthMsec));
-        subem.setAttribute("ccolor", String.valueOf(_ccolor));
-        subem.setAttribute("hcolor", String.valueOf(_hcolor));
-        subem.setAttribute("bgcolor", String.valueOf(_bgcolor));
+        subem.setAttribute("traceColor", String.format("0x%08x", _traceColor.rgba()));
+        subem.setAttribute("historyColor", String.format("0x%08x", _historyColor.rgba()));
+        subem.setAttribute("bgColor", String.format("0x%08x", _bgColor.rgba()));
         parent.appendChild(subem);
     }
 
-    private String getValue(Node n, String attr) {
+    private String getValue(Node n, String attr)
+    {
         Node nn = n.getAttributes().getNamedItem(attr);
-        if (nn==null) return null;
+        if (nn == null) return null;
         return nn.getNodeValue();
     }
 }
