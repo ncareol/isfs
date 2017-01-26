@@ -1,3 +1,29 @@
+// -*- mode: java; indent-tabs-mode: nil; tab-width: 4; -*-
+// vim: set shiftwidth=4 softtabstop=4 expandtab:
+/*
+ ********************************************************************
+ ** ISFS: NCAR Integrated Surface Flux System software
+ **
+ ** 2016, Copyright University Corporation for Atmospheric Research
+ **
+ ** This program is free software; you can redistribute it and/or modify
+ ** it under the terms of the GNU General Public License as published by
+ ** the Free Software Foundation; either version 2 of the License, or
+ ** (at your option) any later version.
+ **
+ ** This program is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+ **
+ ** The LICENSE.txt file accompanying this software contains
+ ** a copy of the GNU General Public License. If it is not found,
+ ** write to the Free Software Foundation, Inc.,
+ ** 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ **
+ ********************************************************************
+*/
+
 package edu.ucar.nidas.apps.cockpit.ui;
 
 import java.awt.Color;
@@ -34,6 +60,7 @@ import com.trolltech.qt.gui.QSizePolicy.Policy;
 
 import edu.ucar.nidas.model.FloatSample;
 import edu.ucar.nidas.model.DataClient;
+import edu.ucar.nidas.model.QProxyDataClient;
 import edu.ucar.nidas.model.Var;
 import edu.ucar.nidas.model.Log;
 import edu.ucar.nidas.apps.cockpit.ui.Cockpit.QMenuActionWithToolTip;
@@ -52,12 +79,16 @@ import edu.ucar.nidas.apps.cockpit.ui.Cockpit.QMenuActionWithToolTip;
  * _painter to draw the data-line  
  * 
  */
-public class Gauge extends QWidget implements DataClient
+public class Gauge extends QWidget
 {
     /*
      * gauge's parent page
      */
     GaugePage _gaugePage;
+
+    private Gauge.GaugeDataClient _client;
+
+    private DataClient _proxyClient;
 
     /**
      * data reduction time of minMaxer, milli-seconds
@@ -219,7 +250,9 @@ public class Gauge extends QWidget implements DataClient
      * @param gaugeWidthMsec - gauge-width in milli-seconds
      * @param var - variable whose data is plotted
      */
-    public Gauge(GaugePage p, QSize size, int gaugeWidthMsec, Var var) {
+    public Gauge(GaugePage p, QSize size, int gaugeWidthMsec, Var var,
+            QColor tc, QColor hc, QColor bg)
+    {
 
         super(p);
         _gaugePage = p;
@@ -227,6 +260,9 @@ public class Gauge extends QWidget implements DataClient
         _xmin = 0; //plot-start-tm-in-sec
         _xwidth = gaugeWidthMsec;  //in-milli-seconds
         _statisticsPeriod = p.getStatisticsPeriod();
+        _traceColor = tc;
+        _historyColor = hc;
+        _bgColor = bg;
 
         setMinimumSize(0,0);
 
@@ -243,9 +279,6 @@ public class Gauge extends QWidget implements DataClient
         rescale(size());
         initPixmaps();
 
-        _traceColor= p.getTraceColor();
-        _historyColor = p.getHistoryColor();
-        _bgColor = p.getBGColor();
         //show();
         _lastTm = System.currentTimeMillis();
         _tm = new QTimer();
@@ -258,6 +291,15 @@ public class Gauge extends QWidget implements DataClient
         System.out.printf("new Gauge %s: w=%d,h=%d\n",
                 getName(),size.width(),size.height());
         */
+
+        _client = this.new GaugeDataClient();
+
+        _proxyClient = QProxyDataClient.getProxy(_client);
+    }
+
+    DataClient getDataClient()
+    {
+        return _proxyClient;
     }
 
     public int heightForWidth(int w)
@@ -418,90 +460,6 @@ public class Gauge extends QWidget implements DataClient
         // repaint();
     }
 
-    /**
-     * get the new data, and plot it
-     * @param samp - sample-data
-     * @param offset -beginning index to read the pair of min and max
-     */
-    public void receive(FloatSample samp, int offset)
-    {
-
-        synchronized (this)
-        {
-            long x = samp.getTimeTag();
-            if (_xmin == 0) {
-                _xmin = x - (x % _xwidth);
-                // show();
-            }
-            int xd = (int)(x - _xmin); // milliseconds into plot
-
-            // reach eof plot
-            if (xd > _xwidth) {
-                drawHistData();
-                resetPainter();
-                _pts.clear();
-                _yminmax[0] = Float.MAX_VALUE;
-                _yminmax[1] = -Float.MAX_VALUE;
-                _xmin = x - (x % _xwidth);
-                xd = (int)(x - _xmin);
-            }
-            int xp = xpixel(xd); // x pixel position
-
-            // String str = getName();
-            // if (str.equals("P.2m") || str.equals("Lon"))   System.out.println(" var="+str +"   x="+x + "  xd="+xd+ "  _xp="+ xp +" (int)_xp="+(int)xp);
-
-            float ymin = samp.getData(offset);
-            float ymax = samp.getData(offset+1);
-            /*
-            System.out.printf("name=%s, ymin=%f,ymax=%f\n",
-                    getName(),ymin,ymax);
-            */
-
-            if (!Float.isNaN(ymin) && !Float.isNaN(ymax)) {
-                _noDataPaint = false;
-                _lastTm = x;
-
-                int ypmin = ypixel(ymin);
-                int ypmax = ypixel(ymax);
-                if (ypmin == ypmax) ypmax++;
-
-                List<QPoint> pa = new ArrayList<QPoint>();
-
-                //check the _xp - gap
-                int xpts = xp - _prevXp;
-
-                if (_prevTtag > 0 && (x - _prevTtag) == _statisticsPeriod ) {
-                    // fill in intervening pixels if there is no data gap
-                    for (int i = 0; i < xpts; i++) {
-                        int xind = _prevXp + 1 + i;
-                        pa.add(new QPoint(xind, ypmin));
-                        pa.add(new QPoint(xind, ypmax));
-                    }
-                } else{
-                    pa.add(new QPoint(xp, ypmin));
-                    pa.add(new QPoint(xp, ypmax));      
-                }
-
-                if (_painter != null) {
-                    _painter.drawLinesFromPoints(pa);
-                    drawOutliners(pa);
-                } else {
-                    status(" plot=" + getName() + " in receive, null painter.", 10000);
-                }
-
-                _pts.addAll(pa);        //push all to the pts
-
-                _yminmax[0] = Math.min(ymin, _yminmax[0]);
-                _yminmax[1] = Math.max(ymax, _yminmax[1]);
-
-                _prevTtag = x;            //keep prevtime
-                _prevXp = xp;
-
-                update();
-            }
-        }
-    }
-
     public void resizeEvent(QResizeEvent ent)
     {
         synchronized(this) {
@@ -573,20 +531,20 @@ public class Gauge extends QWidget implements DataClient
                 menu.addAction(action);
             }
 
-            if (_gaugePage.frozenGrid()) {
+            if (_gaugePage.frozenGridLayout()) {
                 QAction action = new QMenuActionWithToolTip(
-                    "Unfreeze &Grid",
+                    "Unfreeze &Grid Layout",
                     "Allow grid layout on this page to change",
                     menu);
-                action.triggered.connect(_gaugePage, "unfreezeGrid()");
+                action.triggered.connect(_gaugePage, "unfreezeGridLayout()");
                 menu.addAction(action);
             }
             else {
                 QAction action = new QMenuActionWithToolTip(
-                    "Freeze &Grid",
+                    "Freeze &Grid Layout",
                     "Fix grid layout on this page",
                     menu);
-                action.triggered.connect(_gaugePage, "freezeGrid()");
+                action.triggered.connect(_gaugePage, "freezeGridLayout()");
                 menu.addAction(action);
             }
 
@@ -892,8 +850,8 @@ public class Gauge extends QWidget implements DataClient
         }
     }
 
-    public void closePlot() {
-
+    public void closePlot()
+    {
         if (_painter != null) _painter.end();
         if (_historyPainter!=null) _historyPainter.end();
         super.close();	
@@ -1071,5 +1029,94 @@ public class Gauge extends QWidget implements DataClient
     public QColor getBGColor()
     {
         return _bgColor;
+    }
+
+    /**
+     * Inner class implementing DataClient.
+     */
+    class GaugeDataClient implements DataClient
+    {
+        /**
+         * get the new data, and plot it
+         * @param samp - sample-data
+         * @param offset -beginning index to read the pair of min and max
+         */
+        public void receive(FloatSample samp, int offset)
+        {
+            synchronized (this)
+            {
+                long x = samp.getTimeTag();
+                if (_xmin == 0) {
+                    _xmin = x - (x % _xwidth);
+                    // show();
+                }
+                int xd = (int)(x - _xmin); // milliseconds into plot
+
+                // reach eof plot
+                if (xd > _xwidth) {
+                    drawHistData();
+                    resetPainter();
+                    _pts.clear();
+                    _yminmax[0] = Float.MAX_VALUE;
+                    _yminmax[1] = -Float.MAX_VALUE;
+                    _xmin = x - (x % _xwidth);
+                    xd = (int)(x - _xmin);
+                }
+                int xp = xpixel(xd); // x pixel position
+
+                // String str = getName();
+                // if (str.equals("P.2m") || str.equals("Lon"))   System.out.println(" var="+str +"   x="+x + "  xd="+xd+ "  _xp="+ xp +" (int)_xp="+(int)xp);
+
+                float ymin = samp.getData(offset);
+                float ymax = samp.getData(offset+1);
+                /*
+                System.out.printf("name=%s, ymin=%f,ymax=%f\n",
+                        getName(),ymin,ymax);
+                */
+
+                if (!Float.isNaN(ymin) && !Float.isNaN(ymax)) {
+                    _noDataPaint = false;
+                    _lastTm = x;
+
+                    int ypmin = ypixel(ymin);
+                    int ypmax = ypixel(ymax);
+                    if (ypmin == ypmax) ypmax++;
+
+                    List<QPoint> pa = new ArrayList<QPoint>();
+
+                    //check the _xp - gap
+                    int xpts = xp - _prevXp;
+
+                    if (_prevTtag > 0 && (x - _prevTtag) == _statisticsPeriod ) {
+                        // fill in intervening pixels if there is no data gap
+                        for (int i = 0; i < xpts; i++) {
+                            int xind = _prevXp + 1 + i;
+                            pa.add(new QPoint(xind, ypmin));
+                            pa.add(new QPoint(xind, ypmax));
+                        }
+                    } else{
+                        pa.add(new QPoint(xp, ypmin));
+                        pa.add(new QPoint(xp, ypmax));      
+                    }
+
+                    if (_painter != null) {
+                        _painter.drawLinesFromPoints(pa);
+                        drawOutliners(pa);
+                    } else {
+                        status(" plot=" + getName() + " in receive, null painter.", 10000);
+                    }
+
+                    _pts.addAll(pa);        //push all to the pts
+
+                    _yminmax[0] = Math.min(ymin, _yminmax[0]);
+                    _yminmax[1] = Math.max(ymax, _yminmax[1]);
+
+                    _prevTtag = x;            //keep prevtime
+                    _prevXp = xp;
+
+                    update();
+                }
+            }
+        }
     }
 }

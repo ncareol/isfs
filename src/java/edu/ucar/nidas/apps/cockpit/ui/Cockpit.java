@@ -1,3 +1,29 @@
+// -*- mode: java; indent-tabs-mode: nil; tab-width: 4; -*-
+// vim: set shiftwidth=4 softtabstop=4 expandtab:
+/*
+ ********************************************************************
+ ** ISFS: NCAR Integrated Surface Flux System software
+ **
+ ** 2016, Copyright University Corporation for Atmospheric Research
+ **
+ ** This program is free software; you can redistribute it and/or modify
+ ** it under the terms of the GNU General Public License as published by
+ ** the Free Software Foundation; either version 2 of the License, or
+ ** (at your option) any later version.
+ **
+ ** This program is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+ **
+ ** The LICENSE.txt file accompanying this software contains
+ ** a copy of the GNU General Public License. If it is not found,
+ ** write to the Free Software Foundation, Inc.,
+ ** 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ **
+ ********************************************************************
+*/
+
 package edu.ucar.nidas.apps.cockpit.ui;
 
 import java.util.ArrayList;
@@ -90,6 +116,8 @@ public class Cockpit extends QMainWindow {
     private StatusBar _statusbar;
 
     private QAction _connectAction;
+
+    private QMenu _addPage;
 
     private QAction _freezeAllPlotAction;
 
@@ -234,6 +262,11 @@ public class Cockpit extends QMainWindow {
         return _dataProcessorByVarName.get(var.getNameWithStn());
     }
 
+    public DataSource getDataSource(String varName) 
+    {
+        return _dataProcessorByVarName.get(varName);
+    }
+
     @Override
     public void closeEvent(QCloseEvent event)
     {
@@ -370,12 +403,11 @@ public class Cockpit extends QMainWindow {
         file.addAction("&Open Config", this, "openConfig()");
         file.addAction("&Exit", this, "close()");
 
-        QMenu add = menuBar.addMenu("Add");
-        add.addAction("NewPageByVar", this, "addPageByVar()");
-        add.addAction("NewPageByHt", this, "addPageByHt()");
-        //add.addAction("SortPageByVariable", _centWidget, "addVariablePage()");
-        //add.addAction("SortPageByHeight", _centWidget, "addHeightPage()");
-        add.setEnabled(false);
+        _addPage = menuBar.addMenu("Add");
+        _addPage.addAction("New Page", this, "addGaugePage()");
+        //_addPage.addAction("SortPageByVariable", _centWidget, "addVariablePage()");
+        //_addPage.addAction("SortPageByHeight", _centWidget, "addHeightPage()");
+        _addPage.setEnabled(false);
 
         // Top menu of global options
         QMenu topMenu = menuBar.addMenu("&Global Options");
@@ -397,20 +429,22 @@ public class Cockpit extends QMainWindow {
         action.triggered.connect(_centWidget, "unfreezePlotSizes()");
         topMenu.addAction(action);
         _unfreezeAllPlotAction = action;
+        disableUnfreezePlotSizeMenu();
 
-        action = new QMenuActionWithToolTip("Freeze Grids", 
+        action = new QMenuActionWithToolTip("Freeze Grid Layouts", 
             "Fix grid layout of plots",
             topMenu);
-        action.triggered.connect(_centWidget, "freezeGrids()");
+        action.triggered.connect(_centWidget, "freezeGridLayouts()");
         topMenu.addAction(action);
         _freezeAllGridAction = action;
 
-        action = new QMenuActionWithToolTip("Unfreeze Grids", 
+        action = new QMenuActionWithToolTip("Unfreeze Grid Layouts", 
             "Allow grid layout to change",
             topMenu);
-        action.triggered.connect(_centWidget, "unfreezeGrids()");
+        action.triggered.connect(_centWidget, "unfreezeGridLayouts()");
         topMenu.addAction(action);
         _unfreezeAllGridAction = action;
+        disableUnfreezeGridLayoutMenu();
 
         action = new QMenuActionWithToolTip("Auto Cycle &Tabs", 
             "Cycle through plot pages",
@@ -496,22 +530,22 @@ public class Cockpit extends QMainWindow {
         _unfreezeAllPlotAction.setEnabled(true);
     }
 
-    public void disableFreezeGridMenu()
+    public void disableFreezeGridLayoutMenu()
     {
         _freezeAllGridAction.setEnabled(false);
     }
 
-    public void enableFreezeGridMenu()
+    public void enableFreezeGridLayoutMenu()
     {
         _freezeAllGridAction.setEnabled(true);
     }
 
-    public void disableUnfreezeGridMenu()
+    public void disableUnfreezeGridLayoutMenu()
     {
         _unfreezeAllGridAction.setEnabled(false);
     }
 
-    public void enableUnfreezeGridMenu()
+    public void enableUnfreezeGridLayoutMenu()
     {
         _unfreezeAllGridAction.setEnabled(true);
     }
@@ -552,14 +586,17 @@ public class Cockpit extends QMainWindow {
         return _configFileName;
     }
     
-    private void addPageByVar()
+    private void addGaugePage()
     {
-        new VarLookup(this);
-    }
-    
-    private void addPageByHt()
-    {
-        new HtLookup(this);
+        NewGaugePageDialog ngp = new NewGaugePageDialog(this);
+
+        List<Var> vars = ngp.getSelectedVariables();
+        /*
+        System.err.printf("# vars from dialog=%d\n",
+                vars.size());
+        */
+        if (!vars.isEmpty())
+            _centWidget.addGaugePage(vars, vars.get(0).getName());
     }
     
     private void saveConfig()
@@ -712,24 +749,13 @@ public class Cockpit extends QMainWindow {
         }
 
         _centWidget.setName(projectname);
+
         _centWidget.addGaugePages(sites);
-
-        Collection<GaugePage> pages = _centWidget.getGaugePages();
-
-        for (GaugePage page: pages) {
-            List<Gauge> gauges = page.getGauges();
-            for (Gauge gauge: gauges) {
-                // System.out.println("gauge name=" + gauge.getName());
-                Var var = _varsByName.get(gauge.getName());
-                DataProcessor dc = _dataProcessorByVarName.get(var.getNameWithStn());
-                DataClient proxy = QProxyDataClient.getProxy(gauge);
-                dc.addClient(proxy);
-            }
-        }
 
         status("   No sensor data yet...", 10000);
         
         _connectAction.setEnabled(false);
+        _addPage.setEnabled(true);
 
         _dataThread.start();
 

@@ -1,3 +1,29 @@
+// -*- mode: java; indent-tabs-mode: nil; tab-width: 4; -*-
+// vim: set shiftwidth=4 softtabstop=4 expandtab:
+/*
+ ********************************************************************
+ ** ISFS: NCAR Integrated Surface Flux System software
+ **
+ ** 2016, Copyright University Corporation for Atmospheric Research
+ **
+ ** This program is free software; you can redistribute it and/or modify
+ ** it under the terms of the GNU General Public License as published by
+ ** the Free Software Foundation; either version 2 of the License, or
+ ** (at your option) any later version.
+ **
+ ** This program is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+ **
+ ** The LICENSE.txt file accompanying this software contains
+ ** a copy of the GNU General Public License. If it is not found,
+ ** write to the Free Software Foundation, Inc.,
+ ** 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ **
+ ********************************************************************
+*/
+
 package edu.ucar.nidas.apps.cockpit.ui;
 
 import java.util.ArrayList;
@@ -138,14 +164,16 @@ public class CentTabWidget extends QTabWidget {
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
 
         GaugePage gp = new GaugePage(this, name);
+        _gaugePageByName.put(name, gp);
 
         int n = _gaugePageByName.size() % Cockpit.defBGColors.size();
         gp.setBGColor(Cockpit.defBGColors.get(n));
         gp.setGeometry(_pageGeometry);
-        gp.createGauges(vars);
-        _gaugePageByName.put(name, gp);
-
         addTab(gp, gp.getName());
+
+        // System.err.printf("creating gauges for %d variables\n", vars.size());
+        gp.createGauges(vars);
+
         setCurrentWidget(gp);
         update();
         setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
@@ -207,7 +235,8 @@ public class CentTabWidget extends QTabWidget {
 
     public String getName() { return _name; }
     
-    public Cockpit getParent() {
+    public Cockpit getCockpit()
+    {
         return _cockpit;
     }
 
@@ -260,39 +289,39 @@ public class CentTabWidget extends QTabWidget {
     {
         int nfrozen = 0;
         for (GaugePage gpp : _gaugePageByName.values()) {
-            if (gpp.frozenGrid()) nfrozen++;
+            if (gpp.frozenGridLayout()) nfrozen++;
         }
         if (nfrozen == _gaugePageByName.size()) {
-            _cockpit.disableFreezeGridMenu();
+            _cockpit.disableFreezeGridLayoutMenu();
         }
         else {
-            _cockpit.enableFreezeGridMenu();
+            _cockpit.enableFreezeGridLayoutMenu();
         }
         if (nfrozen == 0) {
-            _cockpit.disableUnfreezeGridMenu();
+            _cockpit.disableUnfreezeGridLayoutMenu();
         }
         else {
-            _cockpit.enableUnfreezeGridMenu();
+            _cockpit.enableUnfreezeGridLayoutMenu();
         }
     }
 
     /**
      * Change all pages' policy to resize 
      */
-    public void freezeGrids()
+    public void freezeGridLayouts()
     {
         for (GaugePage gpp : _gaugePageByName.values()) {
-            gpp.freezeGrid();
+            gpp.freezeGridLayout();
         }
     }
 
     /**
      * Change all pages' policy to resize 
      */
-    public void unfreezeGrids()
+    public void unfreezeGridLayouts()
     {
         for (GaugePage gpp : _gaugePageByName.values()) {
-            gpp.unfreezeGrid();
+            gpp.unfreezeGridLayout();
         }
     }
 
@@ -355,9 +384,6 @@ public class CentTabWidget extends QTabWidget {
      */
     public void pageBackgroundColor()
     {
-        if (_cockpit.confirmMessageBox(
-            "All plot history will be lost", "Color Background") ==
-            StandardButton.Abort.value()) return;
         QColor c = QColorDialog.getColor();//((GaugePage)currentWidget()).getBGColor());
         getCurrentGaugePage().backgroundColor(c);
     }
@@ -515,44 +541,35 @@ public class CentTabWidget extends QTabWidget {
         synchronized (this){
             setWindowTitle(conf.getName());
             // System.out.println("conf-apply "+conf.getGaugePageConfig().size()+ "   "+conf.getGaugePageConfig().get(0).getName());
-            List<GaugePageConfig> tps = conf.getGaugePageConfig();
-            for (int i = 0; i<tps.size(); i++){
-                GaugePageConfig tp = tps.get(i);
-                String pname = tp.getName();
-                GaugePage gp = getGaugePage(tp.getName());
+            for (GaugePageConfig gpc : conf.getGaugePageConfig()) {
+
+                String pname = gpc.getName();
+                GaugePage gp = getGaugePage(gpc.getName());
 
                 if (gp == null) {
                     gp = new GaugePage(this, pname);
                     _gaugePageByName.put(pname, gp);
                 }
 
-                List<GaugeConfig> gcs = tp.getGaugeConfigs();
+                List<GaugeConfig> gcs = gpc.getGaugeConfigs();
                 for (GaugeConfig gc : gcs) {
                     String vname = gc.getName();
                     Var var = _cockpit.getVar(vname);
                     if (var != null) {
-                        Gauge g = gp.addGauge(var);
-                        if ((g.getYMax() != gc.getMax()) || (g.getYMin() != gc.getMin())) {
-                            g.changeYMaxMin(gc.getMax(),gc.getMin());
-                        }
-                        if (!g.getTraceColor().equals(new QColor(gc.getTraceColor()))) {
-                            g._noDataPaint = false; g.setTraceColor(new QColor(gc.getTraceColor()));
-                        }
-                        if (!g.getHistoryColor().equals(new QColor(gc.getHistoryColor()))) {
-                            g._noDataPaint = false; g.setHistoryColor(new QColor(gc.getHistoryColor()));
-                        }
-                        if (!g.getBGColor().equals(new QColor(gc.getBGColor()))) {
-                            g._noDataPaint = false; g.setBGColor(new QColor(gc.getBGColor()));
-                        }
-                        if (gc.getDataTimeout() != g.getDataTimeout()) g.setDataTimeout(gc.getDataTimeout());
-                        if (gc.getPlotWidthMsec() != g.getWidthMsec()) g.setWidthMsec(gc.getPlotWidthMsec());
-                        DataSource ds = _cockpit.getDataSource(var);
-                        ds.addClient(g);
+                        Gauge g = gp.addGauge(var, gc.getTraceColor(),
+                                gc.getHistoryColor(), gc.getBGColor());
+
+                        g.changeYMaxMin(gc.getMax(),gc.getMin());
+                        g.setDataTimeout(gc.getDataTimeout());
+                        g.setWidthMsec(gc.getPlotWidthMsec());
+
+                        // DataSource ds = _cockpit.getDataSource(var);
+                        // ds.addClient(g.getDataClient());
                     }
                 }
 
-                gp.setWindowTitle(tp.getName());
-                gp.resize(tp.getSize()[0], tp.getSize()[1]);
+                gp.setWindowTitle(gpc.getName());
+                gp.resize(gpc.getSize());
             }
         }
     }

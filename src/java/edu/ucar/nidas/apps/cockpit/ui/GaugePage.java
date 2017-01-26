@@ -1,3 +1,29 @@
+// -*- mode: java; indent-tabs-mode: nil; tab-width: 4; -*-
+// vim: set shiftwidth=4 softtabstop=4 expandtab:
+/*
+ ********************************************************************
+ ** ISFS: NCAR Integrated Surface Flux System software
+ **
+ ** 2016, Copyright University Corporation for Atmospheric Research
+ **
+ ** This program is free software; you can redistribute it and/or modify
+ ** it under the terms of the GNU General Public License as published by
+ ** the Free Software Foundation; either version 2 of the License, or
+ ** (at your option) any later version.
+ **
+ ** This program is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+ **
+ ** The LICENSE.txt file accompanying this software contains
+ ** a copy of the GNU General Public License. If it is not found,
+ ** write to the Free Software Foundation, Inc.,
+ ** 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ **
+ ********************************************************************
+*/
+
 package edu.ucar.nidas.apps.cockpit.ui;
 
 import java.util.ArrayList;
@@ -30,6 +56,7 @@ import edu.ucar.nidas.model.Dsm;
 import edu.ucar.nidas.model.Sample;
 import edu.ucar.nidas.model.Var;
 import edu.ucar.nidas.model.Log;
+import edu.ucar.nidas.model.DataSource;
 
 /**
  * A page of Cockpit Gauges.
@@ -71,7 +98,9 @@ public class GaugePage extends QWidget {
     int _ncols;
 
     QColor _traceColor = Cockpit.defTraceColor;
+
     QColor _historyColor = Cockpit.defHistoryColor;
+
     QColor _bgColor = Cockpit.defBGColors.get(0);
 
     /**
@@ -116,13 +145,13 @@ public class GaugePage extends QWidget {
                             GaugePage.this, "freezePlotSizes()");
                 }
 
-                if (frozenGrid()) {
-                    menu.addAction("Unfreeze &Grid",
-                            GaugePage.this, "unfreezeGrid()");
+                if (frozenGridLayout()) {
+                    menu.addAction("Unfreeze &Grid Layout",
+                            GaugePage.this, "unfreezeGridLayout()");
                 }
                 else {
-                    menu.addAction("Freeze &Grid",
-                            GaugePage.this, "freezeGrid()");
+                    menu.addAction("Freeze &Grid Layout",
+                            GaugePage.this, "freezeGridLayout()");
                 }
                 menu.popup(event.globalPos());
             }
@@ -185,7 +214,7 @@ public class GaugePage extends QWidget {
         return _frozenPlotSizes;
     }
 
-    public boolean frozenGrid()
+    public boolean frozenGridLayout()
     {
         return _frozenGrid;
     }
@@ -194,13 +223,14 @@ public class GaugePage extends QWidget {
      * Create a Gauge.
      * @param Var -- the variable.
      */
-    public Gauge addGauge(Var var)
+    public Gauge addGauge(Var var, QColor tc, QColor hc, QColor bg)
     {
         synchronized(this) {
             int ng = _gauges.size();
             Gauge g = _gaugesByName.get(var.getNameWithStn());
             if (g == null) {
-                g = new Gauge(this, _gaugeSize, _gaugeWidthMsec, var);
+                g = new Gauge(this, _gaugeSize, _gaugeWidthMsec, var,
+                        tc, hc, bg);
 
                 if (_frozenPlotSizes) g.setSizePolicy(_fixedPolicy);
                 else g.setSizePolicy(_varyingPolicy);
@@ -216,6 +246,10 @@ public class GaugePage extends QWidget {
                         g.getName(),row,col);
                 */
                 _gaugeLayout.addWidget(g,row,col);
+
+                DataSource ds = _centTabWidget.getCockpit().getDataSource(var);
+                if (ds != null)
+                    ds.addClient(g.getDataClient());
             }
             return g;
         }
@@ -405,7 +439,7 @@ public class GaugePage extends QWidget {
     /**
      * Freeze the grid.
      */
-    public void freezeGrid()
+    public void freezeGridLayout()
     {
         _frozenGrid = true;
         _centTabWidget.gridStateChange();
@@ -414,7 +448,7 @@ public class GaugePage extends QWidget {
     /**
      * Freeze the grid.
      */
-    public void unfreezeGrid()
+    public void unfreezeGridLayout()
     {
         _frozenGrid = false;
         int ncols = calcGaugeColumns();
@@ -551,6 +585,10 @@ public class GaugePage extends QWidget {
     public void remove(Gauge g)
     {
         synchronized (this) {
+
+            DataSource ds = _centTabWidget.getCockpit().getDataSource(g.getName());
+            if (ds != null) ds.removeClient(g.getDataClient());
+
             _gauges.remove(g); 
             _gaugesByName.put(g.getName(), null);
             _gaugeLayout.removeWidget(g);
@@ -612,7 +650,8 @@ public class GaugePage extends QWidget {
         for (Sample samp : samples) {
             ArrayList<Var> vars = samp.getVars();
             for (Var var : vars) {
-                addGauge(var);
+                addGauge(var, getTraceColor(), getHistoryColor(),
+                        getBGColor());
             }
         }
         update(); 
@@ -622,7 +661,8 @@ public class GaugePage extends QWidget {
     public void createGauges(List<Var> vars) 
     {
         for (Var var : vars) {
-            addGauge(var);
+            addGauge(var, getTraceColor(), getHistoryColor(),
+                    getBGColor());
         }
         update(); 
         // fixPlotSizes();
