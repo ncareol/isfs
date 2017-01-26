@@ -26,7 +26,7 @@
 
 package edu.ucar.nidas.apps.cockpit.model;
 
-import java.util.ArrayList;
+import java.util.HashSet;
 
 import edu.ucar.nidas.model.FloatSample;
 import edu.ucar.nidas.model.DataProcessor;
@@ -66,18 +66,21 @@ public class MinMaxer implements DataProcessor {
     private float[] _data = null;
 
     /**
-     * clients who share the same variable's float-value
+     * DataClients of this processor.  
+     * Use a HashSet to avoid duplicate clients.
      */
-    private ArrayList<DataClient> _clients = new ArrayList<DataClient>();
+    private HashSet<DataClient> _clients = new HashSet<DataClient>();
 
     /**
      * caller passes a time-tag in microsecond, and a float data point
      * For one second data, record max and min in the list array
-     * If the data's ttag exist the max-time of this object, distribute the data to plots, and renew this object
+     * If the data's ttag exist the max-time of this object, distribute
+     * the data to plots, and renew this object
      *
      * @param samp  -- the data sample
      * @param offset	-- index into the sample of the first data value to receive
      */
+    @Override
     public void receive(FloatSample samp,int offset)
     {
         long ttag= samp.getTimeTag();
@@ -107,13 +110,12 @@ public class MinMaxer implements DataProcessor {
     /**
      * Add a plot-client
      */
+    @Override
     public void addClient(DataClient clnt) 
     {
-        if (clnt==null) return;
-        // prevent adding twice
+        if (clnt == null) return;
         synchronized (_clients)
         {
-            removeClient(clnt);
             _clients.add(clnt);
         }
     }
@@ -121,6 +123,7 @@ public class MinMaxer implements DataProcessor {
     /**
      * Remove a plot client
      */
+    @Override
     public void removeClient(DataClient clnt) 
     {
         if (clnt == null) return;
@@ -132,16 +135,14 @@ public class MinMaxer implements DataProcessor {
 
     private void distribute(FloatSample samp)
     {
-
-        ArrayList<DataClient> listcopy;
+        HashSet<DataClient> tmpcopy;
         synchronized (_clients)
         {
-            listcopy = _clients;
+            tmpcopy = new HashSet<DataClient>(_clients);
+        }
 
-            for (int i = 0; i < listcopy.size(); i++) {
-                DataClient clnt = listcopy.get(i);
-                clnt.receive(samp,0); //the out-sample only contains the min and max
-            }
+        for (DataClient clnt: tmpcopy) {
+            clnt.receive(samp,0); //the out-sample only contains the min and max
         }
     }
 }
