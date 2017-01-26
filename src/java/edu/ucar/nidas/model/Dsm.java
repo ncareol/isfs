@@ -28,10 +28,13 @@ package edu.ucar.nidas.model;
 
 import java.util.ArrayList;
 
+import edu.ucar.nidas.util.DOMUtils;
+
 import org.w3c.dom.Attr;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 /**
  * A data sampling module, the soure of one or more samples.
@@ -67,20 +70,18 @@ public class Dsm {
         return _samples;
     }
 
-    public void walkSamples(Node dsmNode, Site site)
+    public void walkSamples(Node dsmNode, Site site) throws SAXException
     {
         NodeList nl = dsmNode.getChildNodes();
         for (int i = 0; i < nl.getLength(); i++) {
             Node n = nl.item(i);
-            if (n == null) return;
-            //get sample attribute
-            NamedNodeMap attrs = n.getAttributes();
-            int sampId = 0;
-            for (int j = 0; j < attrs.getLength(); j++) {
-                Attr attr = (Attr)attrs.item(j);
-                if ("id".equals(attr.getName())) 
-                    sampId = Integer.valueOf(attr.getValue());
-            }
+            if (!"sample".equals(n.getNodeName())) continue;
+
+            String id = DOMUtils.getAttribute(n, "id");
+            if (id == null || id.length() < 1)
+                throw new SAXException("<sample> with no id");
+            int sampId = Integer.valueOf(id);
+
             Sample s = new Sample(this);
             s.setId(sampId);
             //System.out.println("sample_gid="+ val);

@@ -31,7 +31,7 @@ import java.util.regex.Matcher;
 import java.util.Comparator;
 
 /**
- *  This class describes an ISFS data variable.
+ *  A NIDAS data variable.
  */
 public class Var {
 
@@ -47,36 +47,36 @@ public class Var {
      */
     String _nameWithStn;
 
-    String _units;
+    String _units = "";
 
-    int _length;
+    int _length = 1;
 
     /**
      * Height in meters, parsed from name, such as "u.10m.tower".
      * Negative values are depths, parsed from a name such as
      * "Tsoil.1.5cm.grass". Float.NaN if no height is found in name.
      */
-    float _height;
+    float _height = Float.NaN;
     
     /**
-     * default plot_min and plot_max of the variable from the data descriptor
+     * plot minimum and maximum of the variable.
      */
-    float _plotMax;
+    float _plotMax = 10.0f;
     
-    float _plotMin;
+    float _plotMin = -10.0f;
     
     /**
      * create a plot at beginning, or later when data arrives.
      * default=false.
      */
-    boolean _dynamic=false;
+    boolean _dynamic = false;
     
     /**
      * The variable is measured in the nidas, but not intended to display. 
      * default =true; 
      */
 
-    boolean _display=true;
+    boolean _display = true;
 
     public Var(String nameWithStn)
     {
@@ -94,7 +94,7 @@ public class Var {
     public Var(Site site, String name)
     {
         _name = name;
-        int sitenum =  site.getNumber();
+        int sitenum = site.getNumber();
         if (sitenum > 0) {
             _nameWithStn = _name + "#" + sitenum;
         }
@@ -103,6 +103,43 @@ public class Var {
         }
         _height = Var.height(_name);
     }
+
+    public void setUnits(String val) { _units = val; }
+
+    public void setMin(float val) { _plotMin = val; }
+
+    public void setMax(float val) { _plotMax = val; }
+
+    public void setDynamic(boolean val)	{ _dynamic = val; }
+
+    public void setDisplay(boolean val) { _display = val; }
+    
+    /**
+     * The data length of the variable. 
+     * Usually there is one measurement per variable.
+     */
+    public void setLength(int val)
+    {
+        _length=val;
+    }
+
+    public float getHeight() { return _height; }
+
+    public int getLength() { return _length; }
+	
+    public String getName() { return _name; }
+
+    public String getNameWithStn() { return _nameWithStn; }
+
+    public String getUnits() { return _units; }
+
+    public float getMin() { return _plotMin; }
+
+    public float getMax() { return _plotMax; }
+
+    public boolean getDynamic()	{ return _dynamic; }
+
+    public boolean getDisplay()	{ return _display; }
 
     /**
      * Parse height from variable name.
@@ -172,41 +209,5 @@ public class Var {
             }
         };
 
-    public void setUnits(String val) { _units = val; }
-
-    public void setMin(float val) { _plotMin = val; }
-
-    public void setMax(float val) { _plotMax = val; }
-
-    public void setDynamic(boolean val)	{ _dynamic = val; }
-
-    public void setDisplay(boolean val) { _display = val; }
-    
-    /**
-     * The data length of the variable. 
-     * Usually there is one measurement per variable.
-     */
-    public void setLength(int val)
-    {
-        _length=val;
-    }
-
-    public float getHeight() { return _height; }
-
-    public int getLength() { return _length; }
-	
-    public String getName() { return _name; }
-
-    public String getNameWithStn() { return _nameWithStn; }
-
-    public String getUnits() { return _units; }
-
-    public float getMin() { return _plotMin; }
-
-    public float getMax() { return _plotMax; }
-
-    public boolean getDynamic()	{ return _dynamic; }
-
-    public boolean getDisplay()	{ return _display; }
 
 }
