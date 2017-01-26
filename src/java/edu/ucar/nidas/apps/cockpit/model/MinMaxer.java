@@ -1,3 +1,29 @@
+// -*- mode: java; indent-tabs-mode: nil; tab-width: 4; -*-
+// vim: set shiftwidth=4 softtabstop=4 expandtab:
+/*
+ ********************************************************************
+ ** ISFS: NCAR Integrated Surface Flux System software
+ **
+ ** 2016, Copyright University Corporation for Atmospheric Research
+ **
+ ** This program is free software; you can redistribute it and/or modify
+ ** it under the terms of the GNU General Public License as published by
+ ** the Free Software Foundation; either version 2 of the License, or
+ ** (at your option) any later version.
+ **
+ ** This program is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+ **
+ ** The LICENSE.txt file accompanying this software contains
+ ** a copy of the GNU General Public License. If it is not found,
+ ** write to the Free Software Foundation, Inc.,
+ ** 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ **
+ ********************************************************************
+*/
+
 package edu.ucar.nidas.apps.cockpit.model;
 
 import java.util.ArrayList;
@@ -7,34 +33,30 @@ import edu.ucar.nidas.model.DataProcessor;
 import edu.ucar.nidas.model.DataClient;
 
 /**
- * This class stores a variable's stat-data (min&max)
- * It services two main purposes:
- *   1.record the min-max of a variable in the given-time-interval (usually 1 second)
- *   2.distribute the variable's min-max to their plots, when the new data time is out of the range
- *   
- * @author dongl
- *
+ * Compute a variable's minimum and maximum value over a time period,
+ * passing the result on to DataClients.
  */
 public class MinMaxer implements DataProcessor {
 
     /**
-     * @param interval  -- millisecond time interval, with in this time-window, the var-data is recorded as min-max
+     * @param interval  -- millisecond time interval to calculate minimums and maximums
      */
-    public MinMaxer(int interval) {
+    public MinMaxer(int interval)
+    {
         _interval = interval;
-        _data =  new float[2];
+        _data = new float[2];
         _data[0] = Float.MAX_VALUE;
         _data[1] = -Float.MAX_VALUE;
     }
 
 
     /**
-     * The beg+interval, the maximun of the ttag in the object
+     * The end time of current data period
      */
     private long _endTime = Long.MIN_VALUE;
 
     /**
-     * The time-window(in msec) for the stat-calculation
+     * The time length, in milliseconds, of the statistics calculation
      */
     private int _interval;
 
@@ -101,7 +123,7 @@ public class MinMaxer implements DataProcessor {
      */
     public void removeClient(DataClient clnt) 
     {
-        if (clnt==null) return;
+        if (clnt == null) return;
         synchronized (_clients)
         {
             _clients.remove(clnt);
