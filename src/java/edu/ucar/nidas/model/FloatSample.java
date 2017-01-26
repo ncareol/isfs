@@ -41,7 +41,7 @@ public class FloatSample  {
     }
     
     /**
-     * Time tag, non-leap microseconds since 1970 Jan 00:00 UTC.
+     * Time tag, non-leap milliseconds since 1970 Jan 00:00 UTC.
      */
     long _tt;  		//time-tag
 
@@ -88,7 +88,7 @@ public class FloatSample  {
     }
 
     /**
-     * get time-tag of the sample
+     * Get the time tag of the sample, non-leap milliseconds since Jan 1, 1970 00:00 UTC.
      * 
      * @return
      */
