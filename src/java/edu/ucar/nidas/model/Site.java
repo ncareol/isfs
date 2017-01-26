@@ -35,7 +35,6 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 import edu.ucar.nidas.util.DOMUtils;
-import edu.ucar.nidas.util.Util;
 
 /**
  * A Site consists of one or more Dsms.
