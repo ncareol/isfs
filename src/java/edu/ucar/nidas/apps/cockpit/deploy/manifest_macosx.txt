@@ -1,2 +1,2 @@
 Main-Class: edu.ucar.nidas.apps.cockpit.ui.Cockpit
-Class-Path: lib/macosx/qtjambi-4.8.6.jar lib/macosx/qtjambi-native-macosx-gcc-4.8.6.jar
+Class-Path: qtjambi-4.8.6.jar qtjambi-native-macosx-gcc-4.8.6.jar

@@ -35,7 +35,7 @@ for arch in linux64 macosx; do
         # -Xlint -Xlint:unchecked \
         # -target 6 -source 6 -bootclasspath jdk1.7.0/lib/rt.jar \
 
-    jar cvfm $d/cockpit_${arch}.jar $d/manifest_${arch}.txt $d/image/nodata.png -C $d/classes_${arch} . || exit 1
+    jar cvfm $d/cockpit_${arch}.jar $d/manifest_${arch}.txt -C $d/classes_${arch} . -C $d image/nodata.png || exit 1
 
 done
 
