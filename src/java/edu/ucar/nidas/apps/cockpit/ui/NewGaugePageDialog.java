@@ -185,9 +185,9 @@ public class NewGaugePageDialog extends QDialog {
         vlayout.addLayout(form);
 
         QPlainTextEdit help = new QPlainTextEdit(this);
-        help.setPlainText("Click to select/deselect a variable.\n" +
-            "Ctrl-click to select additional variables.\n" +
-            "Shift-click to select a range of variables.\n");
+        help.setPlainText("Click to select or deselect a variable.\n" +
+            "Ctrl-click (command-click on macs) to select additional variables.\n" +
+            "Click then shift-click to select a range of variables.\n");
         help.setReadOnly(true);
 
         vlayout.addWidget(help);
