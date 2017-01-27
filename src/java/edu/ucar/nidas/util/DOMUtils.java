@@ -51,7 +51,9 @@ import org.xml.sax.SAXException;
 
 import org.w3c.dom.Attr;
 import org.w3c.dom.DOMException;
+import org.w3c.dom.DOMImplementation;
 import org.w3c.dom.Document;
+import org.w3c.dom.DocumentType;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
@@ -106,10 +108,26 @@ public class DOMUtils {
             TransformerFactory tFactory = TransformerFactory.newInstance();
             Transformer transformer = tFactory.newTransformer();
             transformer.setOutputProperty(OutputKeys.INDENT, "yes");
-	    if (doc.getDoctype() != null) {
-		String systemValue = (new File (doc.getDoctype().getSystemId())).getName();
-		transformer.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, systemValue);
-	    }
+
+            if (false) {
+                transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
+                transformer.setOutputProperty(OutputKeys.METHOD, "xml");
+
+                DOMImplementation domImpl = doc.getImplementation();
+                /*
+                DocumentType doctype = domImpl.createDocumentType("doctype",
+                    "-//Oberon//YOUR PUBLIC DOCTYPE//EN", "YOURDTD.dtd");
+                */
+                DocumentType doctype = domImpl.createDocumentType("doctype","","");
+                System.err.printf("doctype.getPublicId=%s\n",doctype.getPublicId());
+                System.err.printf("doctype.getSystemId=%s\n",doctype.getSystemId());
+                transformer.setOutputProperty(OutputKeys.DOCTYPE_PUBLIC, doctype.getPublicId());
+                transformer.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, doctype.getSystemId());
+                if (doc.getDoctype() != null) {
+                    String systemValue = (new File (doc.getDoctype().getSystemId())).getName();
+                    transformer.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, systemValue);
+                }
+            }
 
             DOMSource source = new DOMSource(doc);
             StreamResult result = new StreamResult(new FileOutputStream(new File(fileName)));
