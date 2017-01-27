@@ -35,12 +35,15 @@ import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import org.xml.sax.SAXException;
+
 import com.trolltech.qt.core.QSize;
 import com.trolltech.qt.gui.QColor;
 
 import edu.ucar.nidas.apps.cockpit.ui.Gauge;
 import edu.ucar.nidas.apps.cockpit.ui.GaugePage;
 import edu.ucar.nidas.model.Var;
+import edu.ucar.nidas.util.DOMUtils;
 
 public class GaugePageConfig {
 
@@ -48,7 +51,7 @@ public class GaugePageConfig {
 
     String _name;
 
-    QSize _size;
+    QSize _size = null;
 
     boolean _frozenPlotSizes = false;
 
@@ -72,33 +75,40 @@ public class GaugePageConfig {
         }
     }
 
-    public GaugePageConfig(Node n) throws NumberFormatException
+    public GaugePageConfig(Node n) throws NumberFormatException, SAXException
     {
 
-        String value = getValue(n,"name");
-        if (value != null && value.length() > 0) _name = value;
+        String value = DOMUtils.getAttribute(n,"name");
+        if (value != null && !value.isEmpty()) _name = value;
+        else throw new SAXException("GaugePage has no name attribute");
 
-        value = getValue(n,"width");
-        if (value != null && value.length() > 0) _size.setWidth(Integer.valueOf(value).intValue());
+        _size = new QSize();
+        value = DOMUtils.getAttribute(n,"width");
+        if (value != null && !value.isEmpty())
+            _size.setWidth(Integer.valueOf(value).intValue());
 
-        value = getValue(n,"height");
-        if (value != null && value.length() > 0) _size.setHeight(Integer.valueOf(value).intValue());
+        value = DOMUtils.getAttribute(n,"height");
+        if (value != null && !value.isEmpty())
+            _size.setHeight(Integer.valueOf(value).intValue());
 
-        value = getValue(n,"frozenPlotSizes");
-        if (value != null && value.length() > 0) _frozenPlotSizes =
+        value = DOMUtils.getAttribute(n,"frozenPlotSizes");
+        if (value != null && !value.isEmpty()) _frozenPlotSizes =
             (Boolean.valueOf(value).booleanValue());
 
-        value = getValue(n,"frozenGridLayout");
-        if (value != null && value.length() > 0) _frozenGridLayout =
+        value = DOMUtils.getAttribute(n,"frozenGridLayout");
+        if (value != null && !value.isEmpty()) _frozenGridLayout =
             (Boolean.valueOf(value).booleanValue());
 
-        // value = getValue(n, "prim");
-        // if (value != null && value.length() > 0) _primary = (Boolean.valueOf(value).booleanValue());
+        // value = DOMUtils.getAttribute(n, "prim");
+        // if (value != null && value.isEmpty() > 0) _primary = (Boolean.valueOf(value).booleanValue());
             
         NodeList nl = n.getChildNodes();
         for (int i = 0; i < nl.getLength(); i++) {
-            GaugeConfig p = new GaugeConfig(nl.item(i));
-            _gaugeConfigs.add(p);
+            n = nl.item(i);
+            if ("Gauge".equals(n.getNodeName())) {
+                GaugeConfig p = new GaugeConfig(n);
+                _gaugeConfigs.add(p);
+            }
         }
     }
     
@@ -142,13 +152,4 @@ public class GaugePageConfig {
             config.toDOM(document, em);
         }
     }
-    
-    private String getValue(Node n, String attr)
-    {
-        Node nn=n.getAttributes().getNamedItem(attr);
-        if (nn == null) return null;
-        return nn.getNodeValue();
-    }
-    
-    
 }

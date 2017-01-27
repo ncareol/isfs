@@ -33,11 +33,14 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import org.xml.sax.SAXException;
+
 import com.trolltech.qt.core.QSize;
 import com.trolltech.qt.gui.QColor;
 
 import edu.ucar.nidas.apps.cockpit.ui.Gauge;
 import edu.ucar.nidas.model.Var;
+import edu.ucar.nidas.util.DOMUtils;
 
 /**
  * Configuration for a Gauge.
@@ -80,40 +83,39 @@ public class GaugeConfig {
         _bgColor = b;
     }
 
-    public GaugeConfig(Node n) throws NumberFormatException
+    public GaugeConfig(Node n) throws NumberFormatException, SAXException
     {
-        Node vn = n.getChildNodes().item(0); //only one
+        String value = DOMUtils.getAttribute(n, "name");
+        if (value != null && !value.isEmpty()) _name = value;
+        else throw new SAXException("Gauge has no name attribute");
 
-        String value = getValue(n, "name");
-        if (value!=null && value.length() > 0) _name = value;
+        value = DOMUtils.getAttribute(n, "max");
+        if (value != null && !value.isEmpty())
+            _max = Float.valueOf(value).floatValue();
 
-        value = getValue(n, "max");
-        if (value != null && value.length() > 0)
-            _max = (Float.valueOf(value).floatValue());
+        value = DOMUtils.getAttribute(n, "min");
+        if (value != null && !value.isEmpty())
+            _min = Float.valueOf(value).floatValue();
 
-        value = getValue(n, "min");
-        if (value != null && value.length() > 0)
-            _min = (Float.valueOf(value).floatValue());
+        value = DOMUtils.getAttribute(n, "dataTimeout");
+        if (value != null && !value.isEmpty())
+            _dataTimeout = Integer.valueOf(value).intValue();
 
-        value = getValue(n, "dataTimeout");
-        if (value != null && value.length() > 0)
-            _dataTimeout = (Integer.valueOf(value).intValue());
+        value = DOMUtils.getAttribute(n, "plotWidthMsec");
+        if (value != null && !value.isEmpty())
+            _plotWidthMsec = Integer.valueOf(value).intValue();
 
-        value = getValue(n, "plotWidthMsec");
-        if (value != null && value.length() > 0)
-            _plotWidthMsec = (Integer.valueOf(value).intValue());
+        value = DOMUtils.getAttribute(n, "traceColor");
+        if (value != null && !value.isEmpty())
+            _traceColor = new QColor(Integer.parseUnsignedInt(value,16));
 
-        value = getValue(n, "traceColor");
-        if (value != null && value.length() > 0)
-            _traceColor = new QColor(Integer.decode(value).intValue());  
+        value = DOMUtils.getAttribute(n, "historyColor");
+        if (value != null && !value.isEmpty())
+            _historyColor = new QColor(Integer.parseUnsignedInt(value,16));
 
-        value = getValue(n, "historyColor");
-        if (value != null && value.length() > 0)
-            _historyColor = new QColor(Integer.decode(value).intValue()); 
-
-        value = getValue(n, "bgColor");
-        if (value != null && value.length() > 0)
-            _bgColor = new QColor(Integer.decode(value).intValue()); 
+        value = DOMUtils.getAttribute(n, "bgColor");
+        if (value != null && !value.isEmpty())
+            _bgColor = new QColor(Integer.parseUnsignedInt(value,16));
     }
 
     public String getName()
@@ -200,17 +202,10 @@ public class GaugeConfig {
         subem.setAttribute("min",  String.valueOf(_min));
         subem.setAttribute("dataTimeout", String.valueOf(_dataTimeout));
         subem.setAttribute("plotWidthMsec", String.valueOf(_plotWidthMsec));
-        subem.setAttribute("traceColor", String.format("0x%08x", _traceColor.rgba()));
-        subem.setAttribute("historyColor", String.format("0x%08x", _historyColor.rgba()));
-        subem.setAttribute("bgColor", String.format("0x%08x", _bgColor.rgba()));
+        subem.setAttribute("traceColor", String.format("%08x", _traceColor.rgba()));
+        subem.setAttribute("historyColor", String.format("%08x", _historyColor.rgba()));
+        subem.setAttribute("bgColor", String.format("%08x", _bgColor.rgba()));
         parent.appendChild(subem);
-    }
-
-    private String getValue(Node n, String attr)
-    {
-        Node nn = n.getAttributes().getNamedItem(attr);
-        if (nn == null) return null;
-        return nn.getNodeValue();
     }
 }
 

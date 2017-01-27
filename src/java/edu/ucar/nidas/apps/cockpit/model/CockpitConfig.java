@@ -35,10 +35,13 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import org.xml.sax.SAXException;
+
 import edu.ucar.nidas.apps.cockpit.ui.CentTabWidget;
 import edu.ucar.nidas.apps.cockpit.ui.Gauge;
 import edu.ucar.nidas.apps.cockpit.ui.GaugePage;
 import edu.ucar.nidas.model.Site;
+import edu.ucar.nidas.util.DOMUtils;
 
 /*
  * This class contains the project display parameters, and tabpages.
@@ -57,7 +60,7 @@ public class CockpitConfig {
      */
     public CockpitConfig(CentTabWidget p)
     {
-        _name = p.getName();
+        setName(p.getName());
         for (GaugePage gp : p.getGaugePages()) {
             GaugePageConfig tp = new GaugePageConfig(gp);
             _tabpages.add(tp);
@@ -67,18 +70,22 @@ public class CockpitConfig {
     /**
      * Construct from a DOM Document.
      */
-    public CockpitConfig(Document doc) throws NumberFormatException
+    public CockpitConfig(Document doc) throws NumberFormatException, SAXException
     {
         Node n = doc.getFirstChild(); //there is only one
+        if (n == null) throw new SAXException("First element is null");
 
-        if (n==null) return;
-        String name = n.getAttributes().getNamedItem("name").getNodeValue();
-        if (name==null || name.length()<1) return;
+        String name = DOMUtils.getAttribute(n, "name");
+        if (name == null || name.isEmpty()) name = "unknown";
         _name = name;
+
         NodeList nl = n.getChildNodes();
         for (int i = 0; i < nl.getLength(); i++) {
-            GaugePageConfig tp = new GaugePageConfig(nl.item(i));
-            _tabpages.add(tp);
+            n = nl.item(i);
+            if ("GaugePage".equals(n.getNodeName())) {
+                GaugePageConfig tp = new GaugePageConfig(n);
+                _tabpages.add(tp);
+            }
         }
     }
 
@@ -91,7 +98,8 @@ public class CockpitConfig {
         return _tabpages;
     }
 
-    public void toDOM(Document document) {
+    public void toDOM(Document document)
+    {
         Element rootElement = document.createElement("Cockpit");
         rootElement.setAttribute("name",_name);
         document.appendChild(rootElement);
