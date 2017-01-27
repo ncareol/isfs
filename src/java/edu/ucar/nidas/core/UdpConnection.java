@@ -252,7 +252,7 @@ public class UdpConnection {
         if (ib == lb) return null;
         byte[] bstr = new byte[lb - ib];
         int i;
-        for (i = 0; ib < lb && (bstr[i++] = bb.get()) != '\0'; ib++) ;
+        for (i = 0; ib < lb && (bstr[i] = bb.get()) != '\0'; ib++,i++) ;
         return new String (bstr,0,i, "UTF-8");
     }
 
