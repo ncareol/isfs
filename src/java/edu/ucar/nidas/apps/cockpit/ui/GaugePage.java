@@ -70,6 +70,8 @@ public class GaugePage extends QWidget {
      * and a timer to control update frequency 
      */
 
+    String _name;
+
     /**
      * Gauges on this page.
      */
@@ -121,8 +123,6 @@ public class GaugePage extends QWidget {
     int _dataTimeout = 600; 
 
     HashMap<String, Gauge> _gaugesByName = new HashMap<String,Gauge>();
-
-    String _name;
 
     CentTabWidget _centTabWidget = null;
 
@@ -296,6 +296,11 @@ public class GaugePage extends QWidget {
     public String getName()
     {
         return _name;
+    }
+
+    public void setName(String val)
+    {
+        _name = val;
     }
 
     public QColor getTraceColor()
@@ -678,25 +683,17 @@ public class GaugePage extends QWidget {
         // fixPlotSizes();
     }
 
-    public void mouseReleaseEvent(QMouseEvent pEvent)
+    public void mouseReleaseEvent(QMouseEvent event)
     {
-        if (pEvent.button() == MouseButton.RightButton)
+        if (event.button() == MouseButton.RightButton)
         {
-            QMenu pMenu = new QMenu("");
-            QMenu option = pMenu.addMenu("RenamePage");
-            option.addAction("&RenamePage", this, "renamePage()");
+            QMenu pMenu = new QMenu(this);
+            pMenu.addAction("&Rename Page", _centTabWidget,
+                    "renameCurrentPage()");
+            pMenu.popup(event.globalPos());
         }
     }
 
-    private void renamePage(){
-        boolean ok;
-        String text = QInputDialog.getText(this,
-                "Get Page Name", "Enter a new name:",
-                QLineEdit.EchoMode.Normal,"");
-        if ( text!=null  ) {
-            setWindowTitle(text);  // user entered something and pressed OK
-        } 
-    }
 }
 
 

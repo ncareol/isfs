@@ -27,7 +27,12 @@
 package edu.ucar.nidas.apps.cockpit.ui;
 
 import java.util.List;
+import java.util.ArrayList;
 
+import edu.ucar.nidas.model.Var;
+
+import com.trolltech.qt.core.QAbstractItemModel;
+import com.trolltech.qt.core.QModelIndex;
 import com.trolltech.qt.gui.QTableView;
 import com.trolltech.qt.gui.QItemSelection;
 import com.trolltech.qt.gui.QItemSelectionModel;
@@ -40,13 +45,65 @@ public class VariableTableView extends QTableView
 {
     // QItemSelectionModel _selection = new QItemSelectionModel();
 
-    public VariableTableView(QWidget parent)
+    NewGaugePageDialog _dialog = null;
+
+    private ArrayList<Var> _selectedVars = new ArrayList<Var>();
+
+    public VariableTableView(NewGaugePageDialog parent)
     {
         super(parent);
+        _dialog = parent;
         // setShowGrid(false);
         setSortingEnabled(true);
         // setCornerButtonEnabled(false);
         // sortByColumn(0,Qt.SortOrder.AscendingOrder);
+    }
+
+    public void select(Var var)
+    {
+        if (!_selectedVars.contains(var))
+            _selectedVars.add(var);
+    }
+
+    public void deselect(Var var)
+    {
+        if (_selectedVars.contains(var))
+            _selectedVars.remove(var);
+    }
+
+    public List<Var> getSelectedVars()
+    {
+        return _selectedVars;
+    }
+
+    public void resetSelection()
+    {
+        QItemSelectionModel smodel = selectionModel();
+        QAbstractItemModel model = model();
+
+        for (Var svar: getSelectedVars()) {
+
+            QModelIndex start = model.index(0, 1, null);
+
+            List<QModelIndex> idxs =
+                model.match(start, Qt.ItemDataRole.DisplayRole, svar, 1,
+                    Qt.MatchFlag.MatchExactly);
+            for (QModelIndex idx: idxs) {
+                /*
+                System.err.printf("selecting row=%d, var=%s\n",
+                        idx.row(), svar.getNameWithStn());
+                */
+                QItemSelection selection = new QItemSelection(idx, idx);
+                smodel.select(selection,
+                    QItemSelectionModel.SelectionFlag.Select,
+                    QItemSelectionModel.SelectionFlag.Rows);
+            }
+        }
+    }
+
+    public void clear()
+    {
+        _selectedVars.clear();
     }
 
     @Override
@@ -55,20 +112,30 @@ public class VariableTableView extends QTableView
     {
         super.selectionChanged(selected, deselected);
         if (model() != null) {
+
             List<QModelIndex> idxs = selected.indexes();
-            /*
-            for (QModelIndex m : idxs) {
-                System.err.printf("row %d, column %d selected\n",
-                    m.row(),m.column());
+            for (QModelIndex idx : idxs) {
+                if (idx.column() == 0) {
+                    Var var = (Var)(idx.model().data(idx.row(), 1));
+                    /*
+                    System.err.printf("row %d, column %d, var=%s selected\n",
+                        idx.row(),idx.column(), var.getNameWithStn());
+                    */
+                    select(var);
+                }
             }
-            */
+
             idxs = deselected.indexes();
-            /*
-            for (QModelIndex m : idxs) {
-                System.err.printf("row %d, column %d deselected\n",
-                    m.row(),m.column());
+            for (QModelIndex idx : idxs) {
+                if (idx.column() == 0) {
+                    Var var = (Var)(idx.model().data(idx.row(), 1));
+                    /*
+                    System.err.printf("row %d, column %d, var=%s deselected\n",
+                        idx.row(),idx.column(), var.getNameWithStn());
+                    */
+                    deselect(var);
+                }
             }
-            */
         }
     }
 

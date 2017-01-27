@@ -85,7 +85,7 @@ public class CentTabWidget extends QTabWidget {
     private HashMap<String, GaugePage> _gaugePageByName =
         new HashMap<String,GaugePage>();
 
-    private GaugePage _currentPage = null;
+    // private GaugePage _currentPage = null;
 
     /**
      * Layout manager.
@@ -115,7 +115,7 @@ public class CentTabWidget extends QTabWidget {
         _log = _cockpit.getLog();
         connectSlotsByName();
         // setLayout(_stacked);
-        currentChanged.connect(this, "pageChanged()");  
+        // currentChanged.connect(this, "pageChanged()");  
         _cycleTm = new QTimer();
         _cycleTm.timeout.connect(this, "cycleTimeout()");
     }
@@ -190,6 +190,7 @@ public class CentTabWidget extends QTabWidget {
         setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
     }
 
+    /*
     public void remove(GaugePage gp)
     {
         _gaugePageByName.remove(gp.getName());
@@ -205,6 +206,7 @@ public class CentTabWidget extends QTabWidget {
     {
         remove(getCurrentGaugePage());
     }
+    */
 
     public GaugePage getCurrentGaugePage()
     {
@@ -445,6 +447,7 @@ public class CentTabWidget extends QTabWidget {
         getCurrentGaugePage().setDataTimeout(timeout);
     }
 
+    /*
     public void pageChanged()
     {
         if (_currentPage != null && !_currentPage.frozenPlotSizes()) {
@@ -452,7 +455,7 @@ public class CentTabWidget extends QTabWidget {
         }
         _currentPage = getCurrentGaugePage();
     }
-
+    */
 
     /*
     public boolean isAnyPlot()
@@ -466,10 +469,10 @@ public class CentTabWidget extends QTabWidget {
     {
         if (event.button() == MouseButton.RightButton)
         {
-            QMenu pMenu = new QMenu("");
-            QMenu option = pMenu.addMenu("RenamePage");
-            option.addAction("&RenamePage", this, "renamePage()");
-            option.popup(event.globalPos());
+            QMenu pMenu = new QMenu(this);
+            pMenu.addAction("&Rename Page", this, "renameCurrentPage()");
+            pMenu.addAction("&Delete Page", this, "deleteCurrentPage()");
+            pMenu.popup(event.globalPos());
         }
     }
 
@@ -480,64 +483,42 @@ public class CentTabWidget extends QTabWidget {
         synchronized(this) {
             QAction at = _cockpit.autoCycleTabsAction;
             String tx = at.text();
-            if (tx.equals("AutoCycleTabs")) {
-                at.setText("StopCycleTabs");
+            if (tx.equals("Auto Cycle &Tabs")) {
+                at.setText("Stop Cycle Tabs");
                 _cycleInt = QInputDialog.getInt(this,"Tab Cycle Time",
                         "Seconds",_cycleInt,0,3600);
                 _cycleTm.start(_cycleInt * 1000); 
                 status("Cycle tabs every " + _cycleInt + " seconds", -1);
             } else {
-                at.setText("AutoCycleTabs");
+                at.setText("Auto Cycle &Tabs");
                 _cycleTm.stop();
                 status("Stop cycle tabs", 10000);
             }
         }
     }
 
-
-    private void renamePage()
+    public void renameCurrentPage()
     {
-        String text = QInputDialog.getText(this,
-                "Get Page Name", "Enter a new name:", QLineEdit.EchoMode.Normal,"");
-        if ( text!=null  ) {
-            setTabText(currentIndex(),text);
+        String name = QInputDialog.getText(this,
+            "Get Page Name", "Enter a new name:",
+            QLineEdit.EchoMode.Normal,"");
+        if (name != null) {
+            GaugePage gp = (GaugePage)currentWidget();
+            _gaugePageByName.remove(gp.getName());
+            gp.setName(name);
+            _gaugePageByName.put(name, gp);
+            setTabText(currentIndex(), name);
         } 
     }
 
-    /**
-     * timer to set current page, and auto-scale. Only one time when the program starts. 
-     */
-    /*
-    private void timeout() {
-        _tm.stop();
-        GaugePage gp=(GaugePage)currentWidget();
-        for (int i = 0; i<_gaugePages.size(); i++ ) {
-            GaugePage p = _gaugePages.get(i);
-            setCurrentWidget(p);
-        }
-        setCurrentWidget(gp);
-       
+    public void deleteCurrentPage()
+    {
+        GaugePage gp = (GaugePage)currentWidget();
+        _gaugePageByName.remove(gp.getName());
+        gp.close();
+        removeTab(currentIndex());
     }
-    */
 
-    /**
-     * timer to set user config, and set current, only onetime when the program starts 
-     */
-    /*
-    private void ucfTimeout() {
-        _ucftm.stop();
-        if (_cockpit.getUserConfig()!=null) {
-            openUserConfig(_cockpit.getUserConfig());
-        }    
-        GaugePage gp=(GaugePage)currentWidget();
-        for (int i = 0; i < _gaugePages.size(); i++ ) {
-            GaugePage p = _gaugePages.get(i);
-            setCurrentWidget(p);
-        }
-        setCurrentWidget(gp);
-    }
-    */
-   
     private void cycleTimeout(){
 
         if (_cycleInt <= 0) {

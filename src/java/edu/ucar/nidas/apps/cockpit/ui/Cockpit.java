@@ -447,8 +447,7 @@ public class Cockpit extends QMainWindow {
         disableUnfreezeGridLayoutMenu();
 
         action = new QMenuActionWithToolTip("Auto Cycle &Tabs", 
-            "Cycle through plot pages",
-            topMenu);
+            "Cycle through plot pages", topMenu);
         action.triggered.connect(_centWidget, "autoCycleTabs()");
         topMenu.addAction(action);
         autoCycleTabsAction = action;

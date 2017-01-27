@@ -52,6 +52,7 @@ import com.trolltech.qt.gui.QGroupBox;
 import com.trolltech.qt.gui.QPushButton;
 import com.trolltech.qt.gui.QRadioButton;
 import com.trolltech.qt.gui.QLineEdit;
+import com.trolltech.qt.gui.QPlainTextEdit;
 import com.trolltech.qt.gui.QSizePolicy;
 
 import edu.ucar.nidas.model.Var;
@@ -59,23 +60,11 @@ import edu.ucar.nidas.model.Var;
 
 public class NewGaugePageDialog extends QDialog {
 
-    /**
-     * The dialog that provides users with UI interface to 
-     * select variables for a new page
-     * It provides users with a table to populate the variables, 
-     * a search-engine to find desirable variables, 
-     * a toggle button to select/unselect vars,
-     * a check or uncheck a variable,
-     * select whole/unselect whole vars in the current table 
-     * @param owner
-     */
 
     /**
      * all the variables from input
      */
     private List<Var> _vars = new ArrayList<Var>(); 
-
-    private ArrayList<Var> _selectedVars = new ArrayList<Var>(); 
 
     private VariableProxyModel _model;
 
@@ -85,6 +74,11 @@ public class NewGaugePageDialog extends QDialog {
 
     private Cockpit _cockpit = null;
 
+    /**
+     * The dialog that provides users with UI interface to 
+     * select variables for a new page
+     * @param owner
+     */
     public NewGaugePageDialog(Cockpit cockpit)
     {
         super(cockpit);
@@ -105,7 +99,7 @@ public class NewGaugePageDialog extends QDialog {
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
 
         // QHBoxLayout mainHlayout = new QHBoxLayout();
-        QGridLayout mainHlayout = new QGridLayout();
+        QGridLayout mainHlayout = new QGridLayout(this);
         mainHlayout.setColumnStretch(0,0);
         mainHlayout.setColumnStretch(1,1);
         setLayout(mainHlayout);
@@ -137,7 +131,7 @@ public class NewGaugePageDialog extends QDialog {
         QVBoxLayout vlayout;
         QGridLayout glayout;
 
-        QGroupBox selectBox = new QGroupBox(tr("Variables"));
+        QGroupBox selectBox = new QGroupBox(tr("Variables"), this);
         // selectBox.setFlat(false);
         vlayout = new QVBoxLayout();
         selectBox.setLayout(vlayout);
@@ -166,11 +160,11 @@ public class NewGaugePageDialog extends QDialog {
         glayout.setColumnStretch(0,1);
         glayout.setColumnStretch(1,0);
 
-        _searchText = new QLineEdit();
+        _searchText = new QLineEdit(selectBox);
         _searchText.textChanged.connect(this, "setNameFilter()");
         glayout.addWidget(_searchText,0,0);
 
-        QPushButton clearSearch = new QPushButton("X");
+        QPushButton clearSearch = new QPushButton("X", selectBox);
         clearSearch.clicked.connect(_searchText, "clear()");
         glayout.addWidget(clearSearch,0,1);
 
@@ -178,11 +172,11 @@ public class NewGaugePageDialog extends QDialog {
 
         // Select: All None
         hlayout = new QHBoxLayout();
-        QPushButton all = new QPushButton("All");
+        QPushButton all = new QPushButton("All", selectBox);
         all.clicked.connect(this, "selectAll()");
         hlayout.addWidget(all);
 
-        QPushButton none = new QPushButton("None");
+        QPushButton none = new QPushButton("None", selectBox);
         none.clicked.connect(this, "unselectAll()");
         hlayout.addWidget(none);
 
@@ -190,12 +184,20 @@ public class NewGaugePageDialog extends QDialog {
 
         vlayout.addLayout(form);
 
+        QPlainTextEdit help = new QPlainTextEdit(this);
+        help.setPlainText("Click to select/deselect a variable.\n" +
+            "Ctrl-click to select additional variables.\n" +
+            "Shift-click to select a range of variables.\n");
+        help.setReadOnly(true);
+
+        vlayout.addWidget(help);
+
         //add ok /cancel
         hlayout = new QHBoxLayout();
-        QPushButton pb = new QPushButton("Ok");
+        QPushButton pb = new QPushButton("Ok", this);
         pb.clicked.connect(this, "pressOK()");
         hlayout.addWidget(pb);
-        pb = new QPushButton("Cancel");
+        pb = new QPushButton("Cancel", this);
         pb.clicked.connect(this, "pressCancel()");
         hlayout.addWidget(pb);
 
@@ -219,47 +221,32 @@ public class NewGaugePageDialog extends QDialog {
         _model.setSortByHeight(true);
     }
 
-
     private void pressCancel()
     {
-        // _table.clear();
+        _table.clear();
         close();
     }
 
     private void pressOK()
     {
-        setCursor(new QCursor(Qt.CursorShape.WaitCursor));
-
-        QAbstractItemModel model = _table.model();
-        QItemSelectionModel smodel = _table.selectionModel();
-
-        List<QModelIndex> rows = smodel.selectedRows();
-        // System.err.printf("# selected rows=%d\n", rows.size());
-
-        for (QModelIndex idx : rows) {
-            Var var = (Var)(model.data(idx.row(),1));
-            // System.err.printf("selected row=%d, var=%s\n", idx.row(), var.getNameWithStn());
-            _selectedVars.add(var);
-        }
-
         close();
-        setCursor(new QCursor(Qt.CursorShape.ArrowCursor));
     }
 
     List<Var> getSelectedVariables()
     {
-        return _selectedVars;
+        return _table.getSelectedVars();
     }
 
     String getName()
     {
-        if (_selectedVars.isEmpty()) return "";
-        return _selectedVars.get(0).getNameWithStn();
+        if (_table.getSelectedVars().isEmpty()) return "";
+        return _table.getSelectedVars().get(0).getNameWithStn();
     }
 
     private void selectAll(boolean select)
     {
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
+
         QAbstractItemModel model = _table.model();
         QItemSelectionModel smodel = _table.selectionModel();
 
@@ -355,12 +342,12 @@ class VariableModel extends QAbstractTableModel
 
         int row = idx.row();
         int col = idx.column();
-        /*
-        System.err.printf("data, row=%d, col=%d\n",
-                row, col);
-        */
 
         Var var = _vars.get(row);
+        /*
+        System.err.printf("data(), row=%d, col=%d, var=%s\n",
+                row, col, var.getNameWithStn());
+        */
 
         if (col == 0) return var.getNameWithStn();
         else if (col == 1) return var;
@@ -393,15 +380,6 @@ class VariableModel extends QAbstractTableModel
         // System.err.printf("VariableModel sort(), column=%d\n", column);
         if (column == 0) {
 
-            ArrayList<Var> selvars = new ArrayList<Var>(); 
-
-            QItemSelectionModel smodel = _table.selectionModel();
-            List<QModelIndex> rows = smodel.selectedRows();
-            for (QModelIndex idx : rows) {
-                Var var = _vars.get(idx.row());
-                selvars.add(var);
-            }
-
             if (_sortByHeight) {
                 if (order == Qt.SortOrder.AscendingOrder)
                     Collections.sort(_vars, Var.HEIGHT_ORDER);
@@ -416,32 +394,9 @@ class VariableModel extends QAbstractTableModel
                     Collections.sort(_vars, Var.NAME_INVERSE_ORDER);
             }
             reset();
-
-            smodel = _table.selectionModel();
-            for (Var svar: selvars) {
-                int i = 0;
-                for (Var var: _vars) {
-                    if (svar == var) {
-                        QModelIndex top = index(i, 0, null);
-                        QModelIndex bot = index(i, 0, null);
-                        QItemSelection selection = new QItemSelection(top, bot);
-                        smodel.select(selection,
-                            QItemSelectionModel.SelectionFlag.Select,
-                            QItemSelectionModel.SelectionFlag.Rows);
-                    }
-                    i++;
-                }
-            }
+            _table.resetSelection();
         }
     }
-
-    /*
-    public Qt.ItemFlags flags(QModelIndex index)
-    {
-        return new Qt.ItemFlags(Qt.ItemFlag.ItemIsSelectable);
-        // return new Qt.ItemFlags(0);
-    }
-    */
 }
 
 /**
@@ -452,8 +407,6 @@ class VariableProxyModel extends QSortFilterProxyModel
     private VariableModel _sourceModel = null;
 
     VariableTableView _table;
-
-    private QItemSelectionModel _selectionModel = null;
 
     private String _nameContains = null;
 
@@ -499,15 +452,11 @@ class VariableProxyModel extends QSortFilterProxyModel
         }
     }
 
-    public QItemSelectionModel getSelectionModel()
-    {
-        return _selectionModel;
-    }
-
     public void setVarNameFilter(String val)
     {
         _nameContains = val;
         reset();
+        _table.resetSelection();
     }
 
     @Override
@@ -535,25 +484,4 @@ class VariableProxyModel extends QSortFilterProxyModel
             _nameOrder = order;
         _sourceModel.sort(column, order);
     }
-
-    /*
-    @Override
-    protected boolean lessThan(QModelIndex left, QModelIndex right)
-    {
-
-        Object leftData = sourceModel().data(left);
-        Object rightData = sourceModel().data(right);
-
-	if (leftData instanceof String) {
-            System.err.println("lessThan string");
-	    return ((String)leftData).compareTo((String)rightData) < 0;
-	}
-        else if (leftData instanceof Float) {
-            System.err.println("lessThan float");
-	    return (Float)leftData < (Float)rightData;
-        }
-        System.err.println("lessThan other");
-        return false;
-    }
-    */
 }
