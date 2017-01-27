@@ -193,7 +193,7 @@ public class Cockpit extends QMainWindow {
      */
     public Cockpit(String[] args)
     {
-        if (args != null && args.length > 0) parseArg(args);
+        if (args != null && args.length > 0) parseArgs(args);
 
         // Just in case we have more than one cockpits :-)
         if (defBGColors.isEmpty()) {
@@ -226,13 +226,13 @@ public class Cockpit extends QMainWindow {
         if (cname != null) {
             try {
                 Document document = DOMUtils.parseXML(
-                        new FileInputStream(cname), true);
+                    new FileInputStream(cname), false);
                 CockpitConfig config = new CockpitConfig(document);
                 _centWidget.apply(config);
             }
             catch(Exception e) {
                 status(e.getMessage());
-                logError(e.getMessage());
+                logError(e.toString());
             }
         }
     }
@@ -632,7 +632,7 @@ public class Cockpit extends QMainWindow {
 	cname = QFileDialog.getOpenFileName(this, "Open File", cname);
         setConfigFileName(cname);
         try {
-            Document document = DOMUtils.parseXML(new FileInputStream(cname), true);
+            Document document = DOMUtils.parseXML(new FileInputStream(cname), false);
             CockpitConfig config = new CockpitConfig(document);
             _centWidget.apply(config);
         }
@@ -790,11 +790,11 @@ public class Cockpit extends QMainWindow {
      * @param args  -s serv:port -c config.xml
      * @return      void
      */
-    private void parseArg(String[] args)
+    private void parseArgs(String[] args)
     {
         for (int i = 0; i < args.length; i++)
         {
-            if (args[i].equals("-s") && i + 1 < args.length){
+            if ("-s".equals(args[i]) && i + 1 < args.length){
                 String opt = args[i+1].trim();
                 String[] ss = opt.split(":");
                 if (ss.length >= 1)
@@ -802,7 +802,7 @@ public class Cockpit extends QMainWindow {
                 if (ss.length > 1)
                     _connPort = Integer.valueOf(ss[1]);
             }
-            else if (args[i].equals("-c") && i + 1 < args.length ) {
+            else if ("-c".equals(args[i]) && i + 1 < args.length ) {
                 String cname = args[++i];
                 if (cname.length() > 0) {
                     if (QDir.isRelativePath(cname))
@@ -810,16 +810,16 @@ public class Cockpit extends QMainWindow {
                     setConfigFileName(cname);
                 }
             }
-            else if (args[i].equals("-arg") || args[i].equals("-open") &&
-                //args from jnlp
+            else if ("-arg".equals(args[i]) || "-open".equals(args[i]) &&
                 i + 1 < args.length) {
+                //args from jnlp
                 String op = args[++i];
                 String[] trs = op.split(" ");
                 if (trs.length != 2) {
                     status("Invalid argument: " + op);
                     logError("Invalid argument: " + op);
                 }
-                else parseArg(trs);
+                else parseArgs(trs);
             }
         }
     }
