@@ -541,6 +541,7 @@ public class CentTabWidget extends QTabWidget {
                 if (gp == null) {
                     gp = new GaugePage(this, pname);
                     _gaugePageByName.put(pname, gp);
+                    addTab(gp, gp.getName());
                 }
 
                 List<GaugeConfig> gcs = gpc.getGaugeConfigs();
@@ -555,10 +556,9 @@ public class CentTabWidget extends QTabWidget {
                         g.setDataTimeout(gc.getDataTimeout());
                         g.setWidthMsec(gc.getPlotWidthMsec());
 
-                        // DataSource ds = _cockpit.getDataSource(var);
-                        // ds.addClient(g.getDataClient());
                     }
                 }
+                gp.connectGauges();
 
                 gp.setWindowTitle(gpc.getName());
                 gp.resize(gpc.getSize());
