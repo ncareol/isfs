@@ -40,6 +40,8 @@ import com.trolltech.qt.core.QRect;
 import com.trolltech.qt.core.QPoint;
 import com.trolltech.qt.core.Qt;
 import com.trolltech.qt.core.QDir;
+import com.trolltech.qt.core.QTranslator;
+import com.trolltech.qt.core.QLocale;
 import com.trolltech.qt.gui.QWidget;
 import com.trolltech.qt.gui.QApplication;
 import com.trolltech.qt.gui.QCloseEvent;
@@ -318,7 +320,7 @@ public class Cockpit extends QMainWindow {
     private void createUIs()
     {
         // status
-        status("Start ...", 10000);
+        status(tr("Starting"), 10000);
 
         //create menu items
         createMenuItems(); 
@@ -385,108 +387,108 @@ public class Cockpit extends QMainWindow {
         setMenuBar(menuBar);
 
         //file and items
-        QMenu file = menuBar.addMenu("&File");
+        QMenu file = menuBar.addMenu(tr("&File"));
         menuBar.setFont(new QFont("Ariel", 12));
 
-        QAction action = new QMenuActionWithToolTip("&Connect",
-                "Connect to data server", file);
+        QAction action = new QMenuActionWithToolTip(tr("&Connect"),
+                tr("Connect to data server"), file);
         action.triggered.connect(this, "connect()");
         file.addAction(action);
         _connectAction = action;
 
-        action = new QMenuActionWithToolTip("&Show Log",
-                "Show log message window", file);
+        action = new QMenuActionWithToolTip(tr("&Show Log"),
+                tr("Show log message window"), file);
         action.triggered.connect(this, "showLog()");
         file.addAction(action);
 
-        file.addAction("&Save Config", this, "saveConfig()");
-        file.addAction("&Open Config", this, "openConfig()");
-        file.addAction("&Exit", this, "close()");
+        file.addAction(tr("&Save Config"), this, "saveConfig()");
+        file.addAction(tr("&Open Config"), this, "openConfig()");
+        file.addAction(tr("&Exit"), this, "close()");
 
-        _addPage = menuBar.addMenu("Add");
-        _addPage.addAction("New Page", this, "addGaugePage()");
+        _addPage = menuBar.addMenu(tr("Add"));
+        _addPage.addAction(tr("New Page"), this, "addGaugePage()");
         //_addPage.addAction("SortPageByVariable", _centWidget, "addVariablePage()");
         //_addPage.addAction("SortPageByHeight", _centWidget, "addHeightPage()");
         _addPage.setEnabled(false);
 
         // Top menu of global options
-        QMenu topMenu = menuBar.addMenu("&Global Options");
+        QMenu topMenu = menuBar.addMenu(tr("&Global Options"));
 
-        action = new QMenuActionWithToolTip("&Clear All History",
-                "Clear history shadows on all plots", topMenu);
+        action = new QMenuActionWithToolTip(tr("&Clear All History"),
+                tr("Clear history shadows on all plots"), topMenu);
         action.triggered.connect(_centWidget, "globalClearHistory()");
         topMenu.addAction(action);
 
-        action = new QMenuActionWithToolTip("Freeze Plot Sizes",
-                "Fix plot sizes on all plot pages", topMenu);
+        action = new QMenuActionWithToolTip(tr("Freeze Plot Sizes"),
+                tr("Fix plot sizes on all plot pages"), topMenu);
         action.triggered.connect(_centWidget, "freezePlotSizes()");
         topMenu.addAction(action);
         _freezeAllPlotAction = action;
 
-        action = new QMenuActionWithToolTip("Unfreeze Plot Sizes", 
-            "Allow plot sizes to vary, losing history shadow",
+        action = new QMenuActionWithToolTip(tr("Unfreeze Plot Sizes"), 
+            tr("Allow plot sizes to vary, losing history shadow"),
             topMenu);
         action.triggered.connect(_centWidget, "unfreezePlotSizes()");
         topMenu.addAction(action);
         _unfreezeAllPlotAction = action;
         disableUnfreezePlotSizeMenu();
 
-        action = new QMenuActionWithToolTip("Freeze Grid Layouts", 
-            "Fix grid layout of plots",
+        action = new QMenuActionWithToolTip(tr("Freeze Grid Layouts"), 
+            tr("Fix grid layout of plots"),
             topMenu);
         action.triggered.connect(_centWidget, "freezeGridLayouts()");
         topMenu.addAction(action);
         _freezeAllGridAction = action;
 
-        action = new QMenuActionWithToolTip("Unfreeze Grid Layouts", 
-            "Allow grid layout to change",
+        action = new QMenuActionWithToolTip(tr("Unfreeze Grid Layouts"), 
+            tr("Allow grid layout to change"),
             topMenu);
         action.triggered.connect(_centWidget, "unfreezeGridLayouts()");
         topMenu.addAction(action);
         _unfreezeAllGridAction = action;
         disableUnfreezeGridLayoutMenu();
 
-        action = new QMenuActionWithToolTip("Auto Cycle &Tabs", 
-            "Cycle through plot pages", topMenu);
+        action = new QMenuActionWithToolTip(tr("Auto Cycle &Tabs"), 
+            tr("Cycle through plot pages"), topMenu);
         action.triggered.connect(_centWidget, "autoCycleTabs()");
         topMenu.addAction(action);
         autoCycleTabsAction = action;
 
-        action = new QMenuActionWithToolTip("Change Plot Time &Width", 
-            "Change time scale on all plots, losing history",
+        action = new QMenuActionWithToolTip(tr("Change Plot Time &Width"), 
+            tr("Change time scale on all plots, losing history"),
             topMenu);
         action.triggered.connect(_centWidget, "changeAllPlotTimeWidth()");
         topMenu.addAction(action);
 
-        action = new QMenuActionWithToolTip("Set Data &Timeout", 
-            "Set data timeout value for all plots, in seconds",
+        action = new QMenuActionWithToolTip(tr("Set Data &Timeout"), 
+            tr("Set data timeout value for all plots, in seconds"),
             topMenu);
         action.triggered.connect(_centWidget, "setDataTimeout()");
         topMenu.addAction(action);
 
-        topMenu.addAction("AutoScalePlots", _centWidget,
-                "globalAutoScalePlots()");
+        topMenu.addAction(tr("Auto Scale Plots"), _centWidget,
+                tr("globalAutoScalePlots()"));
 
         // Top menu of page options
-        topMenu = menuBar.addMenu("&Page Options");
-        action = new QMenuActionWithToolTip("&Clear History",
-                "Clear history shadow on plots in current page", topMenu);
+        topMenu = menuBar.addMenu(tr("&Page Options"));
+        action = new QMenuActionWithToolTip(tr("&Clear History"),
+                tr("Clear history shadow on plots in current page"), topMenu);
         action.triggered.connect(_centWidget, "pageClearHistory()");
         topMenu.addAction(action);
 
-        QMenu subMenu = topMenu.addMenu("Color");
-        action = new QMenuActionWithToolTip("Change &Trace Color",
-                "Change trace color on plots in current page", subMenu);
+        QMenu subMenu = topMenu.addMenu(tr("Color"));
+        action = new QMenuActionWithToolTip(tr("Change &Trace Color"),
+                tr("Change trace color on plots in current page"), subMenu);
         action.triggered.connect(_centWidget, "pageTraceColor()");
         subMenu.addAction(action);
 
-        action = new QMenuActionWithToolTip("Change &History Color",
-                "Change color of history shadows in current page", subMenu);
+        action = new QMenuActionWithToolTip(tr("Change &History Color"),
+                tr("Change color of history shadows in current page"), subMenu);
         action.triggered.connect(_centWidget, "pageHistoryColor()");
         subMenu.addAction(action);
 
-        action = new QMenuActionWithToolTip("Change &Background Color",
-                "Change background color in current page, losing history", subMenu);
+        action = new QMenuActionWithToolTip(tr("Change &Background Color"),
+                tr("Change background color in current page, losing history"), subMenu);
         action.triggered.connect(_centWidget, "pageBackgroundColor()");
         subMenu.addAction(action);
 
@@ -496,8 +498,8 @@ public class Cockpit extends QMainWindow {
         // srt.addAction("Height", _centWidget, "gsortHeight()");
         */
 
-        action = new QMenuActionWithToolTip("Change Plot Time &Width", 
-            "Change time scale of plots on current page, losing history",
+        action = new QMenuActionWithToolTip(tr("Change Plot Time &Width"), 
+            tr("Change time scale of plots on current page, losing history"),
             topMenu);
         action.triggered.connect(_centWidget, "changePagePlotTimeWidth()");
         topMenu.addAction(action);
@@ -605,9 +607,9 @@ public class Cockpit extends QMainWindow {
         if (cname == null)
             cname = defaultConfigName;
 
-	cname = QFileDialog.getSaveFileName(this, "Save File", cname);
+	cname = QFileDialog.getSaveFileName(this, tr("Save File"), cname);
         if (cname == null || cname.isEmpty()){
-            statusBar().showMessage("configuration file is NOT selected.", 10000); //10 sec
+            statusBar().showMessage(tr("No configuration file."), 10000); //10 sec
         }
         setConfigFileName(cname);
 
@@ -629,7 +631,7 @@ public class Cockpit extends QMainWindow {
         String cname = getConfigFileName();
         if (cname == null)
             cname = defaultConfigName;
-	cname = QFileDialog.getOpenFileName(this, "Open File", cname);
+	cname = QFileDialog.getOpenFileName(this, tr("Open File"), cname);
         setConfigFileName(cname);
         try {
             Document document = DOMUtils.parseXML(new FileInputStream(cname), false);
@@ -755,7 +757,7 @@ public class Cockpit extends QMainWindow {
 
         _centWidget.connect(sites);
 
-        status("No sensor data yet...", 10000);
+        status(tr("No data yet..."), 10000);
         
         _connectAction.setEnabled(false);
         _addPage.setEnabled(true);
@@ -816,8 +818,8 @@ public class Cockpit extends QMainWindow {
                 String op = args[++i];
                 String[] trs = op.split(" ");
                 if (trs.length != 2) {
-                    status("Invalid argument: " + op);
-                    logError("Invalid argument: " + op);
+                    status(tr("Invalid argument: ") + op);
+                    logError(tr("Invalid argument: ") + op);
                 }
                 else parseArgs(trs);
             }
@@ -832,6 +834,17 @@ public class Cockpit extends QMainWindow {
     public static void main(String[] args)
     {
         QApplication.initialize(args);
+
+	QTranslator qtTranslator = new QTranslator();
+	qtTranslator.load("classpath:/translations_directory/qt_" + QLocale.system().name() + ".qm");
+        QApplication.installTranslator(qtTranslator);
+
+        if (false) {
+	    QTranslator myappTranslator = new QTranslator();
+	    myappTranslator.load("classpath:/translations_directory/myapp_" + QLocale.system().name() + ".qm");
+	    QApplication.installTranslator(myappTranslator);
+	}
+
         //setNativeLookAndFeel();
         Cockpit cockpit = new Cockpit(args);
         QApplication.execStatic();
@@ -852,12 +865,12 @@ public class Cockpit extends QMainWindow {
         @Override
 	public void run()
 	{
-            status("Attempting reconnect...");
+            status(tr("Attempting reconnect"));
             while (!connect(false)) {
-                status("Attempting reconnect...");
+                status(tr("Attempting reconnect"));
                 QApplication.processEvents();
             }
-            status("Reconnected",5*1000);
+            status(tr("Reconnected"),5*1000);
 	}
     }
 

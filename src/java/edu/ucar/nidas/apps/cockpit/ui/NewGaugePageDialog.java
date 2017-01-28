@@ -95,7 +95,7 @@ public class NewGaugePageDialog extends QDialog {
 
     private void createComp(Cockpit cockpit)
     {
-        setWindowTitle("Choose Variables to Plot");
+        setWindowTitle(tr("Choose Variables to Plot"));
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
 
         // QHBoxLayout mainHlayout = new QHBoxLayout();
@@ -144,16 +144,16 @@ public class NewGaugePageDialog extends QDialog {
         // glayout.setColumnStretch(0,0);
         // glayout.setColumnStretch(1,0);
 
-        QRadioButton radio = new QRadioButton("Name", selectBox);
+        QRadioButton radio = new QRadioButton(tr("Name"), selectBox);
         radio.setChecked(true);
         radio.clicked.connect(this, "sortByName()");
         hlayout.addWidget(radio);
 
-        radio = new QRadioButton("Height", selectBox);
+        radio = new QRadioButton(tr("Height"), selectBox);
         radio.clicked.connect(this, "sortByHeight()");
         hlayout.addWidget(radio);
 
-        form.addRow("Sort By:",hlayout);
+        form.addRow(tr("Sort By:"),hlayout);
 
         // Search
         glayout = new QGridLayout();
@@ -164,40 +164,41 @@ public class NewGaugePageDialog extends QDialog {
         _searchText.textChanged.connect(this, "setNameFilter()");
         glayout.addWidget(_searchText,0,0);
 
-        QPushButton clearSearch = new QPushButton("X", selectBox);
+        QPushButton clearSearch = new QPushButton(tr("X"), selectBox);
         clearSearch.clicked.connect(_searchText, "clear()");
         glayout.addWidget(clearSearch,0,1);
 
-        form.addRow("Contains:",glayout);
+        form.addRow(tr("Contains:"),glayout);
 
         // Select: All None
         hlayout = new QHBoxLayout();
-        QPushButton all = new QPushButton("All", selectBox);
+        QPushButton all = new QPushButton(tr("All"), selectBox);
         all.clicked.connect(this, "selectAll()");
         hlayout.addWidget(all);
 
-        QPushButton none = new QPushButton("None", selectBox);
+        QPushButton none = new QPushButton(tr("None"), selectBox);
         none.clicked.connect(this, "unselectAll()");
         hlayout.addWidget(none);
 
-        form.addRow("Select:",hlayout);
+        form.addRow(tr("Select:"),hlayout);
 
         vlayout.addLayout(form);
 
         QPlainTextEdit help = new QPlainTextEdit(this);
-        help.setPlainText("Click to select or deselect a variable.\n" +
-            "Ctrl-click (command-click on macs) to select additional variables.\n" +
-            "Click then shift-click to select a range of variables.\n");
+        help.setPlainText(tr("Click to select or deselect a variable.\n") +
+            tr("Ctrl-click (command-click on macs) to select additional variables.\n") +
+            tr("Click then shift-click to select a range of variables.\n") +
+            tr("Click on Variables header to reverse sort\n"));
         help.setReadOnly(true);
 
         vlayout.addWidget(help);
 
         //add ok /cancel
         hlayout = new QHBoxLayout();
-        QPushButton pb = new QPushButton("Ok", this);
+        QPushButton pb = new QPushButton(tr("Ok"), this);
         pb.clicked.connect(this, "pressOK()");
         hlayout.addWidget(pb);
-        pb = new QPushButton("Cancel", this);
+        pb = new QPushButton(tr("Cancel"), this);
         pb.clicked.connect(this, "pressCancel()");
         hlayout.addWidget(pb);
 
@@ -364,7 +365,7 @@ class VariableModel extends QAbstractTableModel
                 System.err.println("headerData() " + orientation.toString());
                 System.err.printf("headerData(), section=%d, role=%d\n", section, role);
                 */
-                if (section == 0) return "Variable";
+                if (section == 0) return tr("Variable");
                 // else if (section == 1) return "";
             }
         }
@@ -431,9 +432,9 @@ class VariableProxyModel extends QSortFilterProxyModel
     String orderToString(Qt.SortOrder order) 
     {
         return order == Qt.SortOrder.AscendingOrder ?
-            "ascending" :
+            tr("ascending") :
             (order == Qt.SortOrder.DescendingOrder ?
-             "descending" : "unknown");
+             tr("descending") : tr("unknown"));
     }
 
     public void setSortByHeight(boolean val)

@@ -361,8 +361,8 @@ public class Gauge extends QWidget
 
     public void setDataTimeout()
     {
-        int timeout = QInputDialog.getInt(this,"Data Timeout",
-                "Seconds",_timeoutSec,1,3600);
+        int timeout = QInputDialog.getInt(this,tr("Data Timeout"),
+                tr("Seconds"),_timeoutSec,1,3600);
         if (timeout <= 0 || _timeoutSec == timeout) return;    
         setDataTimeout(timeout);
     }
@@ -491,7 +491,7 @@ public class Gauge extends QWidget
 
             if (_noDataPaint) {
                 p.setPen(new QColor(Qt.GlobalColor.lightGray));
-                p.drawText(width() / 2, height() / 2, "RIP");
+                p.drawText(width() / 2, height() / 2, tr("RIP"));
             }
         }
         /*
@@ -512,20 +512,20 @@ public class Gauge extends QWidget
     {
         if (event.button() == MouseButton.RightButton)
         {
-            QMenu menu = new QMenu("Plot Options");
+            QMenu menu = new QMenu(tr("Plot Options"));
 
             if (_gaugePage.frozenPlotSizes()) {
                 QAction action = new QMenuActionWithToolTip(
-                    "&Unfreeze &Plot Sizes",
-                    "Allow plot sizes on this page to vary, losing history shadow",
+                    tr("&Unfreeze &Plot Sizes"),
+                    tr("Allow plot sizes on this page to vary, losing history shadow"),
                     menu);
                 action.triggered.connect(_gaugePage, "unfreezePlotSizes()");
                 menu.addAction(action);
             }
             else {
                 QAction action = new QMenuActionWithToolTip(
-                    "Freeze &Plot Sizes",
-                    "Fix plot sizes on this page",
+                    tr("Freeze &Plot Sizes"),
+                    tr("Fix plot sizes on this page"),
                     menu);
                 action.triggered.connect(_gaugePage, "freezePlotSizes()");
                 menu.addAction(action);
@@ -533,56 +533,56 @@ public class Gauge extends QWidget
 
             if (_gaugePage.frozenGridLayout()) {
                 QAction action = new QMenuActionWithToolTip(
-                    "Unfreeze &Grid Layout",
-                    "Allow grid layout on this page to change",
+                    tr("Unfreeze &Grid Layout"),
+                    tr("Allow grid layout on this page to change"),
                     menu);
                 action.triggered.connect(_gaugePage, "unfreezeGridLayout()");
                 menu.addAction(action);
             }
             else {
                 QAction action = new QMenuActionWithToolTip(
-                    "Freeze &Grid Layout",
-                    "Fix grid layout on this page",
+                    tr("Freeze &Grid Layout"),
+                    tr("Fix grid layout on this page"),
                     menu);
                 action.triggered.connect(_gaugePage, "freezeGridLayout()");
                 menu.addAction(action);
             }
 
-            QAction action = new QMenuActionWithToolTip("Clear &History",
-                    "Clear history shadow on this plot", menu);
+            QAction action = new QMenuActionWithToolTip(tr("Clear &History"),
+                    tr("Clear history shadow on this plot"), menu);
             action.triggered.connect(this, "clearHistory()");
             menu.addAction(action);
 
-            QMenu color = menu.addMenu("&Color"); 
-            action = new QMenuActionWithToolTip("&Trace Color",
-                    "Change trace color on this plot", color);
+            QMenu color = menu.addMenu(tr("&Color")); 
+            action = new QMenuActionWithToolTip(tr("&Trace Color"),
+                    tr("Change trace color on this plot"), color);
             action.triggered.connect(this, "changeTraceColor()");
             color.addAction(action);
 
-            action = new QMenuActionWithToolTip("&History Color",
-                    "Change color of history shadow on this plot", color);
+            action = new QMenuActionWithToolTip(tr("&History Color"),
+                    tr("Change color of history shadow on this plot"), color);
             action.triggered.connect(this, "changeHistoryColor()");
             color.addAction(action);
 
-            action = new QMenuActionWithToolTip("&Background Color",
-                    "Change background color on this plot", color);
+            action = new QMenuActionWithToolTip(tr("&Background Color"),
+                    tr("Change background color on this plot"), color);
             action.triggered.connect(this, "changeBGColor()");
             color.addAction(action);
 
-            QMenu scale = menu.addMenu("&Scale");
-            action = new QMenuActionWithToolTip("&Manual Scale Plot",
-                    "Fix Y scale on this plot", scale);
+            QMenu scale = menu.addMenu(tr("&Scale"));
+            action = new QMenuActionWithToolTip(tr("&Manual Scale Plot"),
+                    tr("Fix Y scale on this plot"), scale);
             action.triggered.connect(this, "changeYMaxMin()");
             scale.addAction(action);
 
-            action = new QMenuActionWithToolTip("&Auto Scale Plot",
-                    "Allow Y scale to vary on this plot", scale);
+            action = new QMenuActionWithToolTip(tr("&Auto Scale Plot"),
+                    tr("Allow Y scale to vary on this plot"), scale);
             action.triggered.connect(this, "forceAutoScalePlot()");
             scale.addAction(action);
 
-            menu.addAction("Set Data &Timeout", this, "setDataTimeout()");
-            // menu.addAction("&Auto Resize", this, "autoResize()");
-            menu.addAction("&Delete Plot", this, "deletePlot()");
+            menu.addAction(tr("Set Data &Timeout"), this, "setDataTimeout()");
+            // menu.addAction(tr("&Auto Resize"), this, "autoResize()");
+            menu.addAction(tr("&Delete Plot"), this, "deletePlot()");
             _mousePoint = event.globalPos();
             menu.popup(_mousePoint);
         }
@@ -622,7 +622,7 @@ public class Gauge extends QWidget
         
         QPen qp = p.pen();
         p.setPen(new QColor(Qt.GlobalColor.lightGray));
-        p.drawText(width()/2, height()/2, "RIP");
+        p.drawText(width()/2, height()/2, tr("RIP"));
         p.setPen(qp);
         paintText(p); 
        
@@ -671,7 +671,7 @@ public class Gauge extends QWidget
                 _mousePoint.y()) ;
         if (!rd.getOk())  return;
         if (rd.getMax() <=rd.getMin()) {
-            _log.error("Y-axis-Max is smaller than Y-axis-Min");
+            _log.error(tr("Y axis max is smaller than Y axis min"));
             return;
         }
 

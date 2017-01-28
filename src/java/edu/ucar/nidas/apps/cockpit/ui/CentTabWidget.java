@@ -407,8 +407,8 @@ public class CentTabWidget extends QTabWidget {
     public void changeAllPlotTimeWidth()
     {
         int oldw = getCurrentGaugePage().getPlotWidthMsec();
-        int neww = QInputDialog.getInt(this,"Plot Width",
-                "Width of plot (seconds)",
+        int neww = QInputDialog.getInt(this,tr("Plot Width"),
+                tr("Width of plot (seconds)"),
                 oldw / 1000,60,3600,60) * 1000;
 
         for (GaugePage gp : _gaugePageByName.values()) {
@@ -422,16 +422,16 @@ public class CentTabWidget extends QTabWidget {
     public void changePagePlotTimeWidth()
     {
         int oldw = getCurrentGaugePage().getPlotWidthMsec();
-        int neww = QInputDialog.getInt(this,"Plot Width",
-                "Width of plot (seconds)",
+        int neww = QInputDialog.getInt(this,tr("Plot Width"),
+                tr("Width of plot (seconds)"),
                 oldw / 1000,60,3600,60) * 1000;
         getCurrentGaugePage().setPlotWidthMsec(neww);
     }
 
     public void setDataTimeout()
     {
-        int timeout = QInputDialog.getInt(this,"Data Timeout",
-                "Seconds",600,0,3600);
+        int timeout = QInputDialog.getInt(this,tr("Data Timeout"),
+                tr("Seconds"),600,0,3600);
 
         for (GaugePage gp : _gaugePageByName.values()) {
             gp.setDataTimeout(timeout);
@@ -441,8 +441,8 @@ public class CentTabWidget extends QTabWidget {
     public void setSingleDataTimeout()
     {
         int oldtm = getCurrentGaugePage().getDataTimeout();
-        Integer timeout = QInputDialog.getInt(this,"Data Timeout",
-                "Seconds",600,0,3600);
+        Integer timeout = QInputDialog.getInt(this,tr("Data Timeout"),
+                tr("Seconds"),600,0,3600);
         if (timeout <= 0 || oldtm == timeout) return;
         getCurrentGaugePage().setDataTimeout(timeout);
     }
@@ -470,8 +470,8 @@ public class CentTabWidget extends QTabWidget {
         if (event.button() == MouseButton.RightButton)
         {
             QMenu pMenu = new QMenu(this);
-            pMenu.addAction("&Rename Page", this, "renameCurrentPage()");
-            pMenu.addAction("&Delete Page", this, "deleteCurrentPage()");
+            pMenu.addAction(tr("&Rename Page"), this, "renameCurrentPage()");
+            pMenu.addAction(tr("&Delete Page"), this, "deleteCurrentPage()");
             pMenu.popup(event.globalPos());
         }
     }
@@ -483,16 +483,16 @@ public class CentTabWidget extends QTabWidget {
         synchronized(this) {
             QAction at = _cockpit.autoCycleTabsAction;
             String tx = at.text();
-            if (tx.equals("Auto Cycle &Tabs")) {
-                at.setText("Stop Cycle Tabs");
-                _cycleInt = QInputDialog.getInt(this,"Tab Cycle Time",
-                        "Seconds",_cycleInt,0,3600);
+            if (tx.equals(tr("Auto Cycle &Tabs"))) {
+                at.setText(tr("Stop Cycle Tabs"));
+                _cycleInt = QInputDialog.getInt(this,tr("Tab Cycle Time"),
+                        tr("Seconds"),_cycleInt,0,3600);
                 _cycleTm.start(_cycleInt * 1000); 
-                status("Cycle tabs every " + _cycleInt + " seconds", -1);
+                status(tr("Cycle tabs every ") + _cycleInt + tr(" seconds"), -1);
             } else {
-                at.setText("Auto Cycle &Tabs");
+                at.setText(tr("Auto Cycle &Tabs"));
                 _cycleTm.stop();
-                status("Stop cycle tabs", 10000);
+                status(tr("Stop cycle tabs"), 10000);
             }
         }
     }
@@ -500,7 +500,7 @@ public class CentTabWidget extends QTabWidget {
     public void renameCurrentPage()
     {
         String name = QInputDialog.getText(this,
-            "Get Page Name", "Enter a new name:",
+            tr("Get Page Name"), tr("Enter a new name:"),
             QLineEdit.EchoMode.Normal,"");
         if (name != null) {
             GaugePage gp = (GaugePage)currentWidget();

@@ -36,7 +36,7 @@ import java.nio.ByteBuffer;
  */
 public class NidasSampleParser  {
 
-    final static int 	headLen = 16;  // nidas-head in bytes
+    final static int headLen = 16;  // nidas-head in bytes
 
     final static int floatSize =  Float.SIZE / 8;
 

@@ -134,23 +134,23 @@ public class GaugePage extends QWidget {
         {
             if (event.button() == MouseButton.RightButton)
             {
-                QMenu menu = new QMenu("Page options");
+                QMenu menu = new QMenu(tr("Page options"));
 
                 if (frozenPlotSizes()) {
-                    menu.addAction("Unfreeze &Plot Sizes",
+                    menu.addAction(tr("Unfreeze &Plot Sizes"),
                             GaugePage.this, "unfreezePlotSizes()");
                 }
                 else {
-                    menu.addAction("Freeze &Plot Sizes",
+                    menu.addAction(tr("Freeze &Plot Sizes"),
                             GaugePage.this, "freezePlotSizes()");
                 }
 
                 if (frozenGridLayout()) {
-                    menu.addAction("Unfreeze &Grid Layout",
+                    menu.addAction(tr("Unfreeze &Grid Layout"),
                             GaugePage.this, "unfreezeGridLayout()");
                 }
                 else {
-                    menu.addAction("Freeze &Grid Layout",
+                    menu.addAction(tr("Freeze &Grid Layout"),
                             GaugePage.this, "freezeGridLayout()");
                 }
                 menu.popup(event.globalPos());
@@ -688,7 +688,7 @@ public class GaugePage extends QWidget {
         if (event.button() == MouseButton.RightButton)
         {
             QMenu pMenu = new QMenu(this);
-            pMenu.addAction("&Rename Page", _centTabWidget,
+            pMenu.addAction(tr("&Rename Page"), _centTabWidget,
                     "renameCurrentPage()");
             pMenu.popup(event.globalPos());
         }

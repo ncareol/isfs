@@ -46,17 +46,17 @@ public class LogDialog extends QWidget
     {
         super(owner, Qt.WindowType.Window);
 
-        setWindowTitle("Cockpit Log");
+        setWindowTitle(tr("Cockpit Log"));
         QVBoxLayout layout = new QVBoxLayout();
 
         _text = new QPlainTextEdit();
         _text.setReadOnly(true);
         layout.addWidget(_text);
 
-        QPushButton clear = new QPushButton("&Clear");
+        QPushButton clear = new QPushButton(tr("&Clear"));
         clear.clicked.connect(this, "clear()");
 
-        QPushButton dismiss = new QPushButton("&Dismiss");
+        QPushButton dismiss = new QPushButton(tr("&Dismiss"));
         dismiss.clicked.connect(this, "dismiss()");
 
         QDialogButtonBox buttons =

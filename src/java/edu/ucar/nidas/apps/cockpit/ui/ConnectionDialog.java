@@ -194,7 +194,7 @@ public class ConnectionDialog extends QDialog
     public void createUI()
     {
 
-        setWindowTitle("Data connection");
+        setWindowTitle(tr("Data connection"));
         QVBoxLayout mlayout = new QVBoxLayout();
 
         _addressSelectionBox = new QGroupBox();
@@ -203,14 +203,14 @@ public class ConnectionDialog extends QDialog
 
         // multicast
         QHBoxLayout hlayout = new QHBoxLayout();
-        _multicast = new QRadioButton("Multicast");
+        _multicast = new QRadioButton(tr("Multicast"));
         _multicast.clicked.connect(this, "multicastServerRadio()");
         hlayout.addWidget(_multicast);
         _multicastInput = new QLineEdit(_multicastAddr);
         // _multicastInput.setMaximumSize(200, 30);
         // _multicastInput.adjustSize();
         hlayout.addWidget(_multicastInput);
-        hlayout.addWidget(new QLabel("TTL"));
+        hlayout.addWidget(new QLabel(tr("TTL")));
         _ttlInput = new QComboBox();
         for (int k = 1; k <= 3; k++) {
             _ttlInput.addItem(String.valueOf(k));
@@ -223,7 +223,7 @@ public class ConnectionDialog extends QDialog
 
         // unicast
         hlayout = new QHBoxLayout();
-        _unicast = new QRadioButton("Unicast"); 
+        _unicast = new QRadioButton(tr("Unicast")); 
         _unicast.setChecked(true);
         _unicast.clicked.connect(this, "unicastServerRadio()");
         hlayout.addWidget(_unicast);
@@ -238,7 +238,7 @@ public class ConnectionDialog extends QDialog
 
         // port 
         hlayout = new QHBoxLayout();
-        hlayout.addWidget(new QLabel("Port"));
+        hlayout.addWidget(new QLabel(tr("Port")));
         _portInput = new QLineEdit(String.valueOf(_connPort));
         // _portInput.setMaximumSize(200, 30);
         // _portInput.adjustSize();
@@ -257,7 +257,7 @@ public class ConnectionDialog extends QDialog
         // if more than one server responds, a selection of servers
         _serverSelectionBox = new QGroupBox();
         QHBoxLayout slayout = new QHBoxLayout();
-        slayout.addWidget(new QLabel("Server"));
+        slayout.addWidget(new QLabel(tr("Server")));
         _serverSelection = new QComboBox();
         slayout.addWidget(_serverSelection);
         _serverSelectionBox.setLayout(slayout);
@@ -267,7 +267,7 @@ public class ConnectionDialog extends QDialog
         hlayout.addWidget(_serverSelectionBox);
         mlayout.addLayout(hlayout);
 
-        _connDebug = new QCheckBox("Log connection debug messages");
+        _connDebug = new QCheckBox(tr("Log connection debug messages"));
         _connDebug.setChecked(false);
         _connDebug.clicked.connect(this, "connDebug()");
         mlayout.addWidget(_connDebug);
@@ -275,10 +275,10 @@ public class ConnectionDialog extends QDialog
         // ok, cancel buttons
         hlayout = new QHBoxLayout();
         // hlayout.addWidget(new QLabel());
-        _okButton = new QPushButton("Search", this);
+        _okButton = new QPushButton(tr("Search"), this);
         _okButton.clicked.connect(this, "pressOk()");
         hlayout.addWidget(_okButton);
-        QPushButton cancel = new QPushButton("Cancel", this);
+        QPushButton cancel = new QPushButton(tr("Cancel"), this);
         cancel.clicked.connect(this, "pressCancel()");
         hlayout.addWidget(cancel);
         mlayout.addItem(hlayout);
@@ -318,7 +318,7 @@ public class ConnectionDialog extends QDialog
     {
         setCursor(new QCursor(Qt.CursorShape.WaitCursor));
 
-        if (_okButton.text().trim().equals("Search")) {
+        if (_okButton.text().trim().equals(tr("Search"))) {
             search();
             if (!_alwaysProvideServerSelection && _connections.size() == 1) {
                 _selectedConnection = _connections.get(0);
@@ -352,13 +352,13 @@ public class ConnectionDialog extends QDialog
                     _cockpit.getLog(), _debug);
         }
         catch (IOException e) {
-            _cockpit.getLog().error("search: " + e.toString());
+            _cockpit.getLog().error(tr("search: ") + e.toString());
             return;
         }
 
         if (_connections.isEmpty()) {
-            _cockpit.getLog().error("search: No server found");
-            _cockpit.status("search: No server found");
+            _cockpit.getLog().error(tr("search: No server found"));
+            _cockpit.status(tr("search: No server found"));
             return;
         }
 
@@ -367,7 +367,7 @@ public class ConnectionDialog extends QDialog
             for (UdpConnInfo conn : _connections) {
                 _serverSelection.addItem(conn.toString());
             }
-            _okButton.setText("Select");
+            _okButton.setText(tr("Select"));
             _addressSelectionBox.setEnabled(false);
             _serverSelectionBox.setVisible(true);
         }

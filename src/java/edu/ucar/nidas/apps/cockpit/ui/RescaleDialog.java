@@ -49,7 +49,7 @@ public class RescaleDialog extends QDialog {
         super.setModal(true);
         setModal(true);
 
-        setWindowTitle( " Change Y scale");
+        setWindowTitle(tr("Change Y scale"));
         QVBoxLayout mlout = new QVBoxLayout();
 
         QHBoxLayout hlayout;
@@ -62,7 +62,7 @@ public class RescaleDialog extends QDialog {
 
         //add row-1 min
         hlayout = new QHBoxLayout();
-        hlayout.addWidget(new QLabel("Ymin= "));
+        hlayout.addWidget(new QLabel(tr("Ymin=")));
         _tfymin = new QLineEdit(String.valueOf(min)); 
         // _tfymin.setMaximumSize(100, 28);
         // _tfymin.adjustSize();
@@ -72,7 +72,7 @@ public class RescaleDialog extends QDialog {
 
         //add row-2 max 
         hlayout = new QHBoxLayout();
-        hlayout.addWidget(new QLabel("Ymax= "));
+        hlayout.addWidget(new QLabel(tr("Ymax=")));
         _tfymax = new QLineEdit(String.valueOf(max)); 
         // _tfymax.setMaximumSize(100, 28);
         // _tfymax.adjustSize();
@@ -90,10 +90,10 @@ public class RescaleDialog extends QDialog {
         //add row-4 ok-cancel
         hlayout = new QHBoxLayout();
         // hlayout.addWidget(new QLabel());// .addItem((QLayoutItemInterface)new QLabel());
-        QPushButton okButton = new QPushButton("Ok", this);
+        QPushButton okButton = new QPushButton(tr("Ok"), this);
         okButton.clicked.connect(this, "pressOk()");
 
-        QPushButton cancelButton = new QPushButton("Cancel", this);
+        QPushButton cancelButton = new QPushButton(tr("Cancel"), this);
         cancelButton.clicked.connect(this, "pressCancel()");
         hlayout.addWidget(okButton);
         hlayout.addWidget(cancelButton);
