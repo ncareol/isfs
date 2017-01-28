@@ -53,6 +53,8 @@ public class CockpitConfig {
 
     List<GaugePageConfig> _tabpages = new ArrayList<GaugePageConfig>();
 
+    int _tabCycleSec = 0;
+
     // public CockpitConfig() { }
 
     /**
@@ -61,10 +63,22 @@ public class CockpitConfig {
     public CockpitConfig(CentTabWidget p)
     {
         setName(p.getName());
+        _tabCycleSec = p.getTabCycleSec();
         for (GaugePage gp : p.getGaugePages()) {
             GaugePageConfig tp = new GaugePageConfig(gp);
             _tabpages.add(tp);
         }
+    }
+
+    public void setName(String name) { _name = name; }
+
+    public String getName() { return _name; }
+
+    public int getTabCycleSec() { return _tabCycleSec; }
+
+    public List<GaugePageConfig> getGaugePageConfig()
+    {
+        return _tabpages;
     }
 
     /**
@@ -75,9 +89,14 @@ public class CockpitConfig {
         Node n = doc.getFirstChild(); //there is only one
         if (n == null) throw new SAXException("First element is null");
 
-        String name = DOMUtils.getAttribute(n, "name");
-        if (name == null || name.isEmpty()) name = "unknown";
-        _name = name;
+        String value = DOMUtils.getAttribute(n, "name");
+        if (value == null || value.isEmpty()) value = "unknown";
+        _name = value;
+
+        value = DOMUtils.getAttribute(n,"tabCycleSec");
+        if (value != null && !value.isEmpty()) _tabCycleSec =
+            (Integer.valueOf(value).intValue());
+        else _tabCycleSec = 0;
 
         NodeList nl = n.getChildNodes();
         for (int i = 0; i < nl.getLength(); i++) {
@@ -89,23 +108,17 @@ public class CockpitConfig {
         }
     }
 
-    public void setName(String name) { _name = name; }
-
-    public String getName() { return _name; }
-
-    public List<GaugePageConfig> getGaugePageConfig()
-    {
-        return _tabpages;
-    }
-
     public void toDOM(Document document)
     {
-        Element rootElement = document.createElement("Cockpit");
-        rootElement.setAttribute("name",_name);
-        document.appendChild(rootElement);
+        Element root = document.createElement("Cockpit");
+
+        root.setAttribute("name",_name);
+        root.setAttribute("tabCycleSec", String.valueOf(_tabCycleSec));
+        document.appendChild(root);
+
         int size = _tabpages.size();
         for (int i = 0; i < size; i++){
-            _tabpages.get(i).toDOM(document, rootElement);
+            _tabpages.get(i).toDOM(document, root);
         }
     }
 }

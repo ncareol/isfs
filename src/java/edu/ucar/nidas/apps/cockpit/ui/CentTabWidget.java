@@ -99,11 +99,16 @@ public class CentTabWidget extends QTabWidget {
     private String _name;
 
     /**
-     * auto-cycle tab-pages, default is 10 seconds
+     * QTimer for auto cycling tab pages.
      */
-    private QTimer _cycleTm;
+    private QTimer _tabCycleTimer;
 
-    private int _cycleInt = 10;
+    private int _tabCycleSec = 0;
+
+    /**
+     * Provide default for time to cycle tabs.
+     */
+    private int _defaultTabCycleSec = 10;
 
     private QRect _pageGeometry = new QRect(350, 250, 1000, 700);
 
@@ -116,8 +121,8 @@ public class CentTabWidget extends QTabWidget {
         connectSlotsByName();
         // setLayout(_stacked);
         // currentChanged.connect(this, "pageChanged()");  
-        _cycleTm = new QTimer();
-        _cycleTm.timeout.connect(this, "cycleTimeout()");
+        _tabCycleTimer = new QTimer();
+        _tabCycleTimer.timeout.connect(this, "cycleTimeout()");
     }
 
     public Log getLog()
@@ -476,25 +481,43 @@ public class CentTabWidget extends QTabWidget {
         }
     }
 
+    public int getTabCycleSec()
+    {
+        return _tabCycleSec;
+    }
+
     /**
-     * auto cycle tabs based on users' chosen time-interval 
+     * Set the auto cycle tab interval and start/stop the QTimer.
      */
-    private void autoCycleTabs(){
-        synchronized(this) {
-            QAction at = _cockpit.autoCycleTabsAction;
-            String tx = at.text();
-            if (tx.equals(tr("Auto Cycle &Tabs"))) {
-                at.setText(tr("Stop Cycle Tabs"));
-                _cycleInt = QInputDialog.getInt(this,tr("Tab Cycle Time"),
-                        tr("Seconds"),_cycleInt,0,3600);
-                _cycleTm.start(_cycleInt * 1000); 
-                status(tr("Cycle tabs every ") + _cycleInt + tr(" seconds"), -1);
-            } else {
-                at.setText(tr("Auto Cycle &Tabs"));
-                _cycleTm.stop();
-                status(tr("Stop cycle tabs"), 10000);
-            }
+    public void setTabCycleSec(int sec)
+    {
+        if (sec != _tabCycleSec)
+            if (_tabCycleTimer.isActive()) _tabCycleTimer.stop();
+
+        _tabCycleSec = sec;
+        if (sec > 0) {
+            _defaultTabCycleSec = sec;
+            _tabCycleTimer.start(_tabCycleSec * 1000); 
+            _cockpit.startCycleTabs();
+            status(tr("Cycle tabs every ") + _tabCycleSec + tr(" seconds"), 10000);
         }
+        else {
+            _cockpit.stopCycleTabs();
+            status(tr("Stop cycle tabs"), 10000);
+        }
+    }
+
+    /**
+     * Start tab cycling, prompting user for the interval.
+     */
+    private void toggleTabCycle()
+    {
+        int sec = 0;
+        if (_tabCycleSec <= 0) {
+            sec = QInputDialog.getInt(this, tr("Tab Cycle Time"),
+                    tr("Seconds"), _defaultTabCycleSec, 0, 3600);
+        }
+        setTabCycleSec(sec);
     }
 
     public void renameCurrentPage()
@@ -521,8 +544,8 @@ public class CentTabWidget extends QTabWidget {
 
     private void cycleTimeout(){
 
-        if (_cycleInt <= 0) {
-            _cycleTm.stop();
+        if (_tabCycleSec <= 0) {
+            _tabCycleTimer.stop();
         } else {
             if (count() > 0) setCurrentIndex((currentIndex() + 1) % count());
         }
@@ -530,7 +553,8 @@ public class CentTabWidget extends QTabWidget {
 
     public void apply(CockpitConfig conf)
     {
-        synchronized (this){
+        synchronized(this) {
+
             setWindowTitle(conf.getName());
             // System.out.println("conf-apply "+conf.getGaugePageConfig().size()+ "   "+conf.getGaugePageConfig().get(0).getName());
             for (GaugePageConfig gpc : conf.getGaugePageConfig()) {
@@ -563,6 +587,7 @@ public class CentTabWidget extends QTabWidget {
                 gp.setWindowTitle(gpc.getName());
                 gp.resize(gpc.getSize());
             }
+            setTabCycleSec(conf.getTabCycleSec());
         }
     }
 

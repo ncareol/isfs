@@ -129,7 +129,7 @@ public class Cockpit extends QMainWindow {
 
     private QAction _unfreezeAllGridAction;
 
-    public QAction autoCycleTabsAction;
+    private QAction _autoCycleTabsAction;
 
     private LogDialog _logDialog;
 
@@ -450,9 +450,9 @@ public class Cockpit extends QMainWindow {
 
         action = new QMenuActionWithToolTip(tr("Auto Cycle &Tabs"), 
             tr("Cycle through plot pages"), topMenu);
-        action.triggered.connect(_centWidget, "autoCycleTabs()");
+        action.triggered.connect(_centWidget, "toggleTabCycle()");
         topMenu.addAction(action);
-        autoCycleTabsAction = action;
+        _autoCycleTabsAction = action;
 
         action = new QMenuActionWithToolTip(tr("Change Plot Time &Width"), 
             tr("Change time scale on all plots, losing history"),
@@ -549,6 +549,24 @@ public class Cockpit extends QMainWindow {
     public void enableUnfreezeGridLayoutMenu()
     {
         _unfreezeAllGridAction.setEnabled(true);
+    }
+
+    /**
+     * Tell Cockpit that tabs are cycling, so
+     * change tab cycle menu action to "Stop".
+     */
+    public void startCycleTabs()
+    {
+        _autoCycleTabsAction.setText(tr("Stop Cycle Tabs"));
+    }
+
+    /**
+     * Tell Cockpit that tabs are no cycling, so
+     * change tab cycle menu action.
+     */
+    public void stopCycleTabs()
+    {
+        _autoCycleTabsAction.setText(tr("Auto Cycle Tabs"));
     }
 
     public void showLog()

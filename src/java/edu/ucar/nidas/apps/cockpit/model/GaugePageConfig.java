@@ -75,6 +75,30 @@ public class GaugePageConfig {
         }
     }
 
+    public String getName()
+    {
+        return _name;
+    }
+    
+    public QSize getSize()
+    {
+        return _size;
+    }
+    
+    public List<GaugeConfig> getGaugeConfigs() {
+        return _gaugeConfigs;
+    }
+    
+    public void setName(String name)
+    {
+        _name = name;
+    }
+    
+    public void setSize(QSize size)
+    {
+        _size = size;
+    }
+            
     public GaugePageConfig(Node n) throws NumberFormatException, SAXException
     {
 
@@ -112,30 +136,6 @@ public class GaugePageConfig {
         }
     }
     
-    public String getName()
-    {
-        return _name;
-    }
-    
-    public QSize getSize()
-    {
-        return _size;
-    }
-    
-    public List<GaugeConfig> getGaugeConfigs() {
-        return _gaugeConfigs;
-    }
-    
-    public void setName(String name)
-    {
-        _name = name;
-    }
-    
-    public void setSize(QSize size)
-    {
-        _size = size;
-    }
-            
     public void toDOM(Document document, Element parent)
     {
         Element em = document.createElement("GaugePage");
