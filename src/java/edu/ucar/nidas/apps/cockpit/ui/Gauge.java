@@ -359,15 +359,15 @@ public class Gauge extends QWidget
         }
     }
 
-    public void setDataTimeout()
+    public void setDataTimeoutSec()
     {
         int timeout = QInputDialog.getInt(this,tr("Data Timeout"),
                 tr("Seconds"),_timeoutSec,1,3600);
-        if (timeout <= 0 || _timeoutSec == timeout) return;    
-        setDataTimeout(timeout);
+        if (timeout <= 0) return;    
+        setDataTimeoutSec(timeout);
     }
 
-    public void setDataTimeout(int sec) {
+    public void setDataTimeoutSec(int sec) {
 
         if (_timeoutSec == sec) return;
         _timeoutSec = sec;

@@ -118,9 +118,9 @@ public class GaugePage extends QWidget {
     int _gaugeWidthMsec = 120 * 1000;
 
     /**
-     * plot-nodata-timeout,default is 10 minutes
+     * If no data received in this number of seconds, display "RIP".
      */
-    int _dataTimeout = 600; 
+    int _dataTimeoutSec = 600; 
 
     HashMap<String, Gauge> _gaugesByName = new HashMap<String,Gauge>();
 
@@ -367,12 +367,12 @@ public class GaugePage extends QWidget {
      * Set the data timeout in seconds.
      * @param msec
      */
-    public void setDataTimeout(int sec) {
-        if (sec != _dataTimeout)
+    public void setDataTimeoutSec(int sec) {
+        if (sec != _dataTimeoutSec)
         {
-            _dataTimeout = sec;
+            _dataTimeoutSec = sec;
             for (Gauge gauge : _gauges) {
-                gauge.setDataTimeout(sec);
+                gauge.setDataTimeoutSec(sec);
             }
         }
     }
@@ -381,9 +381,9 @@ public class GaugePage extends QWidget {
      * get the time-width-in-milli-seconds
      * @return
      */
-    public int getDataTimeout()
+    public int getDataTimeoutSec()
     {
-        return _dataTimeout;
+        return _dataTimeoutSec;
     }
 
     /**

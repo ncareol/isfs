@@ -58,7 +58,7 @@ public class GaugeConfig {
 
     float _min;
 
-    int _dataTimeout;
+    int _dataTimeoutSec;
 
     int _plotWidthMsec;
 
@@ -76,7 +76,7 @@ public class GaugeConfig {
         _name = name;
         _min = min;
         _max = max;
-        _dataTimeout = timeout;
+        _dataTimeoutSec = timeout;
         _plotWidthMsec = widthMsec;
         _traceColor = c;
         _historyColor= h;
@@ -99,7 +99,7 @@ public class GaugeConfig {
 
         value = DOMUtils.getAttribute(n, "dataTimeout");
         if (value != null && !value.isEmpty())
-            _dataTimeout = Integer.valueOf(value).intValue();
+            _dataTimeoutSec = Integer.valueOf(value).intValue();
 
         value = DOMUtils.getAttribute(n, "plotWidthMsec");
         if (value != null && !value.isEmpty())
@@ -173,14 +173,14 @@ public class GaugeConfig {
         return _max;
     }
 
-    public void setDataTimeout(int val)
+    public void setDataTimeoutSec(int val)
     {
-        _dataTimeout = val;
+        _dataTimeoutSec = val;
     }
 
-    public int getDataTimeout()
+    public int getDataTimeoutSec()
     {
-        return _dataTimeout;
+        return _dataTimeoutSec;
     }
 
     public void setPlotWidthMsec(int tm)
@@ -200,7 +200,7 @@ public class GaugeConfig {
         //    subem.setAttribute("cname", _cname);
         subem.setAttribute("max",  String.valueOf(_max));
         subem.setAttribute("min",  String.valueOf(_min));
-        subem.setAttribute("dataTimeout", String.valueOf(_dataTimeout));
+        subem.setAttribute("dataTimeout", String.valueOf(_dataTimeoutSec));
         subem.setAttribute("plotWidthMsec", String.valueOf(_plotWidthMsec));
         subem.setAttribute("traceColor", String.format("%08x", _traceColor.rgba()));
         subem.setAttribute("historyColor", String.format("%08x", _historyColor.rgba()));

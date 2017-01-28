@@ -463,7 +463,7 @@ public class Cockpit extends QMainWindow {
         action = new QMenuActionWithToolTip(tr("Set Data &Timeout"), 
             tr("Set data timeout value for all plots, in seconds"),
             topMenu);
-        action.triggered.connect(_centWidget, "setDataTimeout()");
+        action.triggered.connect(_centWidget, "setDataTimeoutSec()");
         topMenu.addAction(action);
 
         topMenu.addAction(tr("Auto Scale Plots"), _centWidget,
@@ -492,16 +492,16 @@ public class Cockpit extends QMainWindow {
         action.triggered.connect(_centWidget, "pageBackgroundColor()");
         subMenu.addAction(action);
 
-        /*
-        QMenu srt = globalMenu.addMenu("SortBy");
-        // srt.addAction("Variable", _centWidget, "gsortVariable()");
-        // srt.addAction("Height", _centWidget, "gsortHeight()");
-        */
-
         action = new QMenuActionWithToolTip(tr("Change Plot Time &Width"), 
             tr("Change time scale of plots on current page, losing history"),
             topMenu);
         action.triggered.connect(_centWidget, "changePagePlotTimeWidth()");
+        topMenu.addAction(action);
+
+        action = new QMenuActionWithToolTip(tr("Set Data &Timeout"), 
+            tr("Set data timeout value for plots on current page, in seconds"),
+            topMenu);
+        action.triggered.connect(_centWidget, "setSingleDataTimeout()");
         topMenu.addAction(action);
 
     }

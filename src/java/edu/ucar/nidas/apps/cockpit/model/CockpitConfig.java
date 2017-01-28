@@ -55,8 +55,6 @@ public class CockpitConfig {
 
     int _tabCycleSec = 0;
 
-    // public CockpitConfig() { }
-
     /**
      * Construct CockpitConfig from current Widgets.
      */

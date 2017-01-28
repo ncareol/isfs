@@ -412,12 +412,14 @@ public class CentTabWidget extends QTabWidget {
     public void changeAllPlotTimeWidth()
     {
         int oldw = getCurrentGaugePage().getPlotWidthMsec();
-        int neww = QInputDialog.getInt(this,tr("Plot Width"),
+        Integer val = QInputDialog.getInt(this,tr("Plot Width"),
                 tr("Width of plot (seconds)"),
-                oldw / 1000,60,3600,60) * 1000;
+                oldw / 1000,60,3600,60);
+        if (val == null) return;
+        val *= 1000;
 
         for (GaugePage gp : _gaugePageByName.values()) {
-            gp.setPlotWidthMsec(neww);
+            gp.setPlotWidthMsec(val);
         }
     }
 
@@ -427,29 +429,42 @@ public class CentTabWidget extends QTabWidget {
     public void changePagePlotTimeWidth()
     {
         int oldw = getCurrentGaugePage().getPlotWidthMsec();
-        int neww = QInputDialog.getInt(this,tr("Plot Width"),
+        Integer val = QInputDialog.getInt(this,tr("Plot Width"),
                 tr("Width of plot (seconds)"),
-                oldw / 1000,60,3600,60) * 1000;
-        getCurrentGaugePage().setPlotWidthMsec(neww);
+                oldw / 1000,60,3600,60);
+        if (val == null) return;
+        val *= 1000;
+        getCurrentGaugePage().setPlotWidthMsec(val);
     }
 
-    public void setDataTimeout()
+    public void setDataTimeoutSec()
     {
-        int timeout = QInputDialog.getInt(this,tr("Data Timeout"),
-                tr("Seconds"),600,0,3600);
+        int oldtm = getCurrentGaugePage().getDataTimeoutSec();
+        Integer val = QInputDialog.getInt(this,tr("Data Timeout"),
+                tr("Seconds"), oldtm, 0, 3600);
+        if (val == null || val <= 0) return;
+        setDataTimeoutSec(val);
+    }
 
+    public void setDataTimeoutSec(int val)
+    {
         for (GaugePage gp : _gaugePageByName.values()) {
-            gp.setDataTimeout(timeout);
+            gp.setDataTimeoutSec(val);
         }
     }
 
     public void setSingleDataTimeout()
     {
-        int oldtm = getCurrentGaugePage().getDataTimeout();
-        Integer timeout = QInputDialog.getInt(this,tr("Data Timeout"),
-                tr("Seconds"),600,0,3600);
-        if (timeout <= 0 || oldtm == timeout) return;
-        getCurrentGaugePage().setDataTimeout(timeout);
+        // If pages are cycling, this could present problems to the user.
+        // Grab the page (which could have cycled already...) and
+        // then set the value on that page after prompting the user.
+        // This also assums that this page won't be deleted.
+        GaugePage page = getCurrentGaugePage();
+        int oldtm = page.getDataTimeoutSec();
+        Integer val = QInputDialog.getInt(this,tr("Data Timeout"),
+                tr("Seconds"), oldtm, 0, 3600);
+        if (val == null || val <= 0 || oldtm == val) return;
+        page.setDataTimeoutSec(val);
     }
 
     /*
@@ -512,10 +527,11 @@ public class CentTabWidget extends QTabWidget {
      */
     private void toggleTabCycle()
     {
-        int sec = 0;
+        Integer sec = 0;
         if (_tabCycleSec <= 0) {
             sec = QInputDialog.getInt(this, tr("Tab Cycle Time"),
                     tr("Seconds"), _defaultTabCycleSec, 0, 3600);
+            if (sec == null) return;
         }
         setTabCycleSec(sec);
     }
@@ -577,7 +593,7 @@ public class CentTabWidget extends QTabWidget {
                                 gc.getHistoryColor(), gc.getBGColor());
 
                         g.changeYMaxMin(gc.getMax(),gc.getMin());
-                        g.setDataTimeout(gc.getDataTimeout());
+                        g.setDataTimeoutSec(gc.getDataTimeoutSec());
                         g.setWidthMsec(gc.getPlotWidthMsec());
 
                     }
