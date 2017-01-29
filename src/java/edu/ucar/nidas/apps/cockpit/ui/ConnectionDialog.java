@@ -163,7 +163,7 @@ public class ConnectionDialog extends QDialog
     }
 
     /**
-     *  Get the user preferred port
+     * Remote server's destination port for the UDP packet requests.
      * @return
      */
     private int getPortInput()
@@ -172,6 +172,9 @@ public class ConnectionDialog extends QDialog
         return _connPort;
     }
 
+    /**
+     * Remote server's destination port for the UDP packet requests.
+     */
     public int getPort()
     {
         return _connPort;
@@ -349,7 +352,7 @@ public class ConnectionDialog extends QDialog
 
         try {
             _connections = _udpConnection.search(addr, port, ttl,
-                    _cockpit.getLog(), _debug);
+                _cockpit.getLog(), _debug);
         }
         catch (IOException e) {
             _cockpit.getLog().error(tr("search: ") + e.toString());

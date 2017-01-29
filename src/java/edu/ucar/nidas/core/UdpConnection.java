@@ -59,24 +59,18 @@ import edu.ucar.nidas.model.Log;
 public class UdpConnection {
 
     DatagramSocket _udpSocket = null;
+
     Socket _tcpSocket = null;
+
+    int _udpPort;
+
+    public UdpConnection(int udpPort)
+    {
+        _udpPort = udpPort;
+    }
 
     public DatagramSocket getUdpSocket()
     {
-        return _udpSocket;
-    }
-
-    //create a udp socket to find data connections
-    public DatagramSocket open(boolean multicast, int ttl)
-        throws  IOException
-    {
-        close();
-        if (multicast) {
-            MulticastSocket sock = new MulticastSocket();
-            sock.setTimeToLive(ttl);
-            _udpSocket = sock;
-        }
-        else _udpSocket = new DatagramSocket();
         return _udpSocket;
     }
 
@@ -93,7 +87,7 @@ public class UdpConnection {
         }
     }
 
-    public ArrayList<UdpConnInfo> search(String addr, int port,
+    public ArrayList<UdpConnInfo> search(String addr, int destPort,
         int ttl, Log log, boolean debug)
         throws IOException
     {
@@ -101,13 +95,20 @@ public class UdpConnection {
         InetAddress inetAddr = InetAddress.getByName(addr);
 
         close();
-        open(inetAddr.isMulticastAddress(),ttl);
+        if (inetAddr.isMulticastAddress()) {
+            // MulticastSocket msock = new MulticastSocket(destPort);
+            // _udpSocket = msock;
+            _udpSocket = openDatagramSocket(_udpPort, log);
+        }
+        else {
+            _udpSocket = openDatagramSocket(_udpPort, log);
+        }
 
         //build packet and display the contents
         DatagramPacket reqPacket =
             buildRequestPacket(_udpSocket.getLocalPort());
 
-        InetSocketAddress sockAddr = new InetSocketAddress(addr, port);
+        InetSocketAddress sockAddr = new InetSocketAddress(addr, destPort);
 
         reqPacket.setSocketAddress(sockAddr);
 
@@ -129,7 +130,8 @@ public class UdpConnection {
                     _udpSocket.receive(packet);
                     if (debug) log.debug("Packet received from " +
                            packet.getSocketAddress().toString());
-                    UdpConnInfo info = parseConnInfo(packet, log, debug);
+                    UdpConnInfo info = parseConnInfo(packet,
+                            inetAddr, log, debug);
                     connections.add(info);
                 }
                 catch(SocketTimeoutException e)
@@ -143,24 +145,70 @@ public class UdpConnection {
             }
         }
         _udpSocket.setSoTimeout(0);
-        if (inetAddr.isMulticastAddress()) close();
         return connections;
     }
 
-    public Socket connect(UdpConnInfo conn,
-            Log log, boolean debug) throws IOException
+    public DatagramSocket openDatagramSocket(int port, Log log)
+        throws SocketException
     {
-        if (_udpSocket == null) open(false, 0);
-        if (_tcpSocket != null) {
-            _tcpSocket.close();
-            _tcpSocket = null;
+
+        SocketException exc = null;
+        DatagramSocket sock = null;
+        for (int i = 0; i < 10; i++) {
+            try {
+                log.debug("Creating UDP socket for initial requests, port=" +
+                        String.valueOf(port+i));
+                sock = new DatagramSocket(port+i);
+                break;
+            }
+            catch(SocketException e) {
+                log.debug(e.toString());
+                exc = e;
+            }
+        }
+        if (sock == null) throw exc;
+        return sock;
+    }
+
+    /**
+     * Send a TCP connection request packet to a TCP port
+     * on the server corresponding to conn.getTcpAddr().
+     * The request packet inclues the UDP port that we
+     * want to receive packets on.
+     * After this is done, the XML can be read from the 
+     * tcp socket with readDOM.
+     */
+    public void connect(UdpConnInfo conn, Log log, boolean debug)
+        throws IOException
+    {
+        /*
+         * If the request was sent to a multicast port.
+         * then we want to receive multicasts back,
+         * on the same group address.
+         */
+        if (conn.getUdpAddr().isMulticastAddress()) {
+            _udpSocket.close();
+            _udpSocket = null;
+            log.debug("Creating Multicast socket, address=" +
+                    conn.getUdpAddr().toString() + ":" +
+                    String.valueOf(conn.getMulticastPort()));
+            MulticastSocket msock = new MulticastSocket(
+                    conn.getMulticastPort());
+            msock.joinGroup(conn.getUdpAddr());
+            _udpSocket = msock;
         }
 
         if (debug)
             log.debug("Creating TCP socket: " +
-                    conn.getIpAddr().getHostAddress() + ':' +
+                    conn.getTcpAddr().getHostAddress() + ':' +
                     String.valueOf(conn.getPort()));
-        _tcpSocket = new Socket(conn.getIpAddr(), conn.getPort());
+
+        if (_tcpSocket != null) {
+            _tcpSocket.close();
+            _tcpSocket = null;
+        }
+        
+        _tcpSocket = new Socket(conn.getTcpAddr(), conn.getPort());
 
         ByteBuffer buf =  ByteBuffer.allocate(6);
         buf.order(ByteOrder.BIG_ENDIAN);
@@ -175,8 +223,6 @@ public class UdpConnection {
         _tcpSocket.getOutputStream().write(buf.array());
 
         _tcpSocket.setSoTimeout(0);
-        
-        return _tcpSocket;
     }
 
     private DatagramPacket buildRequestPacket(int clientPort)
@@ -195,14 +241,20 @@ public class UdpConnection {
         return new DatagramPacket(buf.array(), buffLen);
     }
     
-    public UdpConnInfo parseConnInfo(DatagramPacket packet, Log log, boolean debug)
+    public UdpConnInfo parseConnInfo(DatagramPacket packet,
+        InetAddress udpAddr, Log log, boolean debug)
         throws IOException  
     {
 
         byte[] buffer = packet.getData();
 
         UdpConnInfo conn = new UdpConnInfo();
-        conn.setIpAddr(packet.getAddress());
+
+        conn.setTcpAddr(packet.getAddress());
+        if (udpAddr.isMulticastAddress())
+            conn.setUdpAddr(udpAddr);
+        else
+            conn.setUdpAddr(packet.getAddress());
 
         // decode _packet data to get servname, dsmname, tcpport -> list<servInf>
         //get port
@@ -218,9 +270,9 @@ public class UdpConnection {
         if (debug) log.debug("Connection response: remote TCP port=" +
                 String.valueOf(conn.getPort()));
 
-        conn.setUDPPort(cb.getShort());
-        if (debug) log.debug("Connection response: remote UDP port=" +
-                String.valueOf(conn.getUDPPort()));
+        conn.setMulticastPort(cb.getShort());
+        if (debug) log.debug("Connection response: optional multicast port=" +
+                String.valueOf(conn.getMulticastPort()));
 
         conn.setServer(packet.getAddress().getHostName());
         if (debug) log.debug("Connection response: remote host=" +
@@ -266,6 +318,10 @@ public class UdpConnection {
 
 	// Create the builder and parse the file
 	Document doc = factory.newDocumentBuilder().parse(xmls);
+
+        // NIDAS code sets the keep alive value on this tcp socket,
+        // in order to detect when the remote client is no longer running.
+        // Therefore we don't want to close it.
         return doc;
     }
 

@@ -33,19 +33,36 @@ import java.util.List;
 /**
  * 
  * This class contains the information about a data feed
- *   server-name
- *   project-name
- *   tcp-port
- *   udp-port
- *   ip-address, etc
  */
 public class UdpConnInfo
 {
     String _server = null;
+
+    /**
+     * Address that the original UDP request was sent to.
+     * This could be a multicast address. 
+     */
+    InetAddress _udpAddr = null;
+
     String _projectName = null;
+
+    /**
+     * Port on server where the XML stream can be read.
+     */
     int _tcpPort = -1;
-    int _udpPort = -1;
-    InetAddress _addr = null;
+
+    /**
+     * If a multicast request is made, then the server will
+     * send data to this multicast port.
+     */
+    int _multicastPort = -1;
+
+    /**
+     * When a response is returned from a server, this
+     * is the address that the response returned from.
+     * A TCP request can then be made to this address to fetch the XML.
+     */
+    InetAddress _tcpAddr = null;
     
     /**
      * Names of DSMs are sent in initial connection exchange.
@@ -53,18 +70,32 @@ public class UdpConnInfo
     List<String> _dsms = new ArrayList<String>();
 
     public void setServer(String val) { _server = val; }
+
     public void setProjectName(String val) { _projectName = val; }
+
     public void setPort(int val) { _tcpPort = val; }
-    public void setUDPPort(int val) { _udpPort = val; }
+
+    public void setMulticastPort(int val) { _multicastPort = val; }
+
     public void addDsm(String dsm) { _dsms.add(dsm); }
-    public void setIpAddr(InetAddress val) { _addr = val; }
+
+    public void setTcpAddr(InetAddress val) { _tcpAddr = val; }
+
+    public void setUdpAddr(InetAddress val) { _udpAddr = val; }
 
     public String getServer() { return _server; }
+
     public String getProjectName() { return _projectName; }
+
     public int getPort() { return _tcpPort; }
-    public int getUDPPort() { return _udpPort; }
+
+    public int getMulticastPort() { return _multicastPort; }
+
     public List<String> getDsms() { return _dsms; }
-    public InetAddress getIpAddr() { return _addr; }
+
+    public InetAddress getTcpAddr() { return _tcpAddr; }
+
+    public InetAddress getUdpAddr() { return _udpAddr; }
     
     public String toString()
     {

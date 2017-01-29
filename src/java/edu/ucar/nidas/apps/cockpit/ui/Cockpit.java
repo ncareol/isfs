@@ -146,7 +146,24 @@ public class Cockpit extends QMainWindow {
      * UDP data server address.
      */
     private String _connAddress = "localhost"; 
+
     private int _connPort = 30005;
+
+    /**
+     * Local UDP port used to send connection packet.
+     * If the request is for unicast data, then the serverr
+     * will also send the data to this local port.
+     * If that port is in use, ports up to _unicastPort + 10
+     * will be tried.
+     * If a multicast request is made, then the UDP multicast port
+     * number is provided by the server in its response.
+     */
+    private int _unicastPort = 30050;
+
+    public int getUnicastPort()
+    {
+        return _unicastPort;
+    }
 
     private ConnectionDialog _connDialog = null;
 
@@ -218,7 +235,7 @@ public class Cockpit extends QMainWindow {
         createUIs();
         openImage();
 
-	_udpConnection = new UdpConnection();
+	_udpConnection = new UdpConnection(_unicastPort);
 
 	_reconnector = this.new Reconnector();
 
@@ -686,7 +703,7 @@ public class Cockpit extends QMainWindow {
             ArrayList<UdpConnInfo> connections = null;
             try {
                 connections = _udpConnection.search(addr, port, ttl,
-                        getLog(), _connDialog.getDebug());
+                    getLog(), _connDialog.getDebug());
             }
             catch (IOException e) {
                 status(e.getMessage());
@@ -718,7 +735,8 @@ public class Cockpit extends QMainWindow {
         setWindowTitle(projectname + " COCKPIT");
 
         try {
-            _udpConnection.connect(_udpConnInfo, _log, _connDialog.getDebug());
+            _udpConnection.connect(_udpConnInfo,
+                    _log, _connDialog.getDebug());
         }
         catch (IOException e) {
             status(e.getMessage());
