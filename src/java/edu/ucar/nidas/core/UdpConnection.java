@@ -95,14 +95,7 @@ public class UdpConnection {
         InetAddress inetAddr = InetAddress.getByName(addr);
 
         close();
-        if (inetAddr.isMulticastAddress()) {
-            // MulticastSocket msock = new MulticastSocket(destPort);
-            // _udpSocket = msock;
-            _udpSocket = openDatagramSocket(_udpPort, log);
-        }
-        else {
-            _udpSocket = openDatagramSocket(_udpPort, log);
-        }
+        _udpSocket = openDatagramSocket(_udpPort, log);
 
         //build packet and display the contents
         DatagramPacket reqPacket =
@@ -116,8 +109,12 @@ public class UdpConnection {
 
         for (int i = 0; i < 3 && connections.isEmpty() ;i++) {
             _udpSocket.send(reqPacket);
-            if (debug) log.debug("Sending connection request to " +
+            if (debug) {
+                log.debug("Searching, sending request to " +
                     sockAddr.toString());
+                log.debug("Expecting response on UDP port " +
+                    String.valueOf(_udpSocket.getLocalPort()));
+            }
 
             long stime = System.currentTimeMillis();
             while ((stime + 2000)> System.currentTimeMillis()) {
@@ -136,7 +133,7 @@ public class UdpConnection {
                 }
                 catch(SocketTimeoutException e)
                 {
-                    if (debug)
+                    if (debug && connections.isEmpty())
                         log.debug("Timeout receiving connection response");
                 }
                 catch(IOException ee) {
@@ -229,7 +226,11 @@ public class UdpConnection {
     {
         //throws BufferOverflowException, IndexOutOfBoundsException  {
 
-        int buffLen = 12; // 4bytes magic, 4 bytes req#, 2bytes cp, 2bytes udp 
+        // 4 bytes magic
+        // 4 byte request enumeration
+        // 2 bytes socket port that this client is listening on
+        // 2 bytes listen socket type, DGRAM=2
+        int buffLen = 12;
         ByteBuffer buf = ByteBuffer.allocate(buffLen); 
         buf.order(ByteOrder.BIG_ENDIAN);
 
