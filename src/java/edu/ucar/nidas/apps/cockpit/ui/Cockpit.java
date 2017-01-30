@@ -218,7 +218,7 @@ public class Cockpit extends QMainWindow {
      */
     public Cockpit(String[] args)
     {
-        if (args != null && args.length > 0) parseArgs(args);
+        if (!parseArgs(args)) System.exit(1);
 
         // Just in case we have more than one cockpits :-)
         if (defBGColors.isEmpty()) {
@@ -845,13 +845,10 @@ public class Cockpit extends QMainWindow {
     }
     
     /**
-     * parse the parameters received from user's input
-     * [-s server:port] [-c config.xml] 
-     * Silently ignores unrecognized arguments.
-     * @param args  -s serv:port -c config.xml
-     * @return      void
+     * Parse the runstring parameters.
+     * See usage().
      */
-    private void parseArgs(String[] args)
+    private boolean parseArgs(String[] args)
     {
         for (int i = 0; i < args.length; i++)
         {
@@ -864,7 +861,7 @@ public class Cockpit extends QMainWindow {
                 }
             }
             else if ("-h".equals(args[i])) {
-                usage();
+                return usage();
             }
             else if ("-s".equals(args[i]) && i + 1 < args.length){
                 String opt = args[i+1].trim();
@@ -887,17 +884,23 @@ public class Cockpit extends QMainWindow {
                     status(tr("Invalid argument: ") + op);
                     logError(tr("Invalid argument: ") + op);
                 }
-                else parseArgs(trs);
+                else return parseArgs(trs);
+            }
+            else {
+                System.err.println("Unrecognized option: " + args[i]);
+                return usage();
             }
         }
+        return true;
     }
 
-    public void usage()
+    public boolean usage()
     {
         System.err.println("Options:\n" +
             "-c config.xml    Initialize from a config file saved from a previous session\n" +
             "-s server[:port] Connect to a server without the initial dialog window, for example \"-s localhost\", or for multicast, \"-s 239.0.0.10\". Port defaults to 30005.\n" +
             "-u unicastPort   Set the port number to receive unicast UDP data packets. Default is 0 (varying). Not needed if using multicast");
+        return false;
     }
 
     /**
