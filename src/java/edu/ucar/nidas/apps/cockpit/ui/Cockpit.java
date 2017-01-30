@@ -755,7 +755,7 @@ public class Cockpit extends QMainWindow {
 
         String projectname = _udpConnInfo.getProjectName();
 
-        setWindowTitle(projectname + " COCKPIT");
+        setWindowTitle(projectname + " cockpit");
 
         try {
             _udpConnection.connect(_udpConnInfo, _log, _connDebug);
@@ -855,7 +855,18 @@ public class Cockpit extends QMainWindow {
     {
         for (int i = 0; i < args.length; i++)
         {
-            if ("-s".equals(args[i]) && i + 1 < args.length){
+            if ("-c".equals(args[i]) && i + 1 < args.length ) {
+                String cname = args[++i];
+                if (cname.length() > 0) {
+                    if (QDir.isRelativePath(cname))
+                        cname = QDir.current().filePath(cname);
+                    setConfigFileName(cname);
+                }
+            }
+            else if ("-h".equals(args[i])) {
+                usage();
+            }
+            else if ("-s".equals(args[i]) && i + 1 < args.length){
                 String opt = args[i+1].trim();
                 String[] ss = opt.split(":");
                 if (ss.length >= 1)
@@ -866,14 +877,6 @@ public class Cockpit extends QMainWindow {
             else if ("-u".equals(args[i]) && i + 1 < args.length){
                 String opt = args[i+1].trim();
                 _unicastPort = Integer.valueOf(opt);
-            }
-            else if ("-c".equals(args[i]) && i + 1 < args.length ) {
-                String cname = args[++i];
-                if (cname.length() > 0) {
-                    if (QDir.isRelativePath(cname))
-                        cname = QDir.current().filePath(cname);
-                    setConfigFileName(cname);
-                }
             }
             else if ("-arg".equals(args[i]) || "-open".equals(args[i]) &&
                 i + 1 < args.length) {
@@ -887,6 +890,14 @@ public class Cockpit extends QMainWindow {
                 else parseArgs(trs);
             }
         }
+    }
+
+    public void usage()
+    {
+        System.err.println("Options:\n" +
+            "-c config.xml    Initialize from a config file saved from a previous session\n" +
+            "-s server[:port] Connect to a server without the initial dialog window, for example \"-s localhost\", or for multicast, \"-s 239.0.0.10\". Port defaults to 30005.\n" +
+            "-u unicastPort   Set the port number to receive unicast UDP data packets. Default is 0 (varying). Not needed if using multicast");
     }
 
     /**
