@@ -864,7 +864,7 @@ public class Cockpit extends QMainWindow {
                 return usage();
             }
             else if ("-s".equals(args[i]) && i + 1 < args.length){
-                String opt = args[i+1].trim();
+                String opt = args[++i].trim();
                 String[] ss = opt.split(":");
                 if (ss.length >= 1)
                     _connAddress = ss[0];
@@ -872,7 +872,7 @@ public class Cockpit extends QMainWindow {
                     _connPort = Integer.valueOf(ss[1]);
             }
             else if ("-u".equals(args[i]) && i + 1 < args.length){
-                String opt = args[i+1].trim();
+                String opt = args[++i].trim();
                 _unicastPort = Integer.valueOf(opt);
             }
             else if ("-arg".equals(args[i]) || "-open".equals(args[i]) &&
@@ -881,8 +881,8 @@ public class Cockpit extends QMainWindow {
                 String op = args[++i];
                 String[] trs = op.split(" ");
                 if (trs.length != 2) {
-                    status(tr("Invalid argument: ") + op);
-                    logError(tr("Invalid argument: ") + op);
+                    System.err.println("Invalid argument: " + op);
+                    return usage();
                 }
                 else return parseArgs(trs);
             }
