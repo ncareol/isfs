@@ -158,7 +158,7 @@ public class Cockpit extends QMainWindow {
      * If a multicast request is made, then the UDP multicast port
      * number is provided by the server in its response.
      */
-    private int _unicastPort = 30050;
+    private int _unicastPort = 0;   // or 30050
 
     public int getUnicastPort()
     {
@@ -757,7 +757,8 @@ public class Cockpit extends QMainWindow {
         synchronized(_dataThreadLock) {
             if (_dataThread != null) _dataThread.interrupt();
             _dataThread = new UdpDataReaderThread(
-                    _udpConnection.getUdpSocket(), _statusbar, _log, _reconnector);
+                    _udpConnection.getUdpSocket(),
+                    _statusbar, _log, _reconnector);
         }
         _dataProcessorByVarName.clear();
         _varsByName.clear();
@@ -839,6 +840,10 @@ public class Cockpit extends QMainWindow {
                     _connAddress = ss[0];
                 if (ss.length > 1)
                     _connPort = Integer.valueOf(ss[1]);
+            }
+            else if ("-u".equals(args[i]) && i + 1 < args.length){
+                String opt = args[i+1].trim();
+                _unicastPort = Integer.valueOf(opt);
             }
             else if ("-c".equals(args[i]) && i + 1 < args.length ) {
                 String cname = args[++i];
