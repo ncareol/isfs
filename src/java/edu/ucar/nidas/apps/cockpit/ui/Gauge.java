@@ -37,7 +37,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.trolltech.qt.core.QPoint;
-import com.trolltech.qt.core.QRectF;
+import com.trolltech.qt.core.QRect;
 import com.trolltech.qt.core.QSize;
 import com.trolltech.qt.core.QTimer;
 import com.trolltech.qt.core.Qt;
@@ -797,59 +797,85 @@ public class Gauge extends QWidget
     private void paintText(QPainter painter) {
         if (painter == null) return; 
         synchronized(this) {
-            QFont hfont = painter.font();
-            int fpixels = Math.min(Math.max(height() / 16, 14), 30);
-            if (fpixels != hfont.pixelSize())
-                hfont.setPixelSize(fpixels);
+
+            QFont font = painter.font();
+            
+            int fpixels = Math.min(Math.max(height() / 16, 12), 30);
+
+            int ticlen = Math.min(Math.max(width() / 30, 8), 20);
             QPen hPen = painter.pen();
 
-            int len = rect().height() / 10;
+            int th = fpixels + 4;   // rectangle height for text
             int w = rect().width();
 
             painter.setPen(new QColor(Qt.GlobalColor.yellow));
-            // name 
-            QFont qf = new QFont(hfont);
-            qf.setPixelSize(Math.round(fpixels * 0.8f));
-            painter.setFont(qf);
-            QRectF rect = new QRectF(0,0,w,len);//QRectF(0,0,w,len*5.6);
-            painter.drawText(rect(), Qt.AlignmentFlag.AlignRight.value(),_name);
 
-            //and units
-            painter.setFont(qf);
-            rect = new QRectF(0,rect().height()-qf.pointSizeF()*1.5,w-2,qf.pointSizeF()*1.5);
-            painter.drawText(rect, Qt.AlignmentFlag.AlignRight.value(),_units);
+            // name  on upper right
+            font.setPixelSize(fpixels);
+            // painter.setFont(qf);
+            QRect rect = new QRect(0, 0, w, th);
+            painter.drawText(rect,
+                Qt.AlignmentFlag.AlignLeft.value() | Qt.AlignmentFlag.AlignTop.value(),
+                _name);
 
-            //tics and labels  
-            //max and min
-            rect = new QRectF(5,0,w,rect().height());
-            painter.drawText(rect,Qt.AlignmentFlag.AlignLeft.value(), getLabel(_yRangeMax));
-            rect = new QRectF(5,rect().height()-qf.pointSizeF()*1.5,w,qf.pointSizeF()*1.5);
-            painter.drawText(rect,Qt.AlignmentFlag.AlignLeft.value(), getLabel(_yRangeMin));
+            // units on bottom right
+            rect = new QRect(0, rect().height() - th, w, th);
+            painter.drawText(rect,
+                Qt.AlignmentFlag.AlignLeft.value() | Qt.AlignmentFlag.AlignBottom.value(),
+                _units);
+
+            // max label
+            rect = new QRect(0, 0, w, th);
+            painter.drawText(rect,
+                Qt.AlignmentFlag.AlignRight.value() | Qt.AlignmentFlag.AlignTop.value(),
+                 getLabel(_yRangeMax));
+
+            // min label
+            rect = new QRect(0, rect().height() - th, w, th);
+            painter.drawText(rect,
+                    Qt.AlignmentFlag.AlignRight.value() | Qt.AlignmentFlag.AlignBottom.value(),
+                    getLabel(_yRangeMin));
 
             //paint the rest of ticmarks
-            QFont tf = new QFont(qf);
-            tf.setPixelSize(Math.round(fpixels * 0.8f));
-            painter.setFont(tf);
-            int rofts = (int)((_yRangeMax - _yRangeMin) / _ticDelta) - 1 ;
-            for (int i = 1; i<=rofts; i++) {
-                int y = ypixel(_yRangeMax - i*_ticDelta);
-                painter.drawLine(0, y, 2, y);
+            int rofts = (int)((_yRangeMax - _yRangeMin) / _ticDelta) - 1;
+            for (int i = 1; i <= rofts; i++) {
+                int y = ypixel(_yRangeMax - i * _ticDelta);
+                painter.drawLine(0, y, ticlen, y);      // left tics
+                painter.drawLine(w, y, w - ticlen, y);  // right tics
             }
 
+            int lpixels = Math.round(fpixels * 0.8f);
+            font.setPixelSize(lpixels);
             //label the middle point(s)
-            if (rofts%2 == 1) {
-                int step = rofts / 2 + 1;
-                paintLabel(step, painter);
+            if (rofts % 2 == 1) {
+                int i = rofts / 2 + 1;
+                float yval = _yRangeMax - i * _ticDelta;
+                int y = ypixel(yval);
+                rect = new QRect(0, y - lpixels / 2, w - ticlen - 2, lpixels + 2);
+                painter.drawText(rect,
+                    Qt.AlignmentFlag.AlignRight.value() | Qt.AlignmentFlag.AlignVCenter.value(),
+                    getLabel(yval));
             } else {
-                int step = rofts / 2 ;
-                paintLabel(step, painter);
-                step = rofts / 2 + 1;
-                paintLabel(step, painter);
+                int i = rofts / 2 ;
+                float yval = _yRangeMax - i * _ticDelta;
+                int y = ypixel(yval);
+                rect = new QRect(0, y - lpixels / 2, w - ticlen - 2, lpixels + 2);
+                painter.drawText(rect,
+                    Qt.AlignmentFlag.AlignRight.value() | Qt.AlignmentFlag.AlignVCenter.value(),
+                    getLabel(yval));
+
+                i = rofts / 2 + 1;
+                yval = _yRangeMax - i * _ticDelta;
+                y = ypixel(yval);
+                rect = new QRect(0, y - lpixels / 2, w - ticlen - 2, lpixels + 2);
+                painter.drawText(rect,
+                    Qt.AlignmentFlag.AlignRight.value() | Qt.AlignmentFlag.AlignVCenter.value(),
+                    getLabel(yval));
             }
 
-            //reset his-color
+            //reset history color
             painter.setPen(hPen);
-            painter.setFont(hfont);
+            font.setPixelSize(fpixels);
         }
     }
 
@@ -858,15 +884,6 @@ public class Gauge extends QWidget
         if (_painter != null) _painter.end();
         if (_historyPainter!=null) _historyPainter.end();
         super.close();	
-    }
-
-    private void paintLabel(int step, QPainter painter)
-    {
-        synchronized(this) {
-            float yval = _yRangeMax - step * _ticDelta;
-            int y = ypixel(yval);
-            painter.drawText(3, y+2, getLabel(yval));
-        }
     }
 
     /**
