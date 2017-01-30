@@ -145,9 +145,13 @@ public class Cockpit extends QMainWindow {
     /**
      * UDP data server address.
      */
-    private String _connAddress = "localhost"; 
+    private String _connAddress = null;
+
+    private String _defaultConnAddress = "localhost"; 
 
     private int _connPort = 30005;
+
+    private int _ttl = 1;
 
     /**
      * Local UDP port used to send connection packet.
@@ -166,6 +170,8 @@ public class Cockpit extends QMainWindow {
     }
 
     private ConnectionDialog _connDialog = null;
+
+    private boolean _connDebug = false;
 
     /**
      * Parameters associated with the current data connection.
@@ -239,7 +245,15 @@ public class Cockpit extends QMainWindow {
 
 	_reconnector = this.new Reconnector();
 
-        connect(true);
+        // If user has set the connection address in the runstring,
+        // don't bring up the dialog.
+        boolean dialog = false;
+        if (_connAddress == null) {
+            dialog = true;
+            _connAddress = _defaultConnAddress;
+        }
+
+        connect(dialog);
 
         String cname = getConfigFileName();
         if (cname != null) {
@@ -695,21 +709,30 @@ public class Cockpit extends QMainWindow {
 
             _udpConnInfo = _connDialog.getSelectedConnection();
             if (_udpConnInfo == null) return false;
+            _connAddress = _connDialog.getAddress();
+            _connPort = _connDialog.getPort();
+            _ttl = _connDialog.getTTL();
+            _connDebug = _connDialog.getDebug();
         }
         else {
-            String addr = _connDialog.getAddress();
-            int port = _connDialog.getPort();
-            int ttl = _connDialog.getTTL();
             ArrayList<UdpConnInfo> connections = null;
             try {
-                connections = _udpConnection.search(addr, port, ttl,
-                    getLog(), _connDialog.getDebug());
+                connections = _udpConnection.search(_connAddress, _connPort, _ttl,
+                    getLog(), _connDebug);
             }
             catch (IOException e) {
                 status(e.getMessage());
                 logError(e.getMessage());
                 return false;
             }
+            if (_udpConnInfo == null && connections.size() == 1) {
+                _udpConnInfo = connections.get(0);
+            }
+            else {
+                logError("using connection dialog");
+                return connect(true);
+            }
+
             UdpConnInfo matchConn = null;
             for (UdpConnInfo conn : connections) {
                 if (_udpConnInfo.getServer().equals(conn.getServer()) &&
@@ -735,8 +758,7 @@ public class Cockpit extends QMainWindow {
         setWindowTitle(projectname + " COCKPIT");
 
         try {
-            _udpConnection.connect(_udpConnInfo,
-                    _log, _connDialog.getDebug());
+            _udpConnection.connect(_udpConnInfo, _log, _connDebug);
         }
         catch (IOException e) {
             status(e.getMessage());
