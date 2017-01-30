@@ -798,22 +798,23 @@ public class Gauge extends QWidget
         if (painter == null) return; 
         synchronized(this) {
             QFont hfont = painter.font();
+            int fpixels = Math.min(Math.max(height() / 16, 14), 30);
+            if (fpixels != hfont.pixelSize())
+                hfont.setPixelSize(fpixels);
             QPen hPen = painter.pen();
-            double hsize = hfont.pointSizeF();
-            QFont qf = new QFont(hfont);
 
-            int len = rect().height()/10;
+            int len = rect().height() / 10;
             int w = rect().width();
 
             painter.setPen(new QColor(Qt.GlobalColor.yellow));
             // name 
-            qf.setPointSizeF(hsize*.8);
+            QFont qf = new QFont(hfont);
+            qf.setPixelSize(Math.round(fpixels * 0.8f));
             painter.setFont(qf);
             QRectF rect = new QRectF(0,0,w,len);//QRectF(0,0,w,len*5.6);
             painter.drawText(rect(), Qt.AlignmentFlag.AlignRight.value(),_name);
 
             //and units
-            qf.setPointSizeF(hsize*.75);
             painter.setFont(qf);
             rect = new QRectF(0,rect().height()-qf.pointSizeF()*1.5,w-2,qf.pointSizeF()*1.5);
             painter.drawText(rect, Qt.AlignmentFlag.AlignRight.value(),_units);
@@ -826,7 +827,9 @@ public class Gauge extends QWidget
             painter.drawText(rect,Qt.AlignmentFlag.AlignLeft.value(), getLabel(_yRangeMin));
 
             //paint the rest of ticmarks
-            painter.setFont(new QFont(hfont.family(), 5));
+            QFont tf = new QFont(qf);
+            tf.setPixelSize(Math.round(fpixels * 0.8f));
+            painter.setFont(tf);
             int rofts = (int)((_yRangeMax - _yRangeMin) / _ticDelta) - 1 ;
             for (int i = 1; i<=rofts; i++) {
                 int y = ypixel(_yRangeMax - i*_ticDelta);
