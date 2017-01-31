@@ -866,7 +866,7 @@ public class Gauge extends QWidget
                 int i = rofts / 2 + 1;
                 float yval = _yRangeMax - i * _ticDelta;
                 int y = ypixel(yval);
-                rect = new QRect(0, y - lpixels / 2, w - ticlen - 2, th);
+                rect = new QRect(0, y - th / 2, w - ticlen - 2, th);
                 painter.drawText(rect,
                     Qt.AlignmentFlag.AlignRight.value() | Qt.AlignmentFlag.AlignVCenter.value(),
                     getLabel(yval));
@@ -874,7 +874,7 @@ public class Gauge extends QWidget
                 int i = rofts / 2 ;
                 float yval = _yRangeMax - i * _ticDelta;
                 int y = ypixel(yval);
-                rect = new QRect(0, y - lpixels / 2, w - ticlen - 2, th);
+                rect = new QRect(0, y - th / 2, w - ticlen - 2, th);
                 painter.drawText(rect,
                     Qt.AlignmentFlag.AlignRight.value() | Qt.AlignmentFlag.AlignVCenter.value(),
                     getLabel(yval));
@@ -882,7 +882,7 @@ public class Gauge extends QWidget
                 i = rofts / 2 + 1;
                 yval = _yRangeMax - i * _ticDelta;
                 y = ypixel(yval);
-                rect = new QRect(0, y - lpixels / 2, w - ticlen - 2, th);
+                rect = new QRect(0, y - th / 2, w - ticlen - 2, th);
                 painter.drawText(rect,
                     Qt.AlignmentFlag.AlignRight.value() | Qt.AlignmentFlag.AlignVCenter.value(),
                     getLabel(yval));
