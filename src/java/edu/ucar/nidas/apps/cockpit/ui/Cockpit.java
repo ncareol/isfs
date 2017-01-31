@@ -44,6 +44,7 @@ import com.trolltech.qt.core.QTranslator;
 import com.trolltech.qt.core.QLocale;
 import com.trolltech.qt.gui.QWidget;
 import com.trolltech.qt.gui.QApplication;
+import com.trolltech.qt.gui.QDesktopWidget;
 import com.trolltech.qt.gui.QCloseEvent;
 import com.trolltech.qt.gui.QColor;
 import com.trolltech.qt.gui.QToolTip;
@@ -59,7 +60,6 @@ import com.trolltech.qt.gui.QStatusBar;
 import com.trolltech.qt.gui.QFileDialog;
 import com.trolltech.qt.gui.QMessageBox;
 import com.trolltech.qt.gui.QMessageBox.StandardButton;
-import com.trolltech.qt.gui.QDesktopWidget;
 
 import edu.ucar.nidas.apps.cockpit.model.CockpitConfig;
 import edu.ucar.nidas.apps.cockpit.model.MinMaxer;
@@ -101,6 +101,11 @@ public class Cockpit extends QMainWindow {
      *    and cent-tab-wdiget
      */
 
+    // private static QDesktopWidget _desktop;
+
+    public static QRect defaultGeometry =
+        new QRect(200, 200, 1000, 700);
+    
     /**
      * global defaults
      */
@@ -234,8 +239,9 @@ public class Cockpit extends QMainWindow {
         _statusbar = new StatusBar(this);
         _logDialog = new LogDialog(this);
         _log = new LogDisplay(_logDialog.getTextWidget());
-        setGeometry(PageGeometry.x,  PageGeometry.y,
-                PageGeometry.w, PageGeometry.h);  
+
+        setGeometry(defaultGeometry);
+
         _centWidget = new CentTabWidget(this);
         setCentralWidget(_centWidget); 
         createUIs();
@@ -261,7 +267,7 @@ public class Cockpit extends QMainWindow {
                 Document document = DOMUtils.parseXML(
                     new FileInputStream(cname), false);
                 CockpitConfig config = new CockpitConfig(document);
-                _centWidget.apply(config);
+                apply(config);
             }
             catch(Exception e) {
                 status(e.getMessage());
@@ -662,7 +668,7 @@ public class Cockpit extends QMainWindow {
         setConfigFileName(cname);
 
         // read current configuration from display
-        CockpitConfig config = new CockpitConfig(_centWidget);
+        CockpitConfig config = new CockpitConfig(this);
         try {
             Document document = DOMUtils.newDocument();
             config.toDOM(document);
@@ -684,12 +690,19 @@ public class Cockpit extends QMainWindow {
         try {
             Document document = DOMUtils.parseXML(new FileInputStream(cname), false);
             CockpitConfig config = new CockpitConfig(document);
-            _centWidget.apply(config);
+            apply(config);
         }
         catch(Exception e) {
             status(e.getMessage());
             logError(e.getMessage());
         }
+    }
+
+    private void apply(CockpitConfig cc)
+    {
+        resize(cc.getSize());
+        move(cc.getPos());
+        _centWidget.apply(cc);
     }
 
     /** 
@@ -839,10 +852,6 @@ public class Cockpit extends QMainWindow {
         gnodataImg.setColor(1,new QColor(Qt.GlobalColor.red).rgb());
     }
 
-    static class PageGeometry {
-        static public int x = 350, y = 250, w = 1000, h = 700;
-    }
-    
     /**
      * Parse the runstring parameters.
      * See usage().
@@ -923,8 +932,14 @@ public class Cockpit extends QMainWindow {
 	}
 
         //setNativeLookAndFeel();
+
+        // To access the screen size
+        // _desktop = QApplication.desktop();
+
         Cockpit cockpit = new Cockpit(args);
+
         QApplication.execStatic();
+
         QApplication.shutdown();
     }
 

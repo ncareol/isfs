@@ -26,6 +26,9 @@
 
 package edu.ucar.nidas.apps.cockpit.model;
 
+import com.trolltech.qt.core.QSize;
+import com.trolltech.qt.core.QPoint;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +40,7 @@ import org.w3c.dom.NodeList;
 
 import org.xml.sax.SAXException;
 
+import edu.ucar.nidas.apps.cockpit.ui.Cockpit;
 import edu.ucar.nidas.apps.cockpit.ui.CentTabWidget;
 import edu.ucar.nidas.apps.cockpit.ui.Gauge;
 import edu.ucar.nidas.apps.cockpit.ui.GaugePage;
@@ -55,14 +59,25 @@ public class CockpitConfig {
 
     int _tabCycleSec = 0;
 
+    QSize _size = null;
+
+    QPoint _pos = null;
+
     /**
      * Construct CockpitConfig from current Widgets.
      */
-    public CockpitConfig(CentTabWidget p)
+    public CockpitConfig(Cockpit cp)
     {
-        setName(p.getName());
-        _tabCycleSec = p.getTabCycleSec();
-        for (GaugePage gp : p.getGaugePages()) {
+
+        CentTabWidget cw = cp.getCentWidget();
+
+        setName(cw.getName());
+        _size = cp.size();
+        _pos = cp.pos();
+
+        _tabCycleSec = cw.getTabCycleSec();
+
+        for (GaugePage gp : cw.getGaugePages()) {
             GaugePageConfig tp = new GaugePageConfig(gp);
             _tabpages.add(tp);
         }
@@ -71,6 +86,10 @@ public class CockpitConfig {
     public void setName(String name) { _name = name; }
 
     public String getName() { return _name; }
+
+    public QSize getSize() { return _size; }
+
+    public QPoint getPos() { return _pos; }
 
     public int getTabCycleSec() { return _tabCycleSec; }
 
@@ -96,6 +115,32 @@ public class CockpitConfig {
             (Integer.valueOf(value).intValue());
         else _tabCycleSec = 0;
 
+        int w = Cockpit.defaultGeometry.width();
+        int h = Cockpit.defaultGeometry.height();
+        value = DOMUtils.getAttribute(n,"width");
+        if (value != null && !value.isEmpty()) w =
+            (Integer.valueOf(value).intValue());
+
+        value = DOMUtils.getAttribute(n,"height");
+        if (value != null && !value.isEmpty()) h =
+            (Integer.valueOf(value).intValue());
+
+        if (h * w > 0)
+            _size = new QSize(w, h);
+        else _size = new QSize();
+
+        int x = Cockpit.defaultGeometry.x();
+        int y = Cockpit.defaultGeometry.y();
+        value = DOMUtils.getAttribute(n,"posx");
+        if (value != null && !value.isEmpty()) x =
+            (Integer.valueOf(value).intValue());
+
+        value = DOMUtils.getAttribute(n,"posy");
+        if (value != null && !value.isEmpty()) y =
+            (Integer.valueOf(value).intValue());
+
+        _pos = new QPoint(x,y);
+
         NodeList nl = n.getChildNodes();
         for (int i = 0; i < nl.getLength(); i++) {
             n = nl.item(i);
@@ -112,6 +157,10 @@ public class CockpitConfig {
 
         root.setAttribute("name",_name);
         root.setAttribute("tabCycleSec", String.valueOf(_tabCycleSec));
+        root.setAttribute("width", String.valueOf(_size.width()));
+        root.setAttribute("height", String.valueOf(_size.height()));
+        root.setAttribute("posx", String.valueOf(_pos.x()));
+        root.setAttribute("posy", String.valueOf(_pos.y()));
         document.appendChild(root);
 
         int size = _tabpages.size();

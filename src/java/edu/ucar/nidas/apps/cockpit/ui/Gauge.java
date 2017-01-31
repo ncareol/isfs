@@ -891,7 +891,6 @@ public class Gauge extends QWidget
             //reset history color
             painter.setPen(hPen);
             painter.setFont(font);
-            font.setPixelSize(fpixels);
         }
     }
 
