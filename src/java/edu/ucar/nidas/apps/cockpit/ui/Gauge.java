@@ -47,6 +47,7 @@ import com.trolltech.qt.gui.QAction;
 import com.trolltech.qt.gui.QInputDialog;
 import com.trolltech.qt.gui.QColorDialog;
 import com.trolltech.qt.gui.QFont;
+import com.trolltech.qt.gui.QFontMetrics;
 import com.trolltech.qt.gui.QMenu;
 import com.trolltech.qt.gui.QMouseEvent;
 import com.trolltech.qt.gui.QPaintEvent;
@@ -795,63 +796,77 @@ public class Gauge extends QWidget
      * Paint the plot label, unit, and scales
      */
     private void paintText(QPainter painter) {
-        if (painter == null) return; 
+
+        // if (painter == null) return; 
         synchronized(this) {
-
-            QFont font = painter.font();
-            
-            int fpixels = Math.min(Math.max(height() / 16, 12), 30);
-
-            int ticlen = Math.min(Math.max(width() / 30, 8), 20);
-            QPen hPen = painter.pen();
-
-            int th = fpixels + 4;   // rectangle height for text
-            int w = rect().width();
 
             painter.setPen(new QColor(Qt.GlobalColor.yellow));
 
-            // name  on upper right
-            font.setPixelSize(fpixels);
-            // painter.setFont(qf);
+            QFont font = painter.font();
+            
+            int fpixels = Math.min(Math.max(height() / 12, 10), 24);
+
+            int ticlen = Math.min(Math.max(width() / 20, 8), 16);
+            QPen hPen = painter.pen();
+
+            int w = rect().width();
+
+            if (font.pixelSize() != fpixels) {
+                font.setPixelSize(fpixels);
+                painter.setFont(font);
+            }
+
+            QFontMetrics fm = new QFontMetrics(font);
+            /*
+            System.err.printf("fpixels=%d, font.pixelSize=%d, font width(\"X\")=%d, height=%d\n",
+                    fpixels, font.pixelSize(), fm.width("X"), fm.height());
+            */
+            int th = fm.lineSpacing();       // rectangle height for text
+
+            // name, upper left
             QRect rect = new QRect(0, 0, w, th);
             painter.drawText(rect,
                 Qt.AlignmentFlag.AlignLeft.value() | Qt.AlignmentFlag.AlignTop.value(),
                 _name);
 
-            // units on bottom right
+            // units, bottom left
             rect = new QRect(0, rect().height() - th, w, th);
             painter.drawText(rect,
                 Qt.AlignmentFlag.AlignLeft.value() | Qt.AlignmentFlag.AlignBottom.value(),
                 _units);
 
-            // max label
+            // max label, upper right
             rect = new QRect(0, 0, w, th);
             painter.drawText(rect,
                 Qt.AlignmentFlag.AlignRight.value() | Qt.AlignmentFlag.AlignTop.value(),
                  getLabel(_yRangeMax));
 
-            // min label
+            // min label, lower right
             rect = new QRect(0, rect().height() - th, w, th);
             painter.drawText(rect,
                     Qt.AlignmentFlag.AlignRight.value() | Qt.AlignmentFlag.AlignBottom.value(),
                     getLabel(_yRangeMin));
 
-            //paint the rest of ticmarks
+            // tics, both right and left
             int rofts = (int)((_yRangeMax - _yRangeMin) / _ticDelta) - 1;
             for (int i = 1; i <= rofts; i++) {
                 int y = ypixel(_yRangeMax - i * _ticDelta);
-                painter.drawLine(0, y, ticlen, y);      // left tics
-                painter.drawLine(w, y, w - ticlen, y);  // right tics
+                painter.drawLine(0, y, ticlen, y);      // left
+                painter.drawLine(w, y, w - ticlen, y);  // right
             }
 
             int lpixels = Math.round(fpixels * 0.8f);
-            font.setPixelSize(lpixels);
-            //label the middle point(s)
+            QFont lfont = new QFont(font);
+            lfont.setPixelSize(lpixels);
+            painter.setFont(lfont);
+            fm = new QFontMetrics(lfont);
+            th = fm.lineSpacing();       // rectangle height for text
+            // label the middle one or two points, right
             if (rofts % 2 == 1) {
                 int i = rofts / 2 + 1;
                 float yval = _yRangeMax - i * _ticDelta;
                 int y = ypixel(yval);
-                rect = new QRect(0, y - lpixels / 2, w - ticlen - 2, lpixels + 2);
+                rect = new QRect(0, y - lpixels / 2, w - ticlen - 2, th);
                 painter.drawText(rect,
                     Qt.AlignmentFlag.AlignRight.value() | Qt.AlignmentFlag.AlignVCenter.value(),
                     getLabel(yval));
@@ -859,7 +874,7 @@ public class Gauge extends QWidget
                 int i = rofts / 2 ;
                 float yval = _yRangeMax - i * _ticDelta;
                 int y = ypixel(yval);
-                rect = new QRect(0, y - lpixels / 2, w - ticlen - 2, lpixels + 2);
+                rect = new QRect(0, y - lpixels / 2, w - ticlen - 2, th);
                 painter.drawText(rect,
                     Qt.AlignmentFlag.AlignRight.value() | Qt.AlignmentFlag.AlignVCenter.value(),
                     getLabel(yval));
@@ -867,7 +882,7 @@ public class Gauge extends QWidget
                 i = rofts / 2 + 1;
                 yval = _yRangeMax - i * _ticDelta;
                 y = ypixel(yval);
-                rect = new QRect(0, y - lpixels / 2, w - ticlen - 2, lpixels + 2);
+                rect = new QRect(0, y - lpixels / 2, w - ticlen - 2, th);
                 painter.drawText(rect,
                     Qt.AlignmentFlag.AlignRight.value() | Qt.AlignmentFlag.AlignVCenter.value(),
                     getLabel(yval));
@@ -875,6 +890,7 @@ public class Gauge extends QWidget
 
             //reset history color
             painter.setPen(hPen);
+            painter.setFont(font);
             font.setPixelSize(fpixels);
         }
     }

@@ -220,7 +220,7 @@ public class Cockpit extends QMainWindow {
     {
         if (!parseArgs(args)) System.exit(1);
 
-        // Just in case we have more than one cockpits :-)
+        // Just in case we have more than one cockpit :-)
         if (defBGColors.isEmpty()) {
             defBGColors.add(new QColor(0,85,127));
             defBGColors.add(new QColor(82,85,79));
@@ -419,7 +419,6 @@ public class Cockpit extends QMainWindow {
 
         //file and items
         QMenu file = menuBar.addMenu(tr("&File"));
-        menuBar.setFont(new QFont("Ariel", 12));
 
         QAction action = new QMenuActionWithToolTip(tr("&Connect"),
                 tr("Connect to data server"), file);
@@ -911,6 +910,7 @@ public class Cockpit extends QMainWindow {
     public static void main(String[] args)
     {
         QApplication.initialize(args);
+        QApplication.setFont(new QFont("Ariel"));
 
 	QTranslator qtTranslator = new QTranslator();
 	qtTranslator.load("classpath:/translations_directory/qt_" + QLocale.system().name() + ".qm");
