@@ -1,27 +1,41 @@
-#!/bin/sh
+#!/bin/sh -e
 
-# set the CLASSPATH to the jar files found in lib/linux
+d=$(dirname $0)
+d=${d/./$PWD}
 
-cp=(lib/*.jar lib/linux/*.jar)
-OLDIFS=$IFS
-IFS=:
-# This syntax for expanding an array expands to a single word
-# with each member separated by the first character in IFS
-export CLASSPATH="${cp[*]}"
-IFS=$OLDIFS
-echo "CLASSPATH=$CLASSPATH"
+cd $d/../../..
 
-[ -d classes ] || mkdir classes
+# echo "d=$d"
+# pwd
 
-javac -d classes -target 5 -source 5  -Xlint:unchecked \
-    ../../../core/*.java \
-    ../../../model/*.java \
-    ../../../util/*.java  \
-    ../../../ui/*.java \
-    ../ui/*.java \
-    ../core/*.java \
-    ../model/*.java\
-    ../model/config/*.java || exit 1
+# set the CLASSPATH to the appropriate jar
+declare -A classpath
 
-jar cvfm cockpit.jar manifest.txt image/nodata.png -C classes . || exit 1
+# classpath[linux64]="$d/lib/linux64/qtjambi-4.8.7.jar:$d/lib/linux64/qtjambi-native-linux64-gcc-4.8.7.jar"
+# classpath[macosx]="$d/lib/macosx/qtjambi-4.8.6.jar:$d/lib/macosx/qtjambi-native-macosx-gcc-4.8.6.jar"
+
+classpath[linux64]="$d/lib/linux64/qtjambi-4.8.7.jar"
+classpath[macosx]="$d/lib/macosx/qtjambi-4.8.6.jar"
+
+for arch in linux64 macosx; do
+
+    export CLASSPATH=${classpath[$arch]}
+
+    [ -d $d/classes_${arch} ] || mkdir $d/classes_${arch}
+
+    javac -d $d/classes_${arch} \
+        -Xlint \
+        core/*.java \
+        model/*.java \
+        util/*.java  \
+        ui/*.java \
+        apps/cockpit/ui/*.java \
+        apps/cockpit/model/*.java || exit 1
+
+        # -Xlint -Xlint:unchecked \
+        # -target 6 -source 6 -bootclasspath jdk1.7.0/lib/rt.jar \
+
+    jar cvfm $d/cockpit_${arch}.jar $d/manifest_${arch}.txt -C $d/classes_${arch} . -C $d image/nodata.png || exit 1
+
+done
 

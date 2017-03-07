@@ -1,3 +1,29 @@
+// -*- mode: java; indent-tabs-mode: nil; tab-width: 4; -*-
+// vim: set shiftwidth=4 softtabstop=4 expandtab:
+/*
+ ********************************************************************
+ ** ISFS: NCAR Integrated Surface Flux System software
+ **
+ ** 2016, Copyright University Corporation for Atmospheric Research
+ **
+ ** This program is free software; you can redistribute it and/or modify
+ ** it under the terms of the GNU General Public License as published by
+ ** the Free Software Foundation; either version 2 of the License, or
+ ** (at your option) any later version.
+ **
+ ** This program is distributed in the hope that it will be useful,
+ ** but WITHOUT ANY WARRANTY; without even the implied warranty of
+ ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ ** GNU General Public License for more details.
+ **
+ ** The LICENSE.txt file accompanying this software contains
+ ** a copy of the GNU General Public License. If it is not found,
+ ** write to the Free Software Foundation, Inc.,
+ ** 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ **
+ ********************************************************************
+*/
+
 package edu.ucar.nidas.apps.cockpit.ui;
 
 import java.awt.Color;
@@ -11,14 +37,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.trolltech.qt.core.QPoint;
-import com.trolltech.qt.core.QRectF;
+import com.trolltech.qt.core.QRect;
 import com.trolltech.qt.core.QSize;
 import com.trolltech.qt.core.QTimer;
 import com.trolltech.qt.core.Qt;
 import com.trolltech.qt.core.Qt.MouseButton;
 import com.trolltech.qt.gui.QColor;
+import com.trolltech.qt.gui.QAction;
+import com.trolltech.qt.gui.QInputDialog;
 import com.trolltech.qt.gui.QColorDialog;
 import com.trolltech.qt.gui.QFont;
+import com.trolltech.qt.gui.QFontMetrics;
 import com.trolltech.qt.gui.QMenu;
 import com.trolltech.qt.gui.QMouseEvent;
 import com.trolltech.qt.gui.QPaintEvent;
@@ -30,9 +59,12 @@ import com.trolltech.qt.gui.QWidget;
 import com.trolltech.qt.gui.QPainter.CompositionMode;
 import com.trolltech.qt.gui.QSizePolicy.Policy;
 
-import edu.ucar.nidas.core.FloatSample;
+import edu.ucar.nidas.model.FloatSample;
+import edu.ucar.nidas.model.DataClient;
+import edu.ucar.nidas.model.QProxyDataClient;
 import edu.ucar.nidas.model.Var;
-import edu.ucar.nidas.util.Util;
+import edu.ucar.nidas.model.Log;
+import edu.ucar.nidas.apps.cockpit.ui.Cockpit.QMenuActionWithToolTip;
 
 /**
  * Gauge class is a plot unit of cockpit.
@@ -47,18 +79,22 @@ import edu.ucar.nidas.util.Util;
  * history image 
  * _painter to draw the data-line  
  * 
- * @author dongl
  */
-public class Gauge extends QWidget {
+public class Gauge extends QWidget
+{
     /*
      * gauge's parent page
      */
-    GaugePage _parent;
+    GaugePage _gaugePage;
+
+    private Gauge.GaugeDataClient _client;
+
+    private DataClient _proxyClient;
 
     /**
-     * reduction-time-of minMaxer, mili-seconds
+     * data reduction time of minMaxer, milli-seconds
      */
-    int _reductionTm = 1000;
+    int _statisticsPeriod = 1000;
 
     /**
      * pixels/sec in Int
@@ -68,11 +104,11 @@ public class Gauge extends QWidget {
     /**
      * If it does not receive the data for the max-time-out, it will put no-data-image to the plot 
      */
-    int     _tmoutMax = 300; 
+    int     _timeoutSec = 300; 
     /**
      * represent the no-data-time-out
      */
-    boolean _noDataPaint =false;
+    boolean _noDataPaint = false;
 
     /**
      * timetag of last sample with non-nan data.
@@ -95,19 +131,20 @@ public class Gauge extends QWidget {
     QTimer  _tm ;
 
     /**
-     * global-request or not.
-     * If local, it is forced to re-scale; If global & there is data in the plot, ignore it   
+     * Whether to force a plot rescale.
      */
-    boolean _gautoScale=false;
+    boolean _forceRescale = true;
 
     /**
      * data-pair for current plot span
      */
     List<QPoint> _pts = new ArrayList<QPoint>();
-    float[]     _maxmin; //idx0=max idx1=min
 
+    /**
+     * Y maximum and minimum values in current trace, used when auto-scaling.
+     */
+    float[] _yminmax = new float[2];
 
-    //images 
     /**
      * current image
      */
@@ -134,33 +171,30 @@ public class Gauge extends QWidget {
      * painter for history data
      */
 
+    /**
+     * plot label
+     */
+    public String _name;
 
-    //plot attributes
     /**
-     * variable whose data is plotted
-     */
-    Var _var;
-    /**
-     * plot label from the data-descriptor
-     */
-    public String _label;
-    /**
-     * plot unit from the data-descriptor
+     * plot units
      */
     String _units;
+
     /**
      * create it dynamically or not
      */
     boolean _dynamic;
-    /**
-     * Min float value in y-range
-     */
-    float _ymin; 
-    /**
-     * Max float value in y-range
-     */
-    float _ymax;
 
+    /**
+     * Minimum value in y range
+     */
+    float _yRangeMin; 
+
+    /**
+     * Maximum value in y range
+     */
+    float _yRangeMax;
 
     /**
      * Current time in milliseconds of start of plot.
@@ -195,7 +229,7 @@ public class Gauge extends QWidget {
     /**
      * x and y locate when a mouse is clicked 
      */
-    int _xmouse, _ymouse;  //when right-mouse clicks, get the location
+    QPoint _mousePoint = null;
 
     /**
      * plot width  and height in pix
@@ -203,11 +237,81 @@ public class Gauge extends QWidget {
     int _pwidth, _pheight;  //plot-height-in-pix
 
     //color
-    QColor _cColor= CockPit.gdefCColor;
-    QColor _hColor = CockPit.gdefHColor;	
-    QColor _bgColor = CockPit.gdefBColor;
+    QColor _traceColor= Cockpit.defTraceColor;
+    QColor _historyColor = Cockpit.defHistoryColor;	
+    QColor _bgColor = Cockpit.defBGColors.get(0);
 
-    //##################################################################
+    static QColor _red = new QColor(Qt.GlobalColor.red);
+
+    private Log _log;
+
+    /**
+     * @param parent
+     * @param size Initial widget QSize
+     * @param gaugeWidthMsec - gauge-width in milli-seconds
+     * @param var - variable whose data is plotted
+     */
+    public Gauge(GaugePage p, QSize size, int gaugeWidthMsec, Var var,
+            QColor tc, QColor hc, QColor bg)
+    {
+
+        super(p);
+        _gaugePage = p;
+        _log = p.getLog();
+        _xmin = 0; //plot-start-tm-in-sec
+        _xwidth = gaugeWidthMsec;  //in-milli-seconds
+        _statisticsPeriod = p.getStatisticsPeriod();
+        _traceColor = tc;
+        _historyColor = hc;
+        _bgColor = bg;
+
+        setMinimumSize(0,0);
+
+        // resize(size);
+
+        _name = var.getNameWithStn();
+        _units = var.getUnits();
+        _dynamic = var.getDynamic();
+
+        _pwidth = size.width();
+        _pheight = size.height();
+
+        calTics(var.getMax(), var.getMin());
+        rescale(size());
+        initPixmaps();
+
+        //show();
+        _lastTm = System.currentTimeMillis();
+        _tm = new QTimer();
+        _tm.timeout.connect(this, "timeout()");
+        // wakeup more often than the _timeoutSec so that we
+        // detect a timeout quicker. 10th of timeoutSec
+        int tmlen = (_timeoutSec*1000)/10;
+        _tm.start(tmlen);
+        /*
+        System.out.printf("new Gauge %s: w=%d,h=%d\n",
+                getName(),size.width(),size.height());
+        */
+
+        _client = this.new GaugeDataClient();
+
+        _proxyClient = QProxyDataClient.getProxy(_client);
+    }
+
+    DataClient getDataClient()
+    {
+        return _proxyClient;
+    }
+
+    public int heightForWidth(int w)
+    {
+        /*
+        System.out.printf("Gauge heightForWidth %s: w=%d,h=%d\n",
+                getName(),w,w*2/3);
+        */
+        return w * 2 / 3;
+    }
+
     /**
      * @ param x milliseconds into plot
      */
@@ -219,102 +323,59 @@ public class Gauge extends QWidget {
      * @ param y value in data units
      */
     private int ypixel(float y) {
-        return Math.round((_ymax - y) * _yscale);
+        return Math.round((_yRangeMax - y) * _yscale);
     }
-
-
-    /**
-     * @param parent
-     * @param w Initial widget width (pixels)
-     * @param h Initial widget height (pixels)
-     * @param gaugeWidthMsec - gauge-width in milli-seconds
-     * @param var - variable whose data is plotted
-     */
-    public Gauge(GaugePage p, int w, int h, int gaugeWidthMsec, Var var) {
-
-        _parent= p;
-        _xmin = 0; //plot-start-tm-in-sec
-        _xwidth = gaugeWidthMsec;  //in-milli-seconds
-        _reductionTm=p.getReductionPeriod();
-
-        setMinimumSize(w,h);
-        resize(w,h);
-
-        _var=var;
-        _label = var.getName();
-        _units = var.getUnits();
-        _dynamic =var.getDynamic();
-
-        _pwidth=w;
-        _pheight=h;
-
-        calTics(var.getMax(), var.getMin());
-        rescale(size());
-        initPixmaps();
-
-        _cColor= p.getCColor();
-        _hColor=p.getHColor();
-        _bgColor=p.getBGColor();
-        //show();
-        _lastTm=System.currentTimeMillis();
-        _tm = new QTimer();
-        _tm.timeout.connect(this, "timeout()");
-        // wakeup more often than the _tmoutMax so that we
-        // detect a timeout quicker. 10th of the MaxTmout
-        int tmlen = (_tmoutMax*1000)/10;
-        _tm.start(tmlen);
-
-    }
-
-    /**
-     * get the variable whose data is plotted 
-     * @return
-     */
-    public Var getVar() {return _var;}
 
     /**
      * get the parent of the plot
      * @return
      */
-    public GaugePage getPage() { return _parent;}
-
-    public void autoResize(){
-        synchronized(this) {
-            QSize qs=_parent.getPlots().get(0).size();
-            resize(qs.width(), qs.height());
-        }
+    public GaugePage getPage()
+    {
+        return _gaugePage;
     }
 
-    public void setNewTimeMSec(int msec) {
-        if (msec== _xwidth) return;
+    /*
+    public void autoResize(){
+        synchronized(this) {
+            QSize qs = size();
+            resize(qs);
+        }
+    }
+    */
+
+    public void setWidthMsec(int msec)
+    {
+        if (msec == _xwidth) return;
         synchronized(this) {
             _xwidth = msec;
 
-            QSize qs = _parent.getPlots().get(0).size();
+            QSize qs = size();
             resize(qs);
             rescale(qs);
             initPixmaps();
-            //synchronized(this) {
             _pts.clear();
-            _maxmin = null;
+            _yminmax[0] = Float.MAX_VALUE;
+            _yminmax[1] = -Float.MAX_VALUE;
         }
     }
 
-    public void setNoDataTmout() {
-        NoDataTimeout tmDlg = new NoDataTimeout(null,_tmoutMax);
-        int newtm = tmDlg.getNewTimeSec();
-        if (newtm<=0 || _tmoutMax==newtm) return;    
-        setNoDataTmout(newtm);
+    public void setDataTimeoutSec()
+    {
+        int timeout = QInputDialog.getInt(this,tr("Data Timeout"),
+                tr("Seconds"),_timeoutSec,1,3600);
+        if (timeout <= 0) return;    
+        setDataTimeoutSec(timeout);
     }
 
-    public void setNoDataTmout(int sec) {
+    public void setDataTimeoutSec(int sec) {
 
-        if (_tmoutMax==sec) return;
-        _tmoutMax = sec;
+        if (_timeoutSec == sec) return;
+        _timeoutSec = sec;
         _tm.stop();
-        _tm.start(sec*1000/6);
-        _noDataPaint=false;
-        _parent.repaint();
+        _tm.start(sec * 1000 / 6);
+        _noDataPaint = false;
+        parentWidget().repaint();
     }
 
     /**
@@ -328,7 +389,7 @@ public class Gauge extends QWidget {
         synchronized(this) {
             _pheight = qs.height();
             _pwidth = qs.width();
-            _xscale = _pwidth /(float)_xwidth;
+            _xscale = _pwidth / (float)_xwidth;
             _yscale = getYScale(); //pheight changed
 
             _prevTtag = -1;
@@ -343,7 +404,7 @@ public class Gauge extends QWidget {
     private void paintLines()
     {
         synchronized(this) {
-            if (_painter!=null)  {
+            if (_painter != null)  {
                 _painter.drawLinesFromPoints(_pts);
                 drawOutliners(_pts); 
                 update();
@@ -355,7 +416,7 @@ public class Gauge extends QWidget {
     /**
      * Clean up the data-history
      */
-    public  void cleanupHistory ()
+    public void clearHistory ()
     {
         initPixmaps();
         paintLines();
@@ -366,9 +427,9 @@ public class Gauge extends QWidget {
      * Color the current data with the new color
      * @param 
      */
-    public  void changeCColor(QColor c)
+    public void changeTraceColor(QColor c)
     {
-        _cColor = c;
+        _traceColor = c;
         resetPainter();
         paintLines();
         //repaint();
@@ -379,9 +440,9 @@ public class Gauge extends QWidget {
      * This method will clean up history, and make a new image 
      * @param c
      */
-    public   void changeHColor(QColor c)
+    public void changeHistoryColor(QColor c)
     {
-        _hColor = c;
+        _historyColor = c;
         initPixmaps();
         paintLines();
         //repaint();
@@ -392,7 +453,7 @@ public class Gauge extends QWidget {
      * Color the back-ground of a plot with the new color
      * @param 
      */
-    public   void changeBGColor(QColor c)
+    public void changeBGColor(QColor c)
     {
         _bgColor = c;
         initPixmaps();
@@ -400,154 +461,138 @@ public class Gauge extends QWidget {
         // repaint();
     }
 
-    /**
-     * get the new data, and plot it
-     * @param samp - sample-data
-     * @param offset -beginning index to read the pair of min and max
-     */
-    public void receive(FloatSample samp, int offset)
-    {
-
-        synchronized (this){
-            long x = samp.getTimeTag();
-            if (_xmin==0) {
-                _xmin = x - (x % _xwidth);
-                // show();
-            }
-            int xd =(int)(x - _xmin); // milliseconds into plot
-
-            // reach eof plot
-            if (xd > _xwidth) {
-                drawHistData();
-                resetPainter();
-                _pts.clear();
-                _maxmin = null;
-                _xmin = x - (x % _xwidth);
-                xd =(int)(x - _xmin);
-            }
-            int xp = xpixel(xd); //x-pixel-pos
-
-            String str=_var.getName();
-            // if (str.equals("P.2m") || str.equals("Lon"))   System.out.println(" var="+str +"   x="+x + "  xd="+xd+ "  _xp="+ xp +" (int)_xp="+(int)xp);
-
-            float ymin = samp.getData(offset);
-            float ymax = samp.getData(offset+1);
-
-            if (!Float.isNaN(ymin) && !Float.isNaN(ymax)) {
-                _noDataPaint=false;
-                _lastTm = x;
-
-                int ypmin = ypixel(ymin);
-                int ypmax = ypixel(ymax);
-                if (ypmin==ypmax) ypmax++;
-                //check the _xp-gape
-                List<QPoint> pa = new ArrayList<QPoint>();
-                int xpts=(int)xp-(int)_prevXp;
-                if (_prevTtag>0 && (x-_prevTtag)==_reductionTm ) {
-                    for (int i=0; i< xpts; i++){
-                        int xind= _prevXp + 1+i;
-                        pa.add( new QPoint(xind,ypmin));
-                        pa.add( new QPoint(xind,ypmax));
-                    }
-                } else{
-                    pa.add( new QPoint(xp,ypmin));
-                    pa.add( new QPoint(xp,ypmax));      
-                }
-
-                if (_painter!=null) {
-                    _painter.drawLinesFromPoints(pa);
-                    drawOutliners(pa);
-                } else {
-                    _parent._parent._parent._cpConn.getStatusBarClient().receive(" plot="+_var.getName()+ " in recieve get null painter.", 10000);
-                }
-
-                _pts.addAll(pa);        //push all to the pts
-                if (_maxmin==null) {_maxmin = new float[2];_maxmin[0] = ymax;_maxmin[1] = ymin;}
-                if (ymax > _maxmin[0]) _maxmin[0] = ymax;
-                if (ymin < _maxmin[1]) _maxmin[1] = ymin;
-
-                _prevTtag=x;            //keep prevtime
-                _prevXp=xp;
-
-                update();
-            }
-        }
-    }
-
     public void resizeEvent(QResizeEvent ent)
     {
-        if (_parent.getPolicy()==Policy.Fixed) return;
         synchronized(this) {
             rescale(ent.size());
             initPixmaps();
-            // synchronized(this) {
             _pts.clear();
-            _maxmin = null;
+            _yminmax[0] = Float.MAX_VALUE;
+            _yminmax[1] = -Float.MAX_VALUE;
         }
     }
 
     /**
      * timer to check the no-data-time-out 
      */
-    private void timeout () {
-        long c= System.currentTimeMillis();
-        if (( c - _lastTm )/1000 <_tmoutMax) return; 
+    private void timeout() {
+        long c = System.currentTimeMillis();
+        if ((c - _lastTm) / 1000 < _timeoutSec) return; 
         _noDataPaint = true;
         repaint();
     }
 
 
-    public  void paintEvent(QPaintEvent e)
+    public void paintEvent(QPaintEvent e)
     {
-        QPainter p= null;
-        if (! _pixmap.isNull()){
+        QPainter p = null;
+        if (! _pixmap.isNull()) {
             p = new QPainter(this);
             p.drawPixmap(0,0, _pixmap);
 
-            if (_noDataPaint ) {
-                p.setPen(QColor.lightGray);
-                p.drawText(width()/2, height()/2, "RIP");
+            if (_noDataPaint) {
+                p.setPen(new QColor(Qt.GlobalColor.lightGray));
+                p.drawText(width() / 2, height() / 2, tr("RIP"));
             }
         }
-        /*if (!_noDataPixmap.isNull()) 
-            {
-                CompositionMode cpmode = p.compositionMode();//QPainter::CompositionMode_Clear;
-                p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Destination);
-                p.drawPixmap(0,0,_noDataPixmap);
-            }*/
-        /*} else  {
+        /*
+        if (!_noDataPixmap.isNull()) {
+            CompositionMode cpmode = p.compositionMode();//QPainter::CompositionMode_Clear;
+            p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Destination);
+            p.drawPixmap(0,0,_noDataPixmap);
+        } else  {
             if (! _pixmap.isNull()) p.drawPixmap(0,0, _pixmap);
 
-        }*/
+        }
+        */
 
         if (p!=null) p.end();
     }
 
-    public void mouseReleaseEvent(QMouseEvent pEvent)
+    public void mouseReleaseEvent(QMouseEvent event)
     {
-        if (pEvent.button() == MouseButton.RightButton)
+        if (event.button() == MouseButton.RightButton)
         {
-            QMenu pMenu = new QMenu("");
-            QMenu option = pMenu.addMenu("Plot_Option");
-            QMenu color = option.addMenu("Color"); 
-            color.addAction("&CleanUp_History", this, "cleanupLocalHistory()");
-            color.addAction("Co&lor_Current", this, "changeLocalCColor()");
-            color.addAction("Color_&History", this, "changeLocalHColor()");
-            color.addAction("Color_&BackGround", this, "changeLocalBGColor()");
-            QMenu scale = option.addMenu("Scale");
-            scale.addAction("&ManuallyScale_Plot", this, "changeYMaxMin()");
-            scale.addAction("&AutoScale_Plot", this, "forcedAutoScalePlot()");
-            option.addAction("SetNoDataTmout", this, "setNoDataTmout()");
-            option.addAction("&AutoResize", this, "autoResize()");
-            option.addAction("&DeletePlot", this, "deletePlot()");
-            _xmouse= pEvent.globalX();
-            _ymouse= pEvent.globalY();
-            option.popup(new QPoint(_xmouse, _ymouse) );	
+            QMenu menu = new QMenu(tr("Plot Options"));
+
+            if (_gaugePage.frozenPlotSizes()) {
+                QAction action = new QMenuActionWithToolTip(
+                    tr("&Unfreeze &Plot Sizes"),
+                    tr("Allow plot sizes on this page to vary, losing history shadow"),
+                    menu);
+                action.triggered.connect(_gaugePage, "unfreezePlotSizes()");
+                menu.addAction(action);
+            }
+            else {
+                QAction action = new QMenuActionWithToolTip(
+                    tr("Freeze &Plot Sizes"),
+                    tr("Fix plot sizes on this page"),
+                    menu);
+                action.triggered.connect(_gaugePage, "freezePlotSizes()");
+                menu.addAction(action);
+            }
+
+            if (_gaugePage.frozenGridLayout()) {
+                QAction action = new QMenuActionWithToolTip(
+                    tr("Unfreeze &Grid Layout"),
+                    tr("Allow grid layout on this page to change"),
+                    menu);
+                action.triggered.connect(_gaugePage, "unfreezeGridLayout()");
+                menu.addAction(action);
+            }
+            else {
+                QAction action = new QMenuActionWithToolTip(
+                    tr("Freeze &Grid Layout"),
+                    tr("Fix grid layout on this page"),
+                    menu);
+                action.triggered.connect(_gaugePage, "freezeGridLayout()");
+                menu.addAction(action);
+            }
+
+            QAction action = new QMenuActionWithToolTip(tr("Clear &History"),
+                    tr("Clear history shadow on this plot"), menu);
+            action.triggered.connect(this, "clearHistory()");
+            menu.addAction(action);
+
+            QMenu color = menu.addMenu(tr("&Color")); 
+            action = new QMenuActionWithToolTip(tr("&Trace Color"),
+                    tr("Change trace color on this plot"), color);
+            action.triggered.connect(this, "changeTraceColor()");
+            color.addAction(action);
+
+            action = new QMenuActionWithToolTip(tr("&History Color"),
+                    tr("Change color of history shadow on this plot"), color);
+            action.triggered.connect(this, "changeHistoryColor()");
+            color.addAction(action);
+
+            action = new QMenuActionWithToolTip(tr("&Background Color"),
+                    tr("Change background color on this plot"), color);
+            action.triggered.connect(this, "changeBGColor()");
+            color.addAction(action);
+
+            QMenu scale = menu.addMenu(tr("&Scale"));
+            action = new QMenuActionWithToolTip(tr("&Manual Scale Plot"),
+                    tr("Fix Y scale on this plot"), scale);
+            action.triggered.connect(this, "changeYMaxMin()");
+            scale.addAction(action);
+
+            action = new QMenuActionWithToolTip(tr("&Auto Scale Plot"),
+                    tr("Allow Y scale to vary on this plot"), scale);
+            action.triggered.connect(this, "forceAutoScalePlot()");
+            scale.addAction(action);
+
+            menu.addAction(tr("Set Data &Timeout"), this, "setDataTimeout()");
+            // menu.addAction(tr("&Auto Resize"), this, "autoResize()");
+            menu.addAction(tr("&Delete Plot"), this, "deletePlot()");
+            _mousePoint = event.globalPos();
+            menu.popup(_mousePoint);
         }
     }
 
-    private void deletePlot() {
-        _parent.deleteIt(this) ;
+    private void deletePlot()
+    {
+        hide();
+        _gaugePage.remove(this) ;
     }
 
     /**
@@ -574,55 +619,48 @@ public class Gauge extends QWidget {
         resetHistoryPainter();
         resetPainter();
 
-        //init nodataImg
-        if (_noDataPixmap.isNull()) return;
         QPainter p = new QPainter(_noDataPixmap);
-        //if (CockPit.gnodataImg!=null) { 
+        
         QPen qp = p.pen();
-        p.setPen(QColor.lightGray);
-        p.drawText(width()/2, height()/2, "RIP");
+        p.setPen(new QColor(Qt.GlobalColor.lightGray));
+        p.drawText(width()/2, height()/2, tr("RIP"));
         p.setPen(qp);
         paintText(p); 
-        //}
+       
         p.end();
     }
 
     /**
      * Color the plot with new color
      */
-    private void changeLocalCColor()
+    private void changeTraceColor()
     {
-        QColor cc = QColorDialog.getColor(_cColor);
+        QColor cc = QColorDialog.getColor(_traceColor);
         if (cc.value()==0) return;
-        _cColor = cc;
-        changeCColor(_cColor);
+        _traceColor = cc;
+        changeTraceColor(_traceColor);
     }
 
     /**
      * Color the history data with new color, discard the previous histroy image
      */
-    private void changeLocalHColor()
+    private void changeHistoryColor()
     {
-        QColor cc = QColorDialog.getColor(_hColor);
+        QColor cc = QColorDialog.getColor(_historyColor);
         if (cc.value()==0) return;
-        _hColor = cc;
-        changeHColor(_hColor);
+        _historyColor = cc;
+        changeHistoryColor(_historyColor);
     }
 
     /**
      *  Color the plot back-ground with new color.
      */
-    private void changeLocalBGColor()
+    private void changeBGColor()
     {
         QColor cc = QColorDialog.getColor(_bgColor);
         if (cc.value()==0) return;
         _bgColor = cc;
-        changeBGColor(_bgColor);//}
-    }
-
-    private void cleanupLocalHistory()
-    {
-        cleanupHistory();//}
+        changeBGColor(_bgColor);
     }
 
     /**
@@ -630,10 +668,11 @@ public class Gauge extends QWidget {
      */
     private void changeYMaxMin()
     {
-        RescaleDialog rd = new RescaleDialog( _ymax, _ymin, _xmouse, _ymouse) ;
+        RescaleDialog rd = new RescaleDialog(_yRangeMax, _yRangeMin, _mousePoint.x(),
+                _mousePoint.y()) ;
         if (!rd.getOk())  return;
         if (rd.getMax() <=rd.getMin()) {
-            Util.prtErr("Y-axis-Max is smaller than Y-axis-Min");
+            _log.error(tr("Y axis max is smaller than Y axis min"));
             return;
         }
 
@@ -645,109 +684,102 @@ public class Gauge extends QWidget {
      */
     public void changeYMaxMin(float ymax, float ymin)
     {
-        if (ymax==_ymax && ymin==_ymin) return;
+        if (ymax == _yRangeMax && ymin == _yRangeMin) return;
         synchronized(this) {
             _yscale = getYScale(ymax, ymin);
             _pts.clear();
-            _maxmin = null;
+            _yminmax[0] = Float.MAX_VALUE;
+            _yminmax[1] = -Float.MAX_VALUE;
             initPixmaps();
         }
         repaint();
     }
 
     /**
-     * forced auto-sclae from the plot's drop-down menu
+     * forced auto-scale from the plot's drop-down menu
      */
-    public void forcedAutoScalePlot() {
-        _gautoScale = false;
-
-        autoScalePlot();
+    public void forceAutoScalePlot()
+    {
+        autoScalePlot(true);
     }
 
     /**
      * Rescale the plot. 
-     * If the g=false, it means (local-rescale) forced rescale. 
+     * If the g is false, it means (local-rescale) forced rescale. 
      * Otherwise, it will check to see yf is in the range.  
      * @param g
      */
-    public void autoScalePlot(boolean g){
-        _gautoScale =g;
+    public void autoScalePlot(boolean force)
+    {
+        _forceRescale = force;
         autoScalePlot();
-        _gautoScale=false;
+        _forceRescale = true;
     }
 
 
     /**
      * Rescale the plot. 
-     * If the g=false, it means (local-rescale) forced rescale. 
+     * If the g is false, it means (local-rescale) forced rescale. 
      * Otherwise, it will check to see yf is in the range.  
      */
-    private void autoScalePlot(){
+    private void autoScalePlot()
+    {
         synchronized(this) {
-            if (_pts==null || _pts.size()<1){
-                _noDataPaint=true;
+            if (_pts == null || _pts.isEmpty()){
+                _noDataPaint = true;
                 repaint();
                 return;
             }
-            if (_maxmin==null) return;
+            if (_yminmax[0] == Float.MAX_VALUE) return;
 
-            float ymax = _maxmin[0];
-            float ymin = _maxmin[1];
+            float ymin = _yminmax[0];
+            float ymax = _yminmax[1];
 
             //check the old ones with 2% margin
-            float oldmargin = Math.abs(_ymax - _ymin) * (float).02;
-            boolean ck = _gautoScale && ymin > (_ymin + oldmargin) && ymax < (_ymax - oldmargin);
-            if ( ck ) return; //in range
+            float oldmargin = Math.abs(_yRangeMax - _yRangeMin) * (float).02;
+            boolean check = !_forceRescale && ymin > (_yRangeMin + oldmargin) && ymax < (_yRangeMax - oldmargin);
+            if (check) return; //in range
 
             // add range if the range is small 
             float range = Math.abs(ymax - ymin);
             if (range < 1.0 ) {
                 ymax =  ymax + 5;
                 ymin =  ymin - 5;
-                ck = _gautoScale && ymin > (_ymin + oldmargin) && ymax < (_ymax - oldmargin);
-                if (ck) return; //in the range
+                check = !_forceRescale && ymin > (_yRangeMin + oldmargin) && ymax < (_yRangeMax - oldmargin);
+                if (check) return; //in the range
             }
 
             _yscale = getYScale(ymax, ymin);
             _pts.clear();
-            _maxmin = null;
+            _yminmax[0] = Float.MAX_VALUE;
+            _yminmax[1] = -Float.MAX_VALUE;
 
             initPixmaps();
         }
         repaint();
     }
 
-
     /**
      * Requested by a user to remove it
-     */
-    public void removeSelf(){
-        _var.setDisplay(false);
-        _parent.removeGaugeFromWidget(this); //use GaugePageThread instead
+    public void removeSelf()
+    {
+        // _var.setDisplay(false);
+        _gaugePage.removeGaugeFromWidget(this); //use GaugePageThread instead
     }
-
+     */
 
     private void resetHistoryPainter()
     {
-        if (_historyPixmap.isNull()) {
-            //initPixmaps();
-            return;
-        } 
-        if (_historyPainter!=null) _historyPainter.end();
-        _historyPainter  = new QPainter(_historyPixmap);
-        _historyPainter.setPen(_hColor);
+        if (_historyPainter != null) _historyPainter.end();
+        _historyPainter = new QPainter(_historyPixmap);
+        _historyPainter.setPen(_historyColor);
     }
-
 
     // not synchronized, only called from other synchronized methods
     private void resetPainter()
     {
-        if (_historyPixmap.isNull()) {
-            //initPixmaps();
-            return;
-        }
         synchronized(this) {
-            if (_painter!=null) _painter.end();
+            if (_painter != null) _painter.end();
             _pixmap = _historyPixmap.copy();
             QPainter ptr = new QPainter(_pixmap);
             paintText(ptr);
@@ -755,7 +787,7 @@ public class Gauge extends QWidget {
 
             //_pixmap = map.copy();
             _painter = new QPainter(_pixmap);
-            _painter.setPen(_cColor);
+            _painter.setPen(_traceColor);
         }
     }
 
@@ -764,91 +796,127 @@ public class Gauge extends QWidget {
      * Paint the plot label, unit, and scales
      */
     private void paintText(QPainter painter) {
-        if (painter==null) return; 
-        synchronized(this) {
-            QFont hfont = painter.font();
-            QPen hPen = painter.pen();
-            double hsize = hfont.pointSizeF();
-            QFont qf = new QFont(hfont);
 
-            int len = rect().height()/10;
+        // if (painter == null) return; 
+        synchronized(this) {
+
+            painter.setPen(new QColor(Qt.GlobalColor.yellow));
+
+            QFont font = painter.font();
+            
+            int fpixels = Math.min(Math.max(height() / 12, 10), 24);
+
+            int ticlen = Math.min(Math.max(width() / 20, 8), 16);
+            QPen hPen = painter.pen();
+
             int w = rect().width();
 
-            painter.setPen(QColor.yellow);
-            // name 
-            qf.setPointSizeF(hsize*.8);
-            painter.setFont(qf);
-            QRectF rect = new QRectF(0,0,w,len);//QRectF(0,0,w,len*5.6);
-            painter.drawText(rect(), Qt.AlignmentFlag.AlignRight.value(),_label);
-
-            //and units
-            qf.setPointSizeF(hsize*.75);
-            painter.setFont(qf);
-            rect = new QRectF(0,rect().height()-qf.pointSizeF()*1.5,w-2,qf.pointSizeF()*1.5);
-            painter.drawText(rect, Qt.AlignmentFlag.AlignRight.value(),_units);
-
-            //tics and labels  
-            //max and min
-            rect = new QRectF(5,0,w,rect().height());
-            painter.drawText(rect,Qt.AlignmentFlag.AlignLeft.value(), getLabel(_ymax));
-            rect = new QRectF(5,rect().height()-qf.pointSizeF()*1.5,w,qf.pointSizeF()*1.5);
-            painter.drawText(rect,Qt.AlignmentFlag.AlignLeft.value(), getLabel(_ymin));
-
-            //paint the rest of ticmarks
-            painter.setFont(new QFont(hfont.family(), 5));
-            int rofts = (int)((_ymax - _ymin) / _ticDelta) - 1 ;
-            for (int i=1; i<=rofts; i++) {
-                int y = ypixel(_ymax - i*_ticDelta);
-                painter.drawLine(0, y, 2, y);
+            if (font.pixelSize() != fpixels) {
+                font.setPixelSize(fpixels);
+                painter.setFont(font);
             }
 
-            //label the middle point(s)
-            if (rofts%2 == 1) {
-                int step = rofts / 2 + 1;
-                paintLabel(step, painter);
+            QFontMetrics fm = new QFontMetrics(font);
+            /*
+            System.err.printf("fpixels=%d, font.pixelSize=%d, font width(\"X\")=%d, height=%d\n",
+                    fpixels, font.pixelSize(), fm.width("X"), fm.height());
+            */
+            int th = fm.lineSpacing();       // rectangle height for text
+
+            // name, upper left
+            QRect rect = new QRect(0, 0, w, th);
+            painter.drawText(rect,
+                Qt.AlignmentFlag.AlignLeft.value() | Qt.AlignmentFlag.AlignTop.value(),
+                _name);
+
+            // units, bottom left
+            rect = new QRect(0, rect().height() - th, w, th);
+            painter.drawText(rect,
+                Qt.AlignmentFlag.AlignLeft.value() | Qt.AlignmentFlag.AlignBottom.value(),
+                _units);
+
+            // max label, upper right
+            rect = new QRect(0, 0, w, th);
+            painter.drawText(rect,
+                Qt.AlignmentFlag.AlignRight.value() | Qt.AlignmentFlag.AlignTop.value(),
+                 getLabel(_yRangeMax));
+
+            // min label, lower right
+            rect = new QRect(0, rect().height() - th, w, th);
+            painter.drawText(rect,
+                    Qt.AlignmentFlag.AlignRight.value() | Qt.AlignmentFlag.AlignBottom.value(),
+                    getLabel(_yRangeMin));
+
+            // tics, both right and left
+            int rofts = (int)((_yRangeMax - _yRangeMin) / _ticDelta) - 1;
+            for (int i = 1; i <= rofts; i++) {
+                int y = ypixel(_yRangeMax - i * _ticDelta);
+                painter.drawLine(0, y, ticlen, y);      // left
+                painter.drawLine(w, y, w - ticlen, y);  // right
+            }
+
+            int lpixels = Math.round(fpixels * 0.8f);
+            QFont lfont = new QFont(font);
+            lfont.setPixelSize(lpixels);
+            painter.setFont(lfont);
+            fm = new QFontMetrics(lfont);
+            th = fm.lineSpacing();       // rectangle height for text
+            // label the middle one or two points, right
+            if (rofts % 2 == 1) {
+                int i = rofts / 2 + 1;
+                float yval = _yRangeMax - i * _ticDelta;
+                int y = ypixel(yval);
+                rect = new QRect(0, y - th / 2, w - ticlen - 2, th);
+                painter.drawText(rect,
+                    Qt.AlignmentFlag.AlignRight.value() | Qt.AlignmentFlag.AlignVCenter.value(),
+                    getLabel(yval));
             } else {
-                int step = rofts / 2 ;
-                paintLabel(step, painter);
-                step = rofts / 2 + 1;
-                paintLabel(step, painter);
+                int i = rofts / 2 ;
+                float yval = _yRangeMax - i * _ticDelta;
+                int y = ypixel(yval);
+                rect = new QRect(0, y - th / 2, w - ticlen - 2, th);
+                painter.drawText(rect,
+                    Qt.AlignmentFlag.AlignRight.value() | Qt.AlignmentFlag.AlignVCenter.value(),
+                    getLabel(yval));
+
+                i = rofts / 2 + 1;
+                yval = _yRangeMax - i * _ticDelta;
+                y = ypixel(yval);
+                rect = new QRect(0, y - th / 2, w - ticlen - 2, th);
+                painter.drawText(rect,
+                    Qt.AlignmentFlag.AlignRight.value() | Qt.AlignmentFlag.AlignVCenter.value(),
+                    getLabel(yval));
             }
 
-            //reset his-color
+            //reset history color
             painter.setPen(hPen);
-            painter.setFont(hfont);
+            painter.setFont(font);
         }
     }
 
-    public void closePlot() {
-
-        if (_painter!=null) _painter.end();
+    public void closePlot()
+    {
+        if (_painter != null) _painter.end();
         if (_historyPainter!=null) _historyPainter.end();
         super.close();	
     }
 
-    private void paintLabel(int step, QPainter painter){
-        synchronized(this) {
-            float yval = _ymax - step*_ticDelta;
-            int y = ypixel(yval);
-            painter.drawText(3, y+2, getLabel(yval));
-        }
-    }
-
     /**
-     * based on the max and min, calculate _ticDelta, _ymax, and _ymin
+     * based on the max and min, calculate _ticDelta, _yRangeMax, and _yRangeMin
      * @param ymax
      * @param ymin
+     * 
+     * _ticDelta will be 1,2,5, or 10 times a power of 10, where there
+     * are at most 6 _ticDeltas on the Y axis.
      */
-    public void calTics(float ymax, float ymin) {
-        if (ymax <= ymin) {
-            setStatusBar("getTics(): The max is less or equal to min. Exit-calTics()", 10000);
-            return;
-        }      
+    public void calTics(float ymax, float ymin)
+    {
+        if (ymax <= ymin) return;
 
-        double dt = (ymax - ymin) / 6;
-        double l10 = Math.floor(Math.log10(dt));
+        double ytic = (ymax - ymin) / 6;    // approximately 6 tics
+        double l10 = Math.floor(Math.log10(ytic));
         double p10 = Math.pow(10.0,l10);
-        int icoef = (int)Math.ceil(dt / p10);
+        int icoef = (int)Math.ceil(ytic / p10);
 
         // round 6-9 up to 10, 3-4 to 5
         if (icoef > 5) icoef = 10;
@@ -856,17 +924,18 @@ public class Gauge extends QWidget {
 
         synchronized (this) {
             _ticDelta = (float)(icoef * p10);
-            _ymax = getMaxTick(ymax, _ticDelta );
-            _ymin = getMinTick(ymin, _ticDelta);
+            _yRangeMax = getMaxTick(ymax, _ticDelta);
+            _yRangeMin = getMinTick(ymin, _ticDelta);
         }
     }
 
-
-    private float getMaxTick(float max, float tic) {
+    private float getMaxTick(float max, float tic)
+    {
         return (float)Math.ceil(max / tic) * tic;
     }
 
-    private float getMinTick(float min, float tic) {
+    private float getMinTick(float min, float tic)
+    {
         return (float)Math.floor(min / tic) * tic;
     }
 
@@ -876,19 +945,21 @@ public class Gauge extends QWidget {
         return str;
     }
 
-
-    private void setStatusBar(String msg, int tm) {
-        _parent._parent._parent._cpConn.getStatusBarClient().receive(msg, tm);
+    private void status(String msg, int tm)
+    {
+        _gaugePage.status(msg, tm);
     }
 
 
-    private float getYScale(float ymax, float ymin){
-        calTics(ymax, ymin); //_ticDelta , _ymax,  and _ymin
-        return  getYScale();
+    private float getYScale(float ymax, float ymin)
+    {
+        calTics(ymax, ymin); //_ticDelta , _yRangeMax,  and _yRangeMin
+        return getYScale();
     }
 
-    private float getYScale() {
-        return _pheight / (_ymax - _ymin);
+    private float getYScale()
+    {
+        return _pheight / (_yRangeMax - _yRangeMin);
     }
 
     /**
@@ -922,71 +993,165 @@ public class Gauge extends QWidget {
      */
     private void drawOutliners(List<QPoint> pts){
 
-        for (int i=0; i< pts.size(); i++){
-            float yy = _ymax - pts.get(i).y()/_yscale;
+        for (int i = 0; i< pts.size(); i++){
+            float yy = _yRangeMax - pts.get(i).y()/_yscale;
 
-            if (yy > _ymax && _painter!=null) {
-                _painter.setPen(QColor.red);
-                _painter.drawEllipse(pts.get(i).x(), ypixel(_ymax), 2,2);
-                _painter.setPen(_cColor);
+            if (yy > _yRangeMax && _painter != null) {
+                _painter.setPen(_red);
+                _painter.drawEllipse(pts.get(i).x(), ypixel(_yRangeMax), 2, 2);
+                _painter.setPen(_traceColor);
             }
-            if (yy < _ymin && _painter!=null) {
-                _painter.setPen(QColor.red);
-                _painter.drawEllipse(pts.get(i).x(), ypixel(_ymin)-3, 2,2);
-                _painter.setPen(_cColor);
+            if (yy < _yRangeMin && _painter != null) {
+                _painter.setPen(_red);
+                _painter.drawEllipse(pts.get(i).x(), ypixel(_yRangeMin)-3, 2, 2);
+                _painter.setPen(_traceColor);
             }
 
         }
     }
 
-    //changeYMaxMin(float ymax, float ymin)
-    public float getYMax(){
-        return _ymax;
+    public float getYMax()
+    {
+        return _yRangeMax;
     }
 
-    public float getYMin(){
-        return _ymin;
+    public float getYMin()
+    {
+        return _yRangeMin;
     }
 
-    //public void setNoDataTmout(float ymax) exists
+    //public void setDataTimeout(float ymax) exists
 
-    public int getNoDataTmout(){
-        return _tmoutMax;
+    public int getDataTimeout(){
+        return _timeoutSec;
     }
 
-    //public void setNewTimeMSec(int tm) exists
-
-    public int getGaugeTimeMSec(){
+    public int getWidthMsec()
+    {
         return _xwidth;
     }
 
-    public String getName(){
-        return _label;
+    public String getName()
+    {
+        return _name;
     }
 
-    public void setCColor(QColor c){
-        changeCColor(c);
+    public void setTraceColor(QColor c)
+    {
+        changeTraceColor(c);
     }
 
-    public QColor getCColor(){
-        return _cColor;
+    public QColor getTraceColor()
+    {
+        return _traceColor;
     }
 
-    public void setHColor(QColor c){
-        changeHColor(c);
+    public void setHistoryColor(QColor c)
+    {
+        changeHistoryColor(c);
     }
 
-    public QColor getHColor(){
-        return _hColor;
+    public QColor getHistoryColor()
+    {
+        return _historyColor;
     }
 
-    public void setBGColor(QColor c){
+    public void setBGColor(QColor c)
+    {
         changeBGColor(c);
     }
 
-    public QColor getBGColor(){
+    public QColor getBGColor()
+    {
         return _bgColor;
     }
 
+    /**
+     * Inner class implementing DataClient.
+     */
+    class GaugeDataClient implements DataClient
+    {
+        /**
+         * get the new data, and plot it
+         * @param samp - sample-data
+         * @param offset -beginning index to read the pair of min and max
+         */
+        public void receive(FloatSample samp, int offset)
+        {
+            synchronized (this)
+            {
+                long x = samp.getTimeTag();
+                if (_xmin == 0) {
+                    _xmin = x - (x % _xwidth);
+                    // show();
+                }
+                int xd = (int)(x - _xmin); // milliseconds into plot
 
+                // reach eof plot
+                if (xd > _xwidth) {
+                    drawHistData();
+                    resetPainter();
+                    _pts.clear();
+                    _yminmax[0] = Float.MAX_VALUE;
+                    _yminmax[1] = -Float.MAX_VALUE;
+                    _xmin = x - (x % _xwidth);
+                    xd = (int)(x - _xmin);
+                }
+                int xp = xpixel(xd); // x pixel position
+
+                // String str = getName();
+                // if (str.equals("P.2m") || str.equals("Lon"))   System.out.println(" var="+str +"   x="+x + "  xd="+xd+ "  _xp="+ xp +" (int)_xp="+(int)xp);
+
+                float ymin = samp.getData(offset);
+                float ymax = samp.getData(offset+1);
+                /*
+                System.out.printf("name=%s, ymin=%f,ymax=%f\n",
+                        getName(),ymin,ymax);
+                */
+
+                if (!Float.isNaN(ymin) && !Float.isNaN(ymax)) {
+                    _noDataPaint = false;
+                    _lastTm = x;
+
+                    int ypmin = ypixel(ymin);
+                    int ypmax = ypixel(ymax);
+                    if (ypmin == ypmax) ypmax++;
+
+                    List<QPoint> pa = new ArrayList<QPoint>();
+
+                    //check the _xp - gap
+                    int xpts = xp - _prevXp;
+
+                    if (_prevTtag > 0 && (x - _prevTtag) == _statisticsPeriod ) {
+                        // fill in intervening pixels if there is no data gap
+                        for (int i = 0; i < xpts; i++) {
+                            int xind = _prevXp + 1 + i;
+                            pa.add(new QPoint(xind, ypmin));
+                            pa.add(new QPoint(xind, ypmax));
+                        }
+                    } else{
+                        pa.add(new QPoint(xp, ypmin));
+                        pa.add(new QPoint(xp, ypmax));      
+                    }
+
+                    if (_painter != null) {
+                        _painter.drawLinesFromPoints(pa);
+                        drawOutliners(pa);
+                    } else {
+                        status(" plot=" + getName() + " in receive, null painter.", 10000);
+                    }
+
+                    _pts.addAll(pa);        //push all to the pts
+
+                    _yminmax[0] = Math.min(ymin, _yminmax[0]);
+                    _yminmax[1] = Math.max(ymax, _yminmax[1]);
+
+                    _prevTtag = x;            //keep prevtime
+                    _prevXp = xp;
+
+                    update();
+                }
+            }
+        }
+    }
 }

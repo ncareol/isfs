@@ -1,10 +1,10 @@
 [submodule "projects"]
 	path = projects
-	url = git@github.com:ncareol/public-field-projects
+	url = ../public-field-projects
 	sparsecheckout = true
 [submodule "embedded-linux"]
 	path = embedded-linux
-	url = ./embedded-linux
+	url = ../embedded-linux
 [submodule "embedded-daq"]
 	path = embedded-daq
-	url = ./embedded-daq
+	url = ../embedded-daq
