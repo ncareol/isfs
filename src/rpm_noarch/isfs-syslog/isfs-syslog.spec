@@ -63,7 +63,13 @@ if grep -Eq "^[[:space:]]*SYSLOGD_OPTIONS.*-c" $cf; then
     sed -r -i -e 's/^[[:space:]]*(SYSLOGD_OPTIONS.*-c)/# \1/' $cf
 fi
 
-$rssyslog && systemctl restart rsyslog.service
+if $rssyslog; then
+    if type -P systemctl > /dev/null 2>&1; then
+        systemctl restart rsyslog.service
+    else
+        service rsyslog restart
+    fi
+fi
 
 %files
 %defattr(-,root,root)
