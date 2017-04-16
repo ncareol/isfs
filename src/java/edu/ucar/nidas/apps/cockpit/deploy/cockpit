@@ -1,0 +1,12 @@
+#! /bin/sh
+
+# For running cockpit on Linux from within a conventional installation
+# with the cockpit and jambi jar files.
+
+server=ustar
+
+cd `dirname "$0"`
+if [ $# -eq 0 -a -n "$server" ]; then
+    set -- -s "$server"
+fi
+exec java -jar cockpit_linux64.jar "$@"
