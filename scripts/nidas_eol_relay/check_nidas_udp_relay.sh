@@ -7,7 +7,7 @@ script=$0
 script=${script##*/}
 logdir=$HOME/nidas_eol_relay
 
-proc="nidas_udp_relay -h perdigao.txt -u 30010"
+proc="nidas_udp_relay -h artse.txt -u 30010"
 
 if ! pgrep -f "$proc" > /dev/null; then
     (cd "$logdir"
