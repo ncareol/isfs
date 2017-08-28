@@ -1,1 +1,1 @@
-*/10 * * * *    $HOME/nidas_eol_relay/check_nidas_udp_relay.sh
+*/10 * * * *    $HOME/nidas_eol_relay/check_nidas_udp_relay.sh start
