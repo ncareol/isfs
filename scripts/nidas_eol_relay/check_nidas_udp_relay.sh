@@ -8,6 +8,7 @@ script=${script##*/}
 logdir=$HOME/nidas_eol_relay
 
 export NTOP=/home/granger/opt/nidas
+export NTOP=/opt/nidas
 export LD_LIBRARY_PATH="$NTOP/lib64"
 export PATH="$NTOP/bin:${PATH}"
 proc="nidas_udp_relay -h artse.txt -u 30010"
