@@ -8,3 +8,6 @@
 [submodule "embedded-daq"]
 	path = embedded-daq
 	url = ../embedded-daq
+[submodule "src/nc-server"]
+	path = src/nc-server
+	url = ../nc-server.git
