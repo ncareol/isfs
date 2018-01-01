@@ -1,9 +1,0 @@
-prefix=@PREFIX@
-libdir=${prefix}/@ARCHLIBDIR@
-includedir=${prefix}/include
-
-Name: nc_server
-Description: SunRPC netcdf file server
-Version: @REPO_TAG@
-Libs: -L${libdir} -lnc_server_rpc
-Cflags: -I${includedir}
