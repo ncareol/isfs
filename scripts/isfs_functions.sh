@@ -4,6 +4,26 @@
 # This script should be source'd, and not exec'd.
 #
 
+source_isfs_env() {
+    isfs_env_path="$1"
+    if [ ! -f ${isfs_env_path} ]; then
+	return
+    fi
+    # new style isfs_env.sh files with sh syntax "X=Y" without export
+    tmpsh=$(mktemp)
+    if $cshell; then
+	# if cshell, convert to envset format
+	sed -r -e 's/^[[:space:]]*([^#][^=]*)=(.*)/envset \1 \2/' \
+	    ${isfs_env_path} > $tmpsh
+    else
+	sed -r -e 's/^[[:space:]]*([^#])/export \1/' \
+	    ${isfs_env_path} > $tmpsh
+    fi
+    source $tmpsh
+    rm -f $tmpsh
+}
+
+
 isfs_env() {
     # args:  [-c] [[project] [dataset]]
     # setup environment for ISFS users.  If passed -c option,
@@ -113,20 +133,21 @@ isfs_env() {
     # old style isff_env.sh files, with envset commands
     if [ -f $ISFF/projects/$PROJECT/ISFS/scripts/isff_env.sh ]; then
         source $ISFF/projects/$PROJECT/ISFS/scripts/isff_env.sh
-    elif [ -f $ISFS/projects/$PROJECT/ISFS/scripts/isfs_env.sh ]; then
-        # new style isfs_env.sh files with sh syntax "X=Y" without export
-        tmpsh=$(mktemp)
-        if $cshell; then
-            # if cshell, convert to envset format
-            sed -r -e 's/^[[:space:]]*([^#][^=]*)=(.*)/envset \1 \2/' \
-                $ISFS/projects/$PROJECT/ISFS/scripts/isfs_env.sh > $tmpsh
-        else
-            sed -r -e 's/^[[:space:]]*([^#])/export \1/' \
-                $ISFS/projects/$PROJECT/ISFS/scripts/isfs_env.sh > $tmpsh
-        fi
-        source $tmpsh
-        rm -f $tmpsh
     fi
+
+    # Load isfs_env.sh from a default path and then from a host-specific
+    # path, so general settings can be overridden on hosts which use
+    # different data paths.  This does not match what systemd unit files
+    # would use, since they only load the general file, and it cannot be
+    # used to override the settings in a <dataset>, but it does allow
+    # changing things like the DATAMNT directory for locating raw data
+    # files.  Someday it might be nice to allow each user to customize the
+    # settings, or to allow custom settings for different project checkouts
+    # on the same host, ie ~isfs/isfs production versus /net/isf/isfs.
+    shost=`hostname -s`
+    isfs_env_dir="$ISFS/projects/$PROJECT/ISFS/scripts"
+    source_isfs_env "${isfs_env_dir}/isfs_env.sh"
+    source_isfs_env "${isfs_env_dir}/isfs_env_${shost}.sh"
 
     # Finally, environment variables for dataset
     # These values will over-ride any from project isfs_env.sh
