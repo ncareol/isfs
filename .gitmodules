@@ -2,9 +2,6 @@
 	path = projects
 	url = ../public-field-projects
 	sparsecheckout = true
-[submodule "embedded-linux"]
-	path = embedded-linux
-	url = ../embedded-linux
 [submodule "embedded-daq"]
 	path = embedded-daq
 	url = ../embedded-daq
