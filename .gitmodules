@@ -2,6 +2,3 @@
 	path = projects
 	url = ../public-field-projects
 	sparsecheckout = true
-[submodule "src/nc-server"]
-	path = src/nc-server
-	url = ../nc-server.git
