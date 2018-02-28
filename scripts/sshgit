@@ -1,0 +1,38 @@
+#! /bin/sh
+
+# git config does not check the environment, so do not replace existing
+# environment settings that might have been passed to the current login
+# with sshgit.
+if [ -z "$GIT_COMMITTER_EMAIL" ]; then
+    export GIT_COMMITTER_EMAIL=`git config user.email`
+    export GIT_COMMITTER_NAME=`git config user.name`
+fi
+
+# The git.config.$USER file is first installed with something like this:
+#
+# scp ~/.gitconfig remote:/var/tmp/git.config.$USER
+#
+# However, even though GIT_CONFIG shows up in the environment, and
+# git config --list even shows the right settings, git commit still complains
+# that the user is unknown and should be set with git config --global.
+#
+#exec ssh -t "$@" "GIT_CONFIG=/var/tmp/git.config.$USER bash -i -l"
+
+# This works.  So apparently git commit needs all four set.
+exec ssh -t "$@" "GIT_COMMITTER_NAME=\"$GIT_COMMITTER_NAME\" GIT_COMMITTER_EMAIL=\"$GIT_COMMITTER_EMAIL\" GIT_AUTHOR_NAME=\"$GIT_COMMITTER_NAME\" GIT_AUTHOR_EMAIL=\"$GIT_COMMITTER_EMAIL\" bash -i -l"
+
+# exec ssh -t "$@" "GC='-c user.name=\\\"$GIT_COMMITTER_NAME\\\" -c user.email=\\\"$GIT_COMMITTER_EMAIL\\\"' bash -i -l"
+
+# exec ssh -t "$@" "GC='-c user.name=\\\"$GIT_COMMITTER_NAME\\\" -c user.email=\\\"$GIT_COMMITTER_EMAIL\\\"' bash -i -l"
+
+# This doesn't work because ssh will not open a pty when stdin is not a
+# terminal, and therefore bash refuses to start an interactive login shell.
+#
+# exec ssh -t "$@" <<EOF
+# set -x
+# export GIT_CONFIG="/tmp/git.config.$$"
+# echo '[user]' > /tmp/git.config.$$
+# echo "      name = $GIT_COMMITTER_NAME" >> /tmp/git.config.$$
+# echo "      mail = $GIT_COMMITTER_EMAIL" >> /tmp/git.config.$$
+# exec /bin/bash -i -l
+# EOF
