@@ -3,15 +3,35 @@
 export PATH=/bin:/usr/bin:/opt/nidas/bin
 # set -x
 
+if [ -z "$ISFS" ]; then
+    export ISFS=$HOME/isfs
+fi
+
+# If PROJECT is set, then look for a nidas header in the
+# config directory.
+headerarg=""
+if [ -n "$PROJECT" ]; then
+    lproject=`echo $PROJECT | tr A-Z a-z`
+    headerfile="$ISFS/projects/$PROJECT/ISFS/config/${lproject}-header.txt"
+    if [ -f "$headerfile" ]; then
+	headerarg="-h $headerfile"
+    else
+	echo "Header file not found: $headerfile"
+	exit 1
+    fi
+else
+    echo "PROJECT not set, cannot derive path to header file."
+    exit 1
+fi
+
 script=$0
 script=${script##*/}
-logdir=$HOME/nidas_eol_relay
+logdir=/tmp
 
-export NTOP=/home/granger/opt/nidas
-export NTOP=/opt/nidas
+export NTOP=${NTOP:=/opt/nidas}
 export LD_LIBRARY_PATH="$NTOP/lib64"
 export PATH="$NTOP/bin:${PATH}"
-proc="nidas_udp_relay -h artse.txt -u 30010"
+proc="nidas_udp_relay $headerarg -u 30010"
 
 debug=0
 if [ "$1" == debug ]; then
