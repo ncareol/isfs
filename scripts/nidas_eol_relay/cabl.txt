@@ -1,0 +1,9 @@
+NIDAS (ncar.ucar.edu)
+archive version: 1
+software version: 7209
+project name: CABL
+system name: ISFF
+config name: $ISFF/projects/$PROJECT/ISFF/config/cabl.xml
+config version: $Revision: 4218 $
+                                                                                                                    
+end header

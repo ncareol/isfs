@@ -1,0 +1,9 @@
+NIDAS (ncar.ucar.edu)
+archive version: 1
+software version: v1.2-593
+project name: ARTSE
+system name: ISFS
+config name: $ISFS/projects/$PROJECT/ISFS/config/artse.xml
+config version: $Revision: 4555 $
+
+end header

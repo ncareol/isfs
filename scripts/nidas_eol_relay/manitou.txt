@@ -1,0 +1,9 @@
+NIDAS (ncar.ucar.edu)
+archive version: 1
+software version: 5790:5791M
+project name: BEACHON_SRM
+system name: ISFF
+config name: $ISFF/projects/$PROJECT/ISFF/config/manitou.xml
+config version: $LastChangedRevision: 1456 $
+                                                                                                                    
+end header
