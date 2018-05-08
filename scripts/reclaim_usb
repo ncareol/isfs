@@ -1,0 +1,162 @@
+#! /bin/sh
+
+# Mount any attached removable data disks and rsync the contents to the
+# given location.
+
+list_data_devices()
+{
+    blkid | grep 'LABEL="data"' | sed -e 's/:.*//'
+}
+
+
+devices=""
+
+set_devices() # [device ...]
+{
+    if [ $# -eq 0 ]; then
+	devices=`list_data_devices`
+	if [ -z "$devices" ]; then
+	    echo "No data devices found."
+	    exit 1
+	fi
+    else
+	devices="$@"
+    fi
+    echo "Data devices: $devices"
+}
+
+
+mountpoint="/tmp/reclaim_$$"
+
+mount_device() # device
+{
+    device="$1"
+    mkdir -p "$mountpoint"
+    mount $device $mountpoint
+}
+
+umount_device() # device
+{
+    device="$1"
+    umount $device
+    rmdir "$mountpoint"
+}
+
+rsync_data() # device src dest 
+{
+    device="$1"
+    src="$2"
+    dest="$3"
+    mount_device $device
+    (set -x; rsync -av "$mountpoint/$src" "$dest")
+    umount_device $device
+}
+
+rsync_remove() # device src dest 
+{
+    device="$1"
+    src="$2"
+    dest="$3"
+    mount_device $device
+    (set -x; rsync -av --remove-source-files "$mountpoint/$src" "$dest")
+    umount_device $device
+}
+
+
+clear_projects() # device
+{
+    device="$1"
+    # Clear the project directories on the data device, but
+    # only the ones that are empty.
+    mount_device $device
+    set -x
+    rmdir $mountpoint/projects/*/raw_data
+    rmdir $mountpoint/projects/*
+    chmod g+w $mountpoint/projects
+    set +x
+    umount_device $device
+}
+
+
+usage()
+{
+    cat <<EOF
+Usage: reclaim_usb {operation} [device ...]
+
+    <src> is the path on the device to be synchronized.
+    <dest> is the path to which files will be synchronized.
+
+Operations:
+
+    list
+    rsync <src> <dest>
+    rsync_remove <src> <dest>
+    clear_projects
+
+If a device is given, then mount and rsync the given device.  Otherwise
+search for attached devices with volume name 'data'.  The rsync_remove adds
+the option to --remove-source-files option rsync to remove files after
+synchronization.  clear_projects removes all empty raw_data directories and
+directories under projects/ on the data device.
+
+EOF
+}
+
+
+if [ $# -lt 1 ]; then
+    usage
+    exit 1
+fi
+
+case "$1" in
+
+    rsync)
+	shift
+	src="$1"
+	dest="$2"
+	shift ; shift
+	set_devices "$@"
+	for device in $devices ; do
+	    rsync_data "$device" "$src" "$dest"
+	done
+	;;
+
+    rsync_remove)
+	shift
+	src=$1
+	dest=$2
+	shift ; shift
+	set_devices "$@"
+	for device in $devices ; do
+	    rsync_remove "$device" "$src" "$dest"
+	done
+	;;
+
+    clear_projects)
+	shift
+	set_devices "$@"
+	for device in $devices ; do
+	    clear_projects $device
+	done
+	;;
+
+    list)
+	shift
+	set_devices
+	for device in $devices ; do
+	    mount_device $device
+	    echo "===== Device: $device ====="
+	    ls -RlaF "$mountpoint"
+	    umount $device
+	done
+	;;
+
+    *)
+	echo "Unknown operation: $1"
+	usage
+	exit 1
+	;;
+esac
+
+
+	
