@@ -14,10 +14,10 @@ source_isfs_env() {
     if $cshell; then
 	# if cshell, convert to envset format
 	sed -r -e 's/^[[:space:]]*([^#][^=]*)=(.*)/envset \1 \2/' \
-	    ${isfs_env_path} > $tmpsh
+	    ${isfs_env_path} >| $tmpsh
     else
 	sed -r -e 's/^[[:space:]]*([^#])/export \1/' \
-	    ${isfs_env_path} > $tmpsh
+	    ${isfs_env_path} >| $tmpsh
     fi
     source $tmpsh
     rm -f $tmpsh
