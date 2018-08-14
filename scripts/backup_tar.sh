@@ -248,6 +248,8 @@ declare -A volgroups
 
 for key in ${!backup[*]}; do
 
+    trap - EXIT
+
     echo "tar backup starting: $key, $(date)"
 
     targ=
@@ -285,7 +287,8 @@ for key in ${!backup[*]}; do
         lv=${lvs[0]}
         vg=${lvs[1]}
         snaplv=${lv}_snapshot
-        snapdev=/dev/mapper/${vg}-$snaplv
+        # snapdev=/dev/mapper/${vg}-$snaplv
+        snapdev=/dev/${vg}/$snaplv
         # echo "lv=$lv"
         # echo "vg=$vg"
         # echo "snaplv=$snaplv"
@@ -311,8 +314,36 @@ for key in ${!backup[*]}; do
     fi
 
     if $snapshot; then
-        lvs $snapdev > /dev/null 2>&1 ||
-            lvcreate --snapshot --permission r -l100%FREE -n $snaplv $mntdev
+        if ! lvs $snapdev > /dev/null 2>&1; then
+            echo "doing lvcreate --snapshot --permission r -l100%FREE -n $snaplv $mntdev"
+            # Seems to be a problem with 4.16 (and 4.17) kernels and
+            # read-only snapshots.  So if lvcreate fails with --permission r,
+            # try rw.  https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=900442
+
+            # Also it appears that a logical group/volume can get in a
+            # weird state, where it must be deactivated and re-activated
+            # in order to create a COW snapshot for it.
+            # To do this on a root file system, you'll have to boot from
+            # an image on an external disk, since otherwise you can't
+            # de-activate the root logical volume that is in use.
+            # Remove any leftover snapshot stuff and fedora-root from
+            # the device mapper:
+            #   lvremove /dev/fedora/root_snapshot
+            #   dmsetup remove fedora-root_snapshot-cow
+            #   dmsetup remove fedora-root
+            # vgdisplay -v should show the fedora/root logical volume as
+            # not active. Then activate with:
+            #   vgchange -ay
+            # see http://plosquare.blogspot.com/2010/01/lvm2-snapshots-device-mapper-create.html
+
+            if ! lvcreate --snapshot -l100%FREE --permission r -n $snaplv $mntdev; then
+                echo "lvcreate failed, doing lvremove dmsetup remove"
+                lvremove --force $snapdev || echo "lvremove --force $snapdev failed"
+                dmsetup remove ${vg}-${snaplv}-cow || echo "dmsetup remove ${vg}-${snaplv}-cow failed"
+                echo "retrying lvcreate with read/write permission"
+                lvcreate --snapshot -l100%FREE --permission rw -n $snaplv $mntdev
+            fi
+        fi
         trap "{ lvremove --force $snapdev; }" EXIT
         tmpdir=$(mktemp -d /tmp/${key}_XXXXXX)
         trap "{ rm -rf $tmpdir; lvremove --force $snapdev; }" EXIT
