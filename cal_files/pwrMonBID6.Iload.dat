@@ -1,0 +1,6 @@
+# Power Monitor Cal File, used by CalFile Parser
+# BID 6
+# dateFormat = %Y %b %d %H:%M:%S
+# timeZone =  America/Denver
+# Date Time  Intercept Slope
+2018 Mar 02 11:01:00 -30.012147 1.005591
