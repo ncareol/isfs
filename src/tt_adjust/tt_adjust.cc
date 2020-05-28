@@ -29,6 +29,7 @@
 #include <iomanip>
 #include <limits>
 #include <math.h>
+#include <unistd.h>
 #include <sys/resource.h>
 
 using namespace nidas::core;
@@ -1031,7 +1032,7 @@ int TT_Adjust::parseRunstring(int argc, char** argv)
     const char* cp;
     char* cp2;
 
-    while ((opt_char = getopt(argc, argv, "B:c:E:f:l:i:o:r:s:u:")) != -1) {
+    while ((opt_char = ::getopt(argc, argv, "B:c:E:f:l:i:o:r:s:u:")) != -1) {
 	switch (opt_char) {
         case 'B':
             try {
@@ -1578,9 +1579,9 @@ int TT_Adjust::run() throw()
             fixed_fit_output();
             output_other();
         }
-        _sorter.finish();
+        _sorter.flush();
         outStream.close();
-        _unmatchedOutput.finish();
+        _unmatchedOutput.flush();
         _unmatchedOutput.close();
     }
     catch (n_u::IOException& ioe) {
