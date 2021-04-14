@@ -1,21 +1,8 @@
-import os
-import platform
 import eol_scons
 
-env = Environment(tools=['default','nidas'])
+from SCons.Script import Environment
 
-p1 = env.Program("tt_adjust", ["tt_adjust.cc","gsl.cc"],
-    CXXFLAGS=['-g','-Wall'])
-#     CXXFLAGS=['-g','-pg','-Wall'],LINKFLAGS="-pg")
+env = Environment(tools=['default', 'buildmode', 'nidas'])
 
-env['ISFF'] = os.environ['ISFF']
-
-if platform.machine() == "x86_64":
-    env['BINDIR'] = "bin64"
-else:
-    env['BINDIR'] = "bin"
-
-env.Install('$ISFF/$BINDIR',p1)
-
-env.Alias('install', [ '$ISFF/$BINDIR' ])
-
+env.Append(CXXFLAGS=['-Wno-deprecated'])
+p1 = env.Program("tt_adjust", ["tt_adjust.cc", "gsl.cc"])

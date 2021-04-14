@@ -237,8 +237,9 @@ const nidas::util::EndianConverter* CSAT3Sensor::_endianConverter =
     n_u::EndianConverter::getConverter(n_u::EndianConverter::EC_LITTLE_ENDIAN);
 
 CSAT3Sensor::CSAT3Sensor(TT_Adjust* adjuster, dsm_sample_id_t id,double rate):
-    _adjuster(adjuster),_id(id),
-    _lastTime(0),_lastFitTime(0), _nfolds(0),_maxNumFolds(0),_lastn(0)
+    _adjuster(adjuster),_id(id),_rate(0),_sampleDt(0),
+    _lastTime(0),_lastFitTime(0), _nfolds(0),_unmatchedFold0Counter(0),
+    _maxNumFolds(0),_lasta(0),_lastb(0),_dev(0),_tlast0(0),_lastn(0)
 {
     setRate(rate);
 }
@@ -371,15 +372,13 @@ void CSAT3Sensor::matchFoldsToFold0()
             }
         }
         if (matchingFold != _folds.end()) {
-#ifdef DEBUG
-            cerr << "debug: " << formatTime(matchingFold->getFirstTime()) <<
+            VLOG(("") << formatTime(matchingFold->getFirstTime()) <<
                 ", id=" << formatId(_id) <<
                 ", #unmatched=" << fold0.getNotMatched() <<
                 ", nfolds=" << _nfolds <<
                 ", splicing matched fold " << mfold <<
                 " to fold 0, f0 last seq=0x" << hex << fold0.getLastSeq() << dec <<
-                ", fold " << mfold << " first seq=0x" << hex << matchingFold->getFirstSeq() << dec << endl;
-#endif
+                ", fold " << mfold << " first seq=0x" << hex << matchingFold->getFirstSeq() << dec);
             _foldLengths.push_back(matchingFold->getSize());
             fold0.append(*matchingFold);
             _folds.erase(matchingFold);
@@ -676,25 +675,20 @@ void CSAT3Sensor::addSample(const Sample* samp, long long dsmSampleNumber)
     
     // no match. 
     if (matchingFold == _folds.end()) {
-        list<CSAT3Fold>::iterator fi = _folds.begin();
         _folds.push_back(CSAT3Fold());
         mfold = _nfolds++;
         matchingFold = _folds.end();
         matchingFold--;
-#ifdef DEBUG
-        cerr << formatTime(tt) <<
+        DLOG(("") << formatTime(tt) <<
             ", id=" << formatId(_id) << " added a fold, nfolds=" <<
-            _nfolds << endl;
-#endif
+            _nfolds);
     }
     else {
-#ifdef DEBUG
         if (mfold != 0 || _nfolds > 1)
-            cerr << formatTime(tt) <<
+            VLOG(("") << formatTime(tt) <<
                 ", id=" << formatId(_id) << " appending sample to fold " << mfold <<
                 ", lastseq=0x" << hex << matchingFold->getLastSeq() << dec <<
-                " cseq=0x" << hex << cseq << dec << endl;
-#endif
+                " cseq=0x" << hex << cseq << dec);
     }
 
     matchingFold->addSample(samp,cseq,dsmSampleNumber);
@@ -936,7 +930,8 @@ int CSAT3Sensor::spliceAllFolds()
 
 FixedRateSensor::FixedRateSensor(TT_Adjust* adjuster,dsm_sample_id_t id, double rate):
     _adjuster(adjuster),_id(id),_rate(rate),_sampleDt((int)rint(USECS_PER_SEC / _rate)),
-    _size(0),_firstTime(0),_lastTime(0),_lastFitTime(0)
+    _size(0),_firstTime(0),_lastTime(0),_lastFitTime(0),
+    _lasta(0),_lastb(0),_dev(0),_tlast0(),_lastn(0)
 {
 }
 
@@ -1065,8 +1060,7 @@ int TT_Adjust::parseRunstring(int argc, char** argv)
                 dsm_sample_id_t id = 0;
                 id = SET_DSM_ID(id,dsmid);
                 id = SET_SHORT_ID(id,sensorid);
-                _csats.insert(
-                        make_pair<dsm_sample_id_t,CSAT3Sensor>(id,CSAT3Sensor(this,id,rate)));
+                _csats.insert(make_pair(id,CSAT3Sensor(this,id,rate)));
             }
             break;
         case 'E':
@@ -1117,7 +1111,7 @@ int TT_Adjust::parseRunstring(int argc, char** argv)
                 id = SET_SHORT_ID(id,sensorid);
 
                 _fixedRateSensors.insert(
-                        make_pair<dsm_sample_id_t,FixedRateSensor>(id,FixedRateSensor(this,id,rate)));
+                    make_pair(id,FixedRateSensor(this,id,rate)));
             }
             break;
 	case 'u':
@@ -1255,7 +1249,7 @@ void TT_Adjust::writeSamples(list<samp_save>& samps,
         _sorter.receive(samp);
 
         unsigned int dsmid = samp->getDSMId();
-        _clockOffsets[dsmid].insert(make_pair<long long,int>(save.dsmSampleNumber,dt));
+        _clockOffsets[dsmid].insert(make_pair(save.dsmSampleNumber,dt));
 
         samp->freeReference();
     }
