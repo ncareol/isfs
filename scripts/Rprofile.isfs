@@ -1,6 +1,8 @@
 library(isfs)
+library(utils)
 
 local({
+
     isfs <- Sys.getenv("ISFS",unset=NA)
     if (is.na(isfs)) isfs <- Sys.getenv("ISFF")
 
