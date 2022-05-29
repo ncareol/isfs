@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#! /opt/local/anaconda3/bin/python3
 
 """
 Mount any attached removable data disks and rsync the contents to the
@@ -13,7 +13,6 @@ import os
 import sys
 import re
 import subprocess as sp
-import shutil
 import argparse
 import textwrap
 import collections
@@ -91,6 +90,7 @@ class ReclaimUSB:
         # The path to the rsync destination directory.
         self.dest = None
         self.dryrun = False
+        self.no_uuid = False
 
     def addArgs(self, parser):
         # So all args have src and dest, even though only required by rsync
@@ -107,6 +107,10 @@ class ReclaimUSB:
         prsync.add_argument('--remove', action="store_true", default=False,
                             help="Remove source files after "
                             "synchronizing them.")
+        prsync.add_argument('--no-uuid', dest="no_uuid",
+                            action="store_true", default=False,
+                            help="Do not append device UUID to "
+                            "destination path.")
         prsync.add_argument('src', help=textwrap.dedent("""
         Relative path to source directory on USB stick, 
         such as projects/RELAMPAGO/raw_data"""))
@@ -114,10 +118,11 @@ class ReclaimUSB:
         for op in [plist, pmount, punmount, pclear]:
             op.add_argument('device', nargs='*')
 
-    def dispatch(self, args):
+    def dispatch(self, args: argparse.Namespace):
         self.src = args.src
         self.dest = args.dest
         self.dryrun = args.dryrun
+        self.no_uuid = vars(args).get('no_uuid', self.no_uuid)
         self.loadDevices()
         names = []
         if args.target:
@@ -237,11 +242,20 @@ class ReclaimUSB:
         for device in devices:
             mountpoint = device.mount()
             cmd = ["rsync", "-av"]
+            if self.dryrun:
+                cmd += ["--dry-run"]
             if remove:
                 cmd += ['--remove-source-files']
-            cmd += [os.path.join(mountpoint, self.src) + "/"]
-            cmd += [os.path.join(self.dest, device.uuid)]
-            procs.append(self._run(cmd, asynck=True, capture_output=False))
+            src = os.path.join(mountpoint, self.src)
+            src += "/" if not src.endswith("/") else ""
+            cmd += [src]
+            # Append UUID to the dest path unless disabled.
+            dest = os.path.join(self.dest, device.uuid)
+            if self.no_uuid:
+                dest = self.dest
+            cmd += [dest]
+            procs.append(self._run(cmd, safe=True, asynck=True,
+                                   capture_output=False))
         for i, device in enumerate(devices):
             procs[i].wait()
             device.unmount()
