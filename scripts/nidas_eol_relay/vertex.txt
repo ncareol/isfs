@@ -1,9 +1,0 @@
-NIDAS (ncar.ucar.edu)
-archive version: 1
-software version: v1.2-373
-project name: VERTEX
-system name: ISFS
-config name: $ISFS/projects/$PROJECT/ISFS/config/vertex.xml
-config version: $Revision: 4555 $
-                                                                                                                    
-end header
