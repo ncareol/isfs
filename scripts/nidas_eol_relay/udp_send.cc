@@ -2,6 +2,8 @@
 #include <iostream>
 #include <nidas/util/Socket.h>
 
+#include <unistd.h>
+
 using namespace std;
 
 int main(int argc, char** argv)
